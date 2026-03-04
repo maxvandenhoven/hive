@@ -1,0 +1,27 @@
+{
+    "name": "hive",
+    "dockerComposeFile": "docker-compose.yaml",
+    "service": "devcontainer",
+    "shutdownAction": "stopCompose",
+    "postStartCommand": "make install-pre-commit && make sync-all",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "johnpapa.vscode-peacock",
+                "charliermarsh.ruff",
+                "astral-sh.ty",
+                "Weidav.uv-auto-venv"
+            ],
+            "settings": {
+                "python.terminal.activateEnvironment": false,
+                "python.createEnvironment.contentButton": "hide",
+                "python.useEnvironmentsExtension": false,
+                "ty.inlayHints.callArgumentNames": false,
+                "ty.inlayHints.variableTypes": false,
+                "ty.completions.autoImport": false
+            }
+        }
+    }
+}

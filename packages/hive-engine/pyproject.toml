@@ -1,0 +1,71 @@
+[project]
+name = "hive-engine"
+version = "0.1.0"
+readme = "README.md"
+requires-python = "~=3.13.0"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "pytest>=9.0.2",
+    "ruff>=0.15.4",
+    "ty>=0.0.20",
+]
+
+[tool.ruff]
+line-length = 90
+indent-width = 4
+include = [
+    "src/**",
+    "tests/**",
+]
+exclude = [
+    "notebooks/**",
+]
+
+[tool.ruff.lint]
+select = [
+    "B",  # flake8-bugbear
+    "D",  # pydocstyle
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "I",  # isort
+    "EM",  # flake8-errmsg
+    "T20",  # flake8-print
+    "RET",  # flake8-return
+    "ANN",  # flake8-annotations
+]
+ignore = [
+    "D100",  # Ignore missing docstring in public module
+    "D104",  # Ignore missing docstring in public package
+    "D203",  # Ignore one blank line before class docstring
+    "D213",  # Ignore multi-line docstring start on second line
+    "D400",  # Ignore missing period in docstring first line (also captured by D415)
+    "D413",  # Ignore missing newline after final section in docstring
+    "ANN002",  # Ignore missing *args type annotations
+    "ANN003",  # Ignore missing **kwargs type annotations
+    "ANN401",  # Ignore Any type annotations
+]
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = [
+    "D100",  # Ignore missing docstring in public module
+    "D101",  # Ignore missing docstring in public class
+    "D102",  # Ignore missing docstring in public method
+    "D103",  # Ignore missing docstring in public function
+    "D107",  # Ignore missing docstring in __init__ method
+    "ANN201",  # Ignore missing return type annotation
+]
+"conftest.py" = [
+    "D100",  # Ignore missing docstring in public module
+    "D101",  # Ignore missing docstring in public class
+    "D102",  # Ignore missing docstring in public method
+    "D103",  # Ignore missing docstring in public function
+    "D107",  # Ignore missing docstring in __init__ method
+    "ANN201",  # Ignore missing return type annotation
+]

@@ -1,0 +1,11 @@
+name: hive
+
+services:
+  devcontainer:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    image: hive-devcontainer
+    container_name: hive-devcontainer
+    stdin_open: true 
+    tty: true
