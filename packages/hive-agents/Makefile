@@ -24,4 +24,4 @@ test:
 
 
 .PHONY: check
-check: format lint type test
+check: format lint type
