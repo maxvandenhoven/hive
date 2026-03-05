@@ -4,36 +4,36 @@ install-pre-commit:
 	@pre-commit install --hook-type commit-msg
 
 
-.PHONY: sync-all
-sync-all:
+.PHONY: sync
+sync:
 	@$(MAKE) --no-print-directory --directory=packages/hive-agents sync
 	@$(MAKE) --no-print-directory --directory=packages/hive-engine sync
 	@$(MAKE) --no-print-directory --directory=services/hive-api sync
 
 
-.PHONY: format-all
-format-all:
+.PHONY: format
+format:
 	@$(MAKE) --no-print-directory --directory=packages/hive-agents format
 	@$(MAKE) --no-print-directory --directory=packages/hive-engine format
 	@$(MAKE) --no-print-directory --directory=services/hive-api format
 
 
-.PHONY: lint-all
-lint-all:
+.PHONY: lint
+lint:
 	@$(MAKE) --no-print-directory --directory=packages/hive-agents lint
 	@$(MAKE) --no-print-directory --directory=packages/hive-engine lint
 	@$(MAKE) --no-print-directory --directory=services/hive-api lint
 
 
-.PHONY: type-all
-type-all:
+.PHONY: type
+type:
 	@$(MAKE) --no-print-directory --directory=packages/hive-agents type
 	@$(MAKE) --no-print-directory --directory=packages/hive-engine type
 	@$(MAKE) --no-print-directory --directory=services/hive-api type
 
 
-.PHONY: check-all
-check-all:
+.PHONY: check
+check:
 	@$(MAKE) --no-print-directory --directory=packages/hive-agents check
 	@$(MAKE) --no-print-directory --directory=packages/hive-engine check
 	@$(MAKE) --no-print-directory --directory=services/hive-api check

@@ -4,7 +4,7 @@
     "service": "devcontainer",
     "shutdownAction": "stopCompose",
     "workspaceFolder": "/workspaces/hive",
-    "postStartCommand": "make install-pre-commit && make sync-all",
+    "postStartCommand": "make install-pre-commit && make sync",
     "customizations": {
         "vscode": {
             "extensions": [
