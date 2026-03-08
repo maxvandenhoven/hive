@@ -71,6 +71,21 @@ class Ruleset:
                 )
                 raise ValueError(msg)
 
+    def create_initial_state(self) -> GameState:
+        """Create the initial game state based on the ruleset configuration.
+
+        This method initializes the game state with the starting player and the piece
+        counts for each player as defined in the ruleset.
+
+        Returns
+        -------
+        GameState
+            The initial game state ready for play.
+        """
+        return GameState(
+            starting_player=self.starting_player, piece_type_count=self.piece_type_count
+        )
+
     def get_legal_placement_moves(self, state: GameState) -> list[Move]:
         """Get all legal placement moves for the current player.
 
