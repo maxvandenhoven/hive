@@ -137,6 +137,7 @@ dev = [
     { name = "ruff", specifier = ">=0.15.4" },
     { name = "ty", specifier = ">=0.0.20" },
 ]
+plotting = [{ name = "matplotlib", specifier = ">=3.10.8" }]
 
 [[package]]
 name = "iniconfig"
