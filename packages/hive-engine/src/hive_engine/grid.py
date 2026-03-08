@@ -1,11 +1,3 @@
-"""Hex grid utilities for axial coordinate operations.
-
-This module provides type aliases, constants, and functions for working with hexagonal
-grids using the axial coordinate system in the "pointy top" orientation. It includes
-directions for navigating between neighboring cells, mappings for rotating directions
-clockwise and anti-clockwise, and helper functions for coordinate arithmetic.
-"""
-
 from typing import TypeAlias
 
 Coordinate: TypeAlias = tuple[int, int]
