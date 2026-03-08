@@ -1,6 +1,6 @@
 .PHONY: sync
 sync:
-	@uv sync
+	@uv sync --all-groups
 
 
 .PHONY: format
