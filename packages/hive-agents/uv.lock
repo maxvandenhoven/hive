@@ -96,6 +96,9 @@ wheels = [
 name = "hive-agents"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "hive-engine" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -104,6 +107,22 @@ dev = [
     { name = "ruff" },
     { name = "ty" },
 ]
+
+[package.metadata]
+requires-dist = [{ name = "hive-engine", directory = "../hive-engine" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipykernel", specifier = ">=7.2.0" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "ruff", specifier = ">=0.15.4" },
+    { name = "ty", specifier = ">=0.0.20" },
+]
+
+[[package]]
+name = "hive-engine"
+version = "0.1.0"
+source = { directory = "../hive-engine" }
 
 [package.metadata]
 
