@@ -6,10 +6,10 @@ from hive_engine.grid import HEX_DIRECTIONS, Coordinate, add
 from hive_engine.state import GameState
 
 
-class BaseMovementRule(ABC):
+class MovementRule(ABC):
     """Base class for movement rules that govern how a piece type moves on the board.
 
-    The `Ruleset` class maps each `PieceType` to exactly one `BaseMovementRule` instance
+    The `Ruleset` class maps each `PieceType` to exactly one `MovementRule` instance
     via the `movement_rules` dictionary. When generating legal movement moves,
     `Ruleset.get_legal_movement_moves` iterates over all movable pieces (as determined by
     the mobility rule) and calls `get_target_coords` on the corresponding movement rule
@@ -37,7 +37,7 @@ class BaseMovementRule(ABC):
         """
 
 
-class BaseSlidingMovementRule(BaseMovementRule):
+class BaseSlidingMovementRule(MovementRule):
     """Base class for piece types that slide along the hive surface.
 
     Sliding pieces move by shifting into an unoccupied neighboring coordinate while
@@ -89,7 +89,7 @@ class BaseSlidingMovementRule(BaseMovementRule):
         return slideable_neighbors
 
 
-class DefaultQueenMovementRule(BaseSlidingMovementRule):
+class BaseQueenMovementRule(BaseSlidingMovementRule):
     """Default movement rule for queen pieces.
 
     The queen moves by sliding exactly one space along the hive surface. It can only
@@ -118,7 +118,7 @@ class DefaultQueenMovementRule(BaseSlidingMovementRule):
             return self.get_slideable_neighbors(state, coord)
 
 
-class DefaultBeetleMovementRule(BaseSlidingMovementRule):
+class BaseBeetleMovementRule(BaseSlidingMovementRule):
     """Default movement rule for beetle pieces.
 
     The beetle can either slide one space along the hive surface like the queen, or climb
@@ -155,7 +155,7 @@ class DefaultBeetleMovementRule(BaseSlidingMovementRule):
         return slideable_destinations + climbable_destinations
 
 
-class DefaultGrasshopperMovementRule(BaseMovementRule):
+class BaseGrasshopperMovementRule(MovementRule):
     """Default movement rule for grasshopper pieces.
 
     The grasshopper moves by jumping in a straight line over one or more occupied
@@ -195,7 +195,7 @@ class DefaultGrasshopperMovementRule(BaseMovementRule):
         return destinations
 
 
-class DefaultSpiderMovementRule(BaseSlidingMovementRule):
+class BaseSpiderMovementRule(BaseSlidingMovementRule):
     """Default movement rule for spider pieces.
 
     The spider moves by sliding exactly three spaces along the hive surface. It must take
@@ -250,7 +250,7 @@ class DefaultSpiderMovementRule(BaseSlidingMovementRule):
         return list(destinations)
 
 
-class DefaultAntMovementRule(BaseSlidingMovementRule):
+class BaseAntMovementRule(BaseSlidingMovementRule):
     """Default movement rule for ant pieces.
 
     The ant moves by sliding any number of spaces along the hive surface. It can reach

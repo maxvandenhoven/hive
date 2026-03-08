@@ -4,10 +4,10 @@ from hive_engine.grid import Coordinate
 from hive_engine.state import GameState, PieceType
 
 
-class BasePlacementRule(ABC):
+class PlacementRule(ABC):
     """Base class for placement rules that govern where and which pieces may be placed.
 
-    The `Ruleset` class holds a single `BasePlacementRule` instance. When generating
+    The `Ruleset` class holds a single `PlacementRule` instance. When generating
     legal placement moves via `Ruleset.get_legal_placement_moves`, the ruleset calls
     `get_placeable_coords` to obtain valid board positions and `get_placeable_piece_types`
     to obtain the piece types available for placement. The Cartesian product of these two
@@ -48,7 +48,7 @@ class BasePlacementRule(ABC):
         """
 
 
-class DefaultPlacementRule(BasePlacementRule):
+class BasePlacementRule(PlacementRule):
     """Default placement rule for Hive.
 
     On the very first turn of the game (ply 0), the first player places a piece at the

@@ -5,10 +5,10 @@ from typing_extensions import override
 from hive_engine.state import GameState, Player
 
 
-class BaseTerminationRule(ABC):
+class TerminationRule(ABC):
     """Base class for termination rules that determine when the game ends.
 
-    The `Ruleset` class holds a single `BaseTerminationRule` instance. The methods
+    The `Ruleset` class holds a single `TerminationRule` instance. The methods
     `Ruleset.get_winning_players` and `Ruleset.is_finished` delegate directly to
     `get_winning_players` on the termination rule. The ruleset considers the game
     finished whenever `get_winning_players` returns a non-`None` value.
@@ -34,7 +34,7 @@ class BaseTerminationRule(ABC):
         """
 
 
-class DefaultTerminationRule(BaseTerminationRule):
+class BaseTerminationRule(TerminationRule):
     """Default termination rule for Hive.
 
     The game ends when at least one player's queen is completely surrounded by pieces

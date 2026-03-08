@@ -6,14 +6,14 @@ from hive_engine.grid import Coordinate
 from hive_engine.state import GameState, PieceType
 
 
-class BaseMobilityRule(ABC):
+class MobilityRule(ABC):
     """Base class for mobility rules that determine which pieces may move.
 
-    The `Ruleset` class holds a single `BaseMobilityRule` instance. When generating legal
+    The `Ruleset` class holds a single `MobilityRule` instance. When generating legal
     movement moves via `Ruleset.get_legal_movement_moves`, the ruleset calls
     `get_movable_pieces` to obtain the list of pieces that are eligible to move. Each
     returned coordinate and piece type is then passed to the corresponding
-    `BaseMovementRule` to determine the specific target coordinates.
+    `MovementRule` to determine the specific target coordinates.
 
     Subclasses must implement `get_movable_pieces` to define the criteria under which a
     piece on the board is allowed to move.
@@ -36,7 +36,7 @@ class BaseMobilityRule(ABC):
         """
 
 
-class DefaultMobilityRule(BaseMobilityRule):
+class BaseMobilityRule(MobilityRule):
     """Default mobility rule for Hive.
 
     A piece belonging to the current player may move if all of the following conditions

@@ -1,7 +1,7 @@
-from hive_engine.rules.mobility import BaseMobilityRule
-from hive_engine.rules.movement import BaseMovementRule
-from hive_engine.rules.placement import BasePlacementRule
-from hive_engine.rules.termination import BaseTerminationRule
+from hive_engine.rules.mobility import MobilityRule
+from hive_engine.rules.movement import MovementRule
+from hive_engine.rules.placement import PlacementRule
+from hive_engine.rules.termination import TerminationRule
 from hive_engine.state import GameState, Move, PieceType, Player
 
 
@@ -15,10 +15,10 @@ class Ruleset:
 
     def __init__(
         self,
-        mobility_rule: BaseMobilityRule,
-        movement_rules: dict[PieceType, BaseMovementRule],
-        placement_rule: BasePlacementRule,
-        termination_rule: BaseTerminationRule,
+        mobility_rule: MobilityRule,
+        movement_rules: dict[PieceType, MovementRule],
+        placement_rule: PlacementRule,
+        termination_rule: TerminationRule,
         piece_type_count: dict[PieceType, int],
         starting_player: Player = Player.WHITE,
     ) -> None:
@@ -26,14 +26,14 @@ class Ruleset:
 
         Parameters
         ----------
-        mobility_rule : BaseMobilityRule
+        mobility_rule : MobilityRule
             The rule that determines which pieces on the board are allowed to move.
-        movement_rules : dict[PieceType, BaseMovementRule]
+        movement_rules : dict[PieceType, MovementRule]
             A mapping from each piece type to the rule that governs how that piece type
             moves on the board.
-        placement_rule : BasePlacementRule
+        placement_rule : PlacementRule
             The rule that determines where and which pieces are allowed to be placed.
-        termination_rule : BaseTerminationRule
+        termination_rule : TerminationRule
             The rule that determines when the game ends and which player(s) win.
         piece_type_count : dict[PieceType, int]
             A mapping from each piece type to the number of copies each player receives
