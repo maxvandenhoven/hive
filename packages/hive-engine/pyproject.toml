@@ -32,6 +32,7 @@ include = [
 ]
 exclude = [
     "notebooks/**",
+    "*.png",
 ]
 
 [tool.ruff.lint]
