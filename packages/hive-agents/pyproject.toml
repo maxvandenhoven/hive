@@ -4,7 +4,7 @@ version = "0.1.0"
 readme = "README.md"
 requires-python = "~=3.13.0"
 dependencies = [
-    "hive-engine",
+    "hive-engine[plotting]",
 ]
 
 [build-system]
