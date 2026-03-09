@@ -168,6 +168,7 @@ dev = [
 ]
 plotting = [
     { name = "matplotlib" },
+    { name = "pillow" },
 ]
 
 [package.metadata]
@@ -180,7 +181,10 @@ dev = [
     { name = "ruff", specifier = ">=0.15.4" },
     { name = "ty", specifier = ">=0.0.20" },
 ]
-plotting = [{ name = "matplotlib", specifier = ">=3.10.8" }]
+plotting = [
+    { name = "matplotlib", specifier = ">=3.10.8" },
+    { name = "pillow", specifier = ">=12.1.1" },
+]
 
 [[package]]
 name = "iniconfig"
