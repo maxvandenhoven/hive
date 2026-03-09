@@ -18,6 +18,8 @@ dev = [
     "ruff>=0.15.4",
     "ty>=0.0.20",
 ]
+
+[project.optional-dependencies]
 plotting = [
     "matplotlib>=3.10.8",
     "pillow>=12.1.1",

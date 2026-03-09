@@ -159,6 +159,12 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 
+[package.optional-dependencies]
+plotting = [
+    { name = "matplotlib" },
+    { name = "pillow" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "ipykernel" },
@@ -166,13 +172,14 @@ dev = [
     { name = "ruff" },
     { name = "ty" },
 ]
-plotting = [
-    { name = "matplotlib" },
-    { name = "pillow" },
-]
 
 [package.metadata]
-requires-dist = [{ name = "typing-extensions", specifier = ">=4.15.0" }]
+requires-dist = [
+    { name = "matplotlib", marker = "extra == 'plotting'", specifier = ">=3.10.8" },
+    { name = "pillow", marker = "extra == 'plotting'", specifier = ">=12.1.1" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
+]
+provides-extras = ["plotting"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -180,10 +187,6 @@ dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "ruff", specifier = ">=0.15.4" },
     { name = "ty", specifier = ">=0.0.20" },
-]
-plotting = [
-    { name = "matplotlib", specifier = ">=3.10.8" },
-    { name = "pillow", specifier = ">=12.1.1" },
 ]
 
 [[package]]
