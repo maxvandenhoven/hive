@@ -44,6 +44,17 @@ class BaseTerminationRule(TerminationRule):
     is surrounded, the game continues.
     """
 
+    def __init__(self, max_turns_per_player: int | None = None) -> None:
+        """Initialize the base termination rule.
+
+        Parameters
+        ----------
+        max_turns_per_player : int | None, optional
+            The maximum number of turns per player before the game is considered a draw,
+            by default `None` (no turn limit).
+        """
+        self.max_turns_per_player = max_turns_per_player
+
     @override
     def get_winning_players(self, state: GameState) -> list[Player] | None:
         """Determine the winning players based on the current game state.
@@ -59,6 +70,13 @@ class BaseTerminationRule(TerminationRule):
             A list of winning players if the game has ended, or `None` if the game is
             still in progress. A list containing both players indicates a draw.
         """
+        # The ply counts moves across all players, so the total number of allowed plies
+        # is twice the max turns per player. A draw may be made in the final allowed
+        # turn, so the game only ends in a draw if the ply count exceeds this total.
+        if self.max_turns_per_player is not None:
+            if state.current_ply > 2 * self.max_turns_per_player:
+                return [Player.WHITE, Player.BLACK]
+
         winning_players: list[Player] = []
 
         for player in Player:
