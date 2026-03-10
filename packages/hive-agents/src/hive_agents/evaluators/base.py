@@ -70,5 +70,5 @@ class WeightedCompositeEvaluator(Evaluator):
         score = 0.0
         for evaluator, weight in self.components:
             score += weight * evaluator.evaluate(state, player)
-            
+
         return score

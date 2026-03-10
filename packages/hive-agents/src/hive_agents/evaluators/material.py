@@ -51,9 +51,7 @@ class MaterialOnBoardEvaluator(Evaluator):
         scores: dict[Player, float] = {Player.WHITE: 0.0, Player.BLACK: 0.0}
         for coord in state.get_occupied_coords():
             for piece in state.board[coord]:
-                scores[piece.owner] += self.piece_values.get(
-                    piece.type, 0.0
-                )
+                scores[piece.owner] += self.piece_values.get(piece.type, 0.0)
 
         return scores[player] - scores[player.opponent]
 

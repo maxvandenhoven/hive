@@ -75,5 +75,5 @@ class MobilityEvaluator(Evaluator):
         """
         player_moves = self._count_legal_moves(state, player)
         opponent_moves = self._count_legal_moves(state, player.opponent)
-        
+
         return float(player_moves - opponent_moves)

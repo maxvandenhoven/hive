@@ -33,7 +33,7 @@ class MinimaxAgent(Agent):
         self.depth = depth
 
     def _minimax(
-        self, state: GameState, depth: int, root_player: Player,
+        self, state: GameState, depth: int, root_player: Player
     ) -> tuple[float, Move | None]:
         """Recursively search the game tree using minimax.
 
@@ -79,7 +79,7 @@ class MinimaxAgent(Agent):
             if score < min_score:
                 min_score = score
                 best_move = move
-                
+
         return min_score, best_move
 
     @override
@@ -187,7 +187,7 @@ class AlphaBetaMinimaxAgent(Agent):
             beta = min(beta, score)
             if alpha >= beta:
                 break
-        
+
         return min_score, best_move
 
     @override
