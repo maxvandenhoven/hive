@@ -10,19 +10,15 @@ from hive_agents.base import Agent
 class RandomAgent(Agent):
     """Agent that selects moves uniformly at random from the set of legal moves."""
 
-    def __init__(self, ruleset: Ruleset, exclude_pass: bool = True) -> None:
+    def __init__(self, ruleset: Ruleset) -> None:
         """Initialize the random agent.
 
         Parameters
         ----------
         ruleset : Ruleset
             The ruleset governing the game.
-        exclude_pass : bool, optional
-            Whether to exlucde passing from the set of legal moves if possible, by
-            default `True`. If passing is the only legal move, it will still be selected.
         """
         self.ruleset = ruleset
-        self.exclude_pass = exclude_pass
 
     @override
     def choose_move(self, state: GameState) -> Move | None:
@@ -36,11 +32,7 @@ class RandomAgent(Agent):
         Returns
         -------
         Move | None
-            A randomly selected legal move, or `None` if there are no legal moves.
+            A randomly selected legal move, or `None` if passing is the only option.
         """
-        legal_moves = set(self.ruleset.get_legal_moves(state))
-
-        if len(legal_moves) >= 2 and self.exclude_pass:
-            legal_moves.discard(None)
-
-        return random.choice(list(legal_moves))
+        legal_moves = self.ruleset.get_legal_moves(state)
+        return legal_moves[random.randrange(len(legal_moves))]

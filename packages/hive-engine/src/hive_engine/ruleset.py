@@ -145,9 +145,9 @@ class Ruleset:
         """Get all legal moves for the current player, including a pass.
 
         Combines the results of `get_legal_placement_moves` and
-        `get_legal_movement_moves`. If there are no legal moves, the returned list will 
+        `get_legal_movement_moves`. If there are no legal moves, the returned list will
         contain only `None` to represent a pass.
-        
+
         and always includes `None` as the first element to
         represent a pass move.
 
@@ -159,7 +159,7 @@ class Ruleset:
         Returns
         -------
         list[Move | None]
-            A list of all legal moves. May contain `None` if there are no legal moves, 
+            A list of all legal moves. May contain `None` if there are no legal moves,
             representing a pass. The remaining elements are placement and movement moves.
         """
         moves: list[Move | None] = []
