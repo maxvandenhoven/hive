@@ -168,7 +168,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "hive-engine", extras = ["plotting"], directory = "../hive-engine" }]
+requires-dist = [{ name = "hive-engine", extras = ["plotting"], editable = "../hive-engine" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -181,7 +181,7 @@ dev = [
 [[package]]
 name = "hive-engine"
 version = "0.1.0"
-source = { directory = "../hive-engine" }
+source = { editable = "../hive-engine" }
 dependencies = [
     { name = "typing-extensions" },
 ]
