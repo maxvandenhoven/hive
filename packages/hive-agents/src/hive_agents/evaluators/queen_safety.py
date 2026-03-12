@@ -1,3 +1,4 @@
+from hive_engine.grid import get_neighbors
 from hive_engine.state import GameState, Player
 from typing_extensions import override
 
@@ -33,7 +34,7 @@ class QueenSafetyEvaluator(Evaluator):
             return 0.0
 
         occupied_count = 0.0
-        for neighbor_coord in state.get_neighbors(queen_coord):
+        for neighbor_coord in get_neighbors(queen_coord):
             if state.is_occupied(neighbor_coord):
                 occupied_count += 1.0
 

@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import TypeAlias
 
 Coordinate: TypeAlias = tuple[int, int]
@@ -66,6 +67,27 @@ def add(coord: Coordinate, direction: Direction) -> Coordinate:
         The new axial coordinate `(q + dq, r + dr)`.
     """
     return (coord[0] + direction[0], coord[1] + direction[1])
+
+
+@lru_cache(maxsize=None)
+def get_neighbors(coord: Coordinate) -> tuple[Coordinate, ...]:
+    """Get the six coordinates that directly neighbor the reference coordinate.
+
+    The result is cached indefinitely — neighbor sets depend only on the coordinate and
+    are the same for every board position, so the cache never needs to be invalidated. The
+    returned tuple must not be modified by callers.
+
+    Parameters
+    ----------
+    coord : Coordinate
+        The axial coordinate `(q, r)` to get the neighbors for.
+
+    Returns
+    -------
+    tuple[Coordinate, ...]
+        The six axial coordinates `(q', r')` that directly neighbor `(q, r)`.
+    """
+    return tuple(add(coord, direction) for direction in HEX_DIRECTIONS)
 
 
 def get_anti_clockwise_direction(direction: Direction) -> Direction:

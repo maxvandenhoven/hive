@@ -1,3 +1,4 @@
+from hive_engine.grid import get_neighbors
 from hive_engine.state import GameState, Player
 from typing_extensions import override
 
@@ -34,7 +35,7 @@ class PositioningEvaluator(Evaluator):
             return 0.0
 
         pressure = 0.0
-        for neighbor_coord in state.get_neighbors(queen_coord):
+        for neighbor_coord in get_neighbors(queen_coord):
             if state.is_occupied(neighbor_coord):
                 top_piece = state.get_top_piece(neighbor_coord)
                 if top_piece.owner == attacker:

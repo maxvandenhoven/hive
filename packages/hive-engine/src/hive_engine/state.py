@@ -4,12 +4,12 @@ from enum import IntEnum
 from typing import Generator, TypeAlias
 
 from hive_engine.grid import (
-    HEX_DIRECTIONS,
     Coordinate,
     add,
     get_anti_clockwise_direction,
     get_clockwise_direction,
     get_direction,
+    get_neighbors,
 )
 
 
@@ -145,7 +145,7 @@ class GameState:
         boundary_coords: set[Coordinate] = set()
         occupied_coords = self.get_occupied_coords()
         for occupied_coord in occupied_coords:
-            neighbor_coords = self.get_neighbors(occupied_coord)
+            neighbor_coords = get_neighbors(occupied_coord)
             for neighbor_coord in neighbor_coords:
                 if not self.is_occupied(neighbor_coord):
                     boundary_coords.add(neighbor_coord)
@@ -179,21 +179,6 @@ class GameState:
                 self.board[coord] = []
             self.board[coord].append(lifted_piece)
 
-    def get_neighbors(self, coord: Coordinate) -> list[Coordinate]:
-        """Get the coordinates that directly neighbor the reference coordinate.
-
-        Parameters
-        ----------
-        coord : Coordinate
-            The axial coordinate `(q, r)` to get the neighbors for.
-
-        Returns
-        -------
-        list[Coordinate]
-            The six axial coordinates `(q', r')` that directly neighbor `(q, r)`.
-        """
-        return [add(coord, direction) for direction in HEX_DIRECTIONS]
-
     def is_surrounded(self, coord: Coordinate) -> bool:
         """Check whether a coordinate is surrounded by other pieces.
 
@@ -208,7 +193,7 @@ class GameState:
             True if the coordinate to check has six occupied neighbors, otherwise False.
         """
         occupied_neighbor_count = 0
-        for neighbor_coord in self.get_neighbors(coord):
+        for neighbor_coord in get_neighbors(coord):
             if self.is_occupied(neighbor_coord):
                 occupied_neighbor_count += 1
 
@@ -323,7 +308,7 @@ class GameState:
 
         while stack:
             candidate_coord = stack.pop()
-            for neighbor_coord in self.get_neighbors(candidate_coord):
+            for neighbor_coord in get_neighbors(candidate_coord):
                 if neighbor_coord in occupied_coords and neighbor_coord not in seen:
                     seen.add(neighbor_coord)
                     stack.append(neighbor_coord)
@@ -377,7 +362,7 @@ class GameState:
             The players that own pieces directly neighboring the given coordinate.
         """
         owners: set[Player] = set()
-        for neighbor_coord in self.get_neighbors(coord):
+        for neighbor_coord in get_neighbors(coord):
             if self.is_occupied(neighbor_coord):
                 top_piece = self.get_top_piece(neighbor_coord)
                 owners.add(top_piece.owner)

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from hive_engine.grid import Coordinate
+from hive_engine.grid import Coordinate, get_neighbors
 from hive_engine.state import GameState, PieceType
 
 
@@ -90,7 +90,7 @@ class BasePlacementRule(PlacementRule):
             return [(0, 0)]
 
         if state.current_ply == 1:
-            return state.get_neighbors((0, 0))
+            return get_neighbors((0, 0))
 
         placeable_coords = set()
         for coord in state.get_occupied_coords():
@@ -98,7 +98,7 @@ class BasePlacementRule(PlacementRule):
             if top_piece.owner != state.current_player:
                 continue
 
-            for neighbor in state.get_neighbors(coord):
+            for neighbor in get_neighbors(coord):
                 if state.is_occupied(neighbor):
                     continue
 

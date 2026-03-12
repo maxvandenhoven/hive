@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from typing_extensions import override
 
-from hive_engine.grid import HEX_DIRECTIONS, Coordinate, add
+from hive_engine.grid import HEX_DIRECTIONS, Coordinate, add, get_neighbors
 from hive_engine.state import GameState
 
 
@@ -71,7 +71,7 @@ class BaseSlidingMovementRule(MovementRule):
             The neighboring coordinates that satisfy all sliding constraints.
         """
         slideable_neighbors: list[Coordinate] = []
-        for neighbor_coord in state.get_neighbors(coord):
+        for neighbor_coord in get_neighbors(coord):
             if state.is_occupied(neighbor_coord):
                 continue
 
@@ -80,7 +80,7 @@ class BaseSlidingMovementRule(MovementRule):
 
             if not any(
                 state.is_occupied(other_neighbor_coord)
-                for other_neighbor_coord in state.get_neighbors(neighbor_coord)
+                for other_neighbor_coord in get_neighbors(neighbor_coord)
             ):
                 continue
 
@@ -148,7 +148,7 @@ class BaseBeetleMovementRule(BaseSlidingMovementRule):
             slideable_destinations = self.get_slideable_neighbors(state, coord)
 
             climbable_destinations: list[Coordinate] = []
-            for neighbor_coord in state.get_neighbors(coord):
+            for neighbor_coord in get_neighbors(coord):
                 if state.is_occupied(neighbor_coord):
                     climbable_destinations.append(neighbor_coord)
 
