@@ -520,11 +520,11 @@ class GameState:
         move : Move | None
             The move to undo, or `None` if the previous turn was a pass.
         """
+        self.current_ply -= 1
+        self.current_player = self.current_player.opponent
+
         if move is not None:
             if move.source_coord is None:
                 self.undo_placement(move)
             else:
                 self.undo_movement(move)
-
-        self.current_ply -= 1
-        self.current_player = self.current_player.opponent
