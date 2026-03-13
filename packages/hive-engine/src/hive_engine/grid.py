@@ -70,12 +70,12 @@ def add(coord: Coordinate, direction: Direction) -> Coordinate:
 
 
 @lru_cache(maxsize=None)
-def get_neighbors(coord: Coordinate) -> tuple[Coordinate, ...]:
+def get_neighbors(coord: Coordinate) -> list[Coordinate]:
     """Get the six coordinates that directly neighbor the reference coordinate.
 
     The result is cached indefinitely — neighbor sets depend only on the coordinate and
     are the same for every board position, so the cache never needs to be invalidated. The
-    returned tuple must not be modified by callers.
+    returned list must not be modified by callers.
 
     Parameters
     ----------
@@ -84,10 +84,10 @@ def get_neighbors(coord: Coordinate) -> tuple[Coordinate, ...]:
 
     Returns
     -------
-    tuple[Coordinate, ...]
+    list[Coordinate]
         The six axial coordinates `(q', r')` that directly neighbor `(q, r)`.
     """
-    return tuple(add(coord, direction) for direction in HEX_DIRECTIONS)
+    return [add(coord, direction) for direction in HEX_DIRECTIONS]
 
 
 def get_anti_clockwise_direction(direction: Direction) -> Direction:
