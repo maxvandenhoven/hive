@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Generator, TypeAlias
+from typing import Generator, Iterator, TypeAlias
 
 from hive_engine.grid import (
     Coordinate,
@@ -271,6 +271,108 @@ class GameState:
             The axial coordinates `(q, r)` that have at least one piece on the board.
         """
         return set(self.board.keys())
+
+    def get_articulation_points(self) -> set[Coordinate]:
+        """Find all coordinates whose removal would disconnect the board.
+
+        Uses Tarjan's articulation point algorithm to identify articulation points in
+        linear time. A coordinate is an articulation point if removing it would split the
+        remaining occupied coordinates into two or more disconnected components.
+        Coordinates with a stack height greater than one are excluded, as removing the
+        top piece still leaves the coordinate occupied.
+
+        Returns
+        -------
+        set[Coordinate]
+            The set of coordinates whose removal would disconnect the board.
+        """
+        occupied_coords = self.get_occupied_coords()
+
+        # A board with two or fewer pieces can never be disconnected by # removing a
+        # single piece.
+        if len(occupied_coords) <= 2:
+            return set()
+
+        # Tarjan's articulation point algorithm using an iterative DFS. Each coordinate
+        # is assigned a discovery time and a low value. The low value tracks the earliest
+        # discovered coordinate reachable from the subtree.
+        discovery_times: dict[Coordinate, int] = {}
+        low_values: dict[Coordinate, int] = {}
+        parent_coords: dict[Coordinate, Coordinate | None] = {}
+        child_counts: dict[Coordinate, int] = {}
+        articulation_coords: set[Coordinate] = set()
+
+        start_coord: Coordinate = next(iter(occupied_coords))
+        time_counter = 0
+
+        discovery_times[start_coord] = time_counter
+        low_values[start_coord] = time_counter
+        parent_coords[start_coord] = None
+        child_counts[start_coord] = 0
+        time_counter += 1
+
+        # Maintain a per-coordinate neighbor iterator so that the DFS can resume
+        # processing neighbors after returning from a simulated recursive call.
+        neighbor_iters: dict[Coordinate, Iterator[Coordinate]] = {
+            start_coord: iter(get_neighbors(start_coord)),
+        }
+        stack: list[Coordinate] = [start_coord]
+
+        while stack:
+            current_coord = stack[-1]
+            advanced = False
+
+            for neighbor_coord in neighbor_iters[current_coord]:
+                if neighbor_coord not in occupied_coords:
+                    continue
+
+                # Tree edge: visit the unvisited neighbor.
+                if neighbor_coord not in discovery_times:
+                    parent_coords[neighbor_coord] = current_coord
+                    discovery_times[neighbor_coord] = time_counter
+                    low_values[neighbor_coord] = time_counter
+                    child_counts[neighbor_coord] = 0
+                    time_counter += 1
+
+                    neighbor_iters[neighbor_coord] = iter(get_neighbors(neighbor_coord))
+                    stack.append(neighbor_coord)
+                    advanced = True
+
+                    break
+
+                # Back edge: update the low value.
+                if neighbor_coord != parent_coords[current_coord]:
+                    low_values[current_coord] = min(
+                        low_values[current_coord], discovery_times[neighbor_coord]
+                    )
+
+            # All neighbors have been processed; backtrack.
+            if not advanced:
+                stack.pop()
+                if stack:
+                    parent_coord = stack[-1]
+                    low_values[parent_coord] = min(
+                        low_values[parent_coord], low_values[current_coord]
+                    )
+                    child_counts[parent_coord] += 1
+
+                    # Root of the DFS tree: articulation point if it has two or more
+                    # children in the DFS tree.
+                    if parent_coords[parent_coord] is None:
+                        if child_counts[parent_coord] >= 2:
+                            articulation_coords.add(parent_coord)
+
+                    # Non-root: articulation point if no vertex in the subtree rooted at
+                    # the child can reach an ancestor of the parent.
+                    else:
+                        if low_values[current_coord] >= discovery_times[parent_coord]:
+                            articulation_coords.add(parent_coord)
+
+        # Coordinates with multiple stacked pieces remain occupied after removing the top
+        # piece, so they cannot disconnect the board.
+        return {
+            coord for coord in articulation_coords if self.get_stack_height(coord) == 1
+        }
 
     def is_connected_after_removing(self, coord: Coordinate) -> bool:
         """Check if the game board remains connected after removing a piece.

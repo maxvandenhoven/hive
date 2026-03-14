@@ -77,15 +77,16 @@ class BaseMobilityRule(MobilityRule):
         ):
             return []
 
-        movable_pieces: list[tuple[Coordinate, PieceType]] = []
+        articulation_points = state.get_articulation_points()
 
+        movable_pieces: list[tuple[Coordinate, PieceType]] = []
         for coord in state.get_occupied_coords():
             top_piece = state.get_top_piece(coord)
 
             if top_piece.owner != state.current_player:
                 continue
 
-            if not state.is_connected_after_removing(coord):
+            if coord in articulation_points:
                 continue
 
             movable_pieces.append((coord, top_piece.type))
