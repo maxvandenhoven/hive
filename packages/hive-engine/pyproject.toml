@@ -23,6 +23,7 @@ dev = [
 plotting = [
     "matplotlib>=3.10.8",
     "pillow>=12.1.1",
+    "drawsvg>=2.4.1",
 ]
 
 [tool.ruff]
@@ -35,6 +36,7 @@ include = [
 exclude = [
     "notebooks/**",
     "*.png",
+    "*.svg",
 ]
 
 [tool.ruff.lint]
