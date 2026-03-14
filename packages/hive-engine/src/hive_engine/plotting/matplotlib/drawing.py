@@ -1,14 +1,18 @@
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from hive_engine.plotting.constants import (
+from hive_engine.plotting.matplotlib.constants import (
     PIECE_LABELS,
     PLAYER_COLORS,
     PLAYER_NAMES,
     PLAYER_TEXT_COLORS,
     load_sprite,
 )
-from hive_engine.plotting.geometry import HexOrientation, axial_to_pixel, get_hex_verts
+from hive_engine.plotting.matplotlib.geometry import (
+    HexOrientation,
+    axial_to_pixel,
+    get_hex_verts,
+)
 from hive_engine.state import Coordinate, GameState, PieceType, Player
 
 

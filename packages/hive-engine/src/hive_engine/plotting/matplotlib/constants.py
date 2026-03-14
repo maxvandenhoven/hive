@@ -52,7 +52,7 @@ def load_sprite(piece_type: PieceType, resolution: int = 256) -> np.ndarray:
     np.ndarray
         An RGBA image array of shape `(resolution, resolution, 4)`.
     """
-    sprite_folder = importlib.resources.files("hive_engine.assets")
+    sprite_folder = importlib.resources.files("hive_engine.assets.png")
     sprite_path = sprite_folder.joinpath(SPRITE_FILENAMES[piece_type])
 
     image = Image.open(str(sprite_path)).convert("RGBA")
