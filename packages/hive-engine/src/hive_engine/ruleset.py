@@ -103,9 +103,12 @@ class Ruleset:
             A list of all legal placement moves. Each move has `source_coord` set to
             `None`.
         """
+        placeable_coords = self.placement_rule.get_placeable_coords(state=state)
+        placeable_piece_types = self.placement_rule.get_placeable_piece_types(state=state)
+
         moves: list[Move] = []
-        for coord in self.placement_rule.get_placeable_coords(state=state):
-            for piece_type in self.placement_rule.get_placeable_piece_types(state=state):
+        for coord in placeable_coords:
+            for piece_type in placeable_piece_types:
                 moves.append(
                     Move(piece_type=piece_type, source_coord=None, target_coord=coord)
                 )
