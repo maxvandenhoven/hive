@@ -214,6 +214,7 @@ provides-extras = ["plotting"]
 dev = [
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.15.4" },
     { name = "ty", specifier = ">=0.0.20" },
 ]
