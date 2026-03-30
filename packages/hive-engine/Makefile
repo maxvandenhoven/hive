@@ -20,7 +20,7 @@ type:
 
 .PHONY: test
 test:
-	@uv run pytest
+	@uv run pytest --cov src
 
 
 .PHONY: check
