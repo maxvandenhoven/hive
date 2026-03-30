@@ -9,9 +9,9 @@ from hive_engine.grid import (
 
 
 class TestAdd:
-    """Test the add function."""
+    """Test the `add` coordinate addition."""
 
-    def test_add_basic(self):
+    def test_coordinate_addition(self):
         """Test that adding two coordinates produces the correct result."""
         assert add((0, 0), (0, 0)) == (0, 0)
         assert add((0, 0), (1, 0)) == (1, 0)
@@ -19,20 +19,20 @@ class TestAdd:
 
 
 class TestNeighbors:
-    """Test the get_neighbors function."""
+    """Test the `get_neighbors` neighbor lookup."""
 
-    def test_get_neighbors_count(self):
+    def test_neighbor_count(self):
         """Test that exactly six neighbors are returned."""
         neighbors = get_neighbors((0, 0))
         assert len(neighbors) == 6
 
-    def test_get_neighbors_correct_positions(self):
+    def test_neighbor_positions(self):
         """Test that the correct six neighbors are returned for the origin."""
         neighbors = get_neighbors((0, 0))
         expected = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)]
         assert set(neighbors) == set(expected)
 
-    def test_get_neighbors_cached_identity(self):
+    def test_cached_identity(self):
         """Test that repeated calls with the same coordinate return the same object."""
         n1 = get_neighbors((0, 0))
         n2 = get_neighbors((0, 0))
@@ -58,39 +58,39 @@ class TestDirectionRotation:
             current_direction = get_clockwise_direction(current_direction)
         assert current_direction == start_direction
 
-    def test_clockwise_vs_anticlockwise_inverse(self):
+    def test_clockwise_then_anticlockwise(self):
         """Test that clockwise and anti-clockwise rotations are inverses."""
         for direction in HEX_DIRECTIONS:
-            new_direction = get_clockwise_direction(direction)
-            original_direction = get_anti_clockwise_direction(new_direction)
-            assert original_direction == direction
+            rotated = get_clockwise_direction(direction)
+            restored = get_anti_clockwise_direction(rotated)
+            assert restored == direction
 
-    def test_anticlockwise_vs_clockwise_inverse(self):
+    def test_anticlockwise_then_clockwise(self):
         """Test that anti-clockwise and clockwise rotations are inverses."""
         for direction in HEX_DIRECTIONS:
-            new_direction = get_anti_clockwise_direction(direction)
-            original_direction = get_clockwise_direction(new_direction)
-            assert original_direction == direction
+            rotated = get_anti_clockwise_direction(direction)
+            restored = get_clockwise_direction(rotated)
+            assert restored == direction
 
 
 class TestGetDirection:
-    """Test the get_direction function."""
+    """Test the `get_direction` direction calculation."""
 
-    def test_get_direction_basic(self):
+    def test_basic_directions(self):
         """Test basic direction calculations."""
         assert get_direction((0, 0), (1, 0)) == (1, 0)
         assert get_direction((0, 0), (1, -1)) == (1, -1)
         assert get_direction((2, 3), (1, 3)) == (-1, 0)
         assert get_direction((2, 3), (2, 4)) == (0, 1)
 
-    def test_get_direction_inverse_of_add(self):
-        """Test that get_direction is the inverse of add."""
+    def test_inverse_of_add(self):
+        """Test that `get_direction` is the inverse of `add`."""
         source_coord = (5, -2)
         for direction in HEX_DIRECTIONS:
             target_coord = add(source_coord, direction)
             computed_direction = get_direction(source_coord, target_coord)
             assert computed_direction == direction
 
-    def test_direction_not_limited_to_neighbors(self):
-        """Test that get_direction works for non-neighboring coordinates."""
+    def test_non_neighboring_coordinates(self):
+        """Test that `get_direction` works for non-neighboring coordinates."""
         assert get_direction((0, 0), (2, -2)) == (2, -2)
