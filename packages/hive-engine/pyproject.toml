@@ -81,3 +81,9 @@ ignore = [
     "D107",  # Ignore missing docstring in __init__ method
     "ANN201",  # Ignore missing return type annotation
 ]
+
+[tool.coverage.run]
+omit = [
+  "src/hive_engine/assets/*",
+  "src/hive_engine/plotting/*",
+]
