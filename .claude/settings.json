@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "make format lint",
+            "timeout": 60,
+            "statusMessage": "Formatting and linting..."
+          }
+        ]
+      }
+    ]
+  }
+}
