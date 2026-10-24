@@ -1,4 +1,4 @@
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntEnum
@@ -92,7 +92,7 @@ class GameState:
 
     def __init__(
         self,
-        piece_type_count: dict[PieceType, int],
+        piece_type_count: Mapping[PieceType, int],
         starting_player: Player = Player.WHITE,
     ) -> None:
         """Initialize a new game state.
@@ -108,8 +108,8 @@ class GameState:
         self.current_ply = 0
 
         self.hand: dict[Player, dict[PieceType, int]] = {
-            Player.WHITE: piece_type_count.copy(),
-            Player.BLACK: piece_type_count.copy(),
+            Player.WHITE: dict(piece_type_count),
+            Player.BLACK: dict(piece_type_count),
         }
 
         self.queen_coord: dict[Player, Coordinate | None] = {

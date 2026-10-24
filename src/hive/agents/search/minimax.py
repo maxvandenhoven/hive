@@ -3,7 +3,7 @@ from typing import override
 
 from hive.agents.base import Agent
 from hive.agents.evaluators.base import Evaluator
-from hive.engine.ruleset import Ruleset
+from hive.engine.rules import Rules
 from hive.engine.state import GameState, Move, Player
 
 
@@ -15,15 +15,15 @@ class MinimaxAgent(Agent):
     provided evaluator to score leaf positions.
     """
 
-    def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
+    def __init__(self, rules: Rules, evaluator: Evaluator, depth: int) -> None:
         """Initialize the minimax agent.
 
         Args:
-            ruleset: The ruleset governing the game.
+            rules: The rules governing the game.
             evaluator: The position evaluator used to score leaf nodes.
             depth: The maximum search depth in plies.
         """
-        self.ruleset = ruleset
+        self.rules = rules
         self.evaluator = evaluator
         self.depth = depth
 
@@ -42,7 +42,7 @@ class MinimaxAgent(Agent):
             The best score and the corresponding move. The move is `None` at leaf nodes or
             when the best action is to pass.
         """
-        if depth == 0 or self.ruleset.is_finished(state):
+        if depth == 0 or self.rules.is_finished(state):
             return self.evaluator.evaluate(state, root_player), None
 
         best_move: Move | None = None
@@ -51,7 +51,7 @@ class MinimaxAgent(Agent):
         # it is at the root of the tree, maximize the score from child nodes.
         if state.current_player == root_player:
             max_score = -math.inf
-            for move in self.ruleset.get_legal_moves(state):
+            for move in self.rules.legal_moves(state):
                 state.apply_move(move)
                 score, _ = self._minimax(state, depth - 1, root_player)
                 state.undo_move(move)
@@ -62,7 +62,7 @@ class MinimaxAgent(Agent):
             return max_score, best_move
 
         min_score = math.inf
-        for move in self.ruleset.get_legal_moves(state):
+        for move in self.rules.legal_moves(state):
             state.apply_move(move)
             score, _ = self._minimax(state, depth - 1, root_player)
             state.undo_move(move)
@@ -95,15 +95,15 @@ class AlphaBetaMinimaxAgent(Agent):
     decision, significantly reducing the number of nodes evaluated.
     """
 
-    def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
+    def __init__(self, rules: Rules, evaluator: Evaluator, depth: int) -> None:
         """Initialize the alpha-beta minimax agent.
 
         Args:
-            ruleset: The ruleset governing the game.
+            rules: The rules governing the game.
             evaluator: The position evaluator used to score leaf nodes.
             depth: The maximum search depth in plies.
         """
-        self.ruleset = ruleset
+        self.rules = rules
         self.evaluator = evaluator
         self.depth = depth
 
@@ -124,14 +124,14 @@ class AlphaBetaMinimaxAgent(Agent):
             The best score and the corresponding move. The move is `None` at leaf nodes or
             when the best action is to pass.
         """
-        if depth == 0 or self.ruleset.is_finished(state):
+        if depth == 0 or self.rules.is_finished(state):
             return self.evaluator.evaluate(state, root_player), None
 
         best_move: Move | None = None
 
         if state.current_player == root_player:
             max_score = -math.inf
-            for move in self.ruleset.get_legal_moves(state):
+            for move in self.rules.legal_moves(state):
                 state.apply_move(move)
                 score, _ = self._minimax(state, depth - 1, root_player, alpha, beta)
                 state.undo_move(move)
@@ -146,7 +146,7 @@ class AlphaBetaMinimaxAgent(Agent):
             return max_score, best_move
 
         min_score = math.inf
-        for move in self.ruleset.get_legal_moves(state):
+        for move in self.rules.legal_moves(state):
             state.apply_move(move)
             score, _ = self._minimax(state, depth - 1, root_player, alpha, beta)
             state.undo_move(move)

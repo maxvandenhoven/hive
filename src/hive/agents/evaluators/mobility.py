@@ -1,7 +1,7 @@
 from typing import override
 
 from hive.agents.evaluators.base import Evaluator
-from hive.engine.ruleset import Ruleset
+from hive.engine.rules import Rules
 from hive.engine.state import GameState, Player
 
 
@@ -11,17 +11,17 @@ class MobilityEvaluator(Evaluator):
     Compares the number of legal moves available to each player. More legal moves for the
     evaluated player relative to the opponent yields a positive score.
 
-    This evaluator requires a `Ruleset` to generate legal moves. Note that computing legal
+    This evaluator requires `Rules` to generate legal moves. Note that computing legal
     moves can be expensive, so this evaluator may be slower than simpler heuristics.
     """
 
-    def __init__(self, ruleset: Ruleset) -> None:
+    def __init__(self, rules: Rules) -> None:
         """Initialize the mobility evaluator.
 
         Args:
-            ruleset: The ruleset used to generate legal moves for each player.
+            rules: The rules used to generate legal moves for each player.
         """
-        self.ruleset = ruleset
+        self.rules = rules
 
     def _count_legal_moves(self, state: GameState, player: Player) -> int:
         """Count the number of legal moves available to a player.
@@ -39,8 +39,8 @@ class MobilityEvaluator(Evaluator):
         original_player = state.current_player
         state.current_player = player
 
-        # Subtract 1 to exclude the pass move (None) that is always included.
-        move_count = len(self.ruleset.get_legal_moves(state)) - 1
+        # Exclude the pass move (`None`), which is only returned when there are no moves.
+        move_count = sum(move is not None for move in self.rules.legal_moves(state))
 
         state.current_player = original_player
 
