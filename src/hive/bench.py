@@ -9,10 +9,10 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from hive.engine.rules import Rules
-from hive.engine.state import GameState, Move, PieceType, Player
+from hive.engine.serialization import deserialize_move, deserialize_rules
+from hive.engine.state import GameState, Move
 
 
 def perft(state: GameState, rules: Rules, depth: int) -> int:
@@ -171,11 +171,9 @@ class PerftSuite:
     def load(cls, path: Path) -> "PerftSuite":
         """Load a perft suite from a JSON file.
 
-        The file holds a `rules` object with `Rules` field values (except
-        `piece_counts`, which keeps its default, and with `starting_player` as a player
-        name) and a list of `positions`, each with a `name`, a `moves` list, `counts`
-        keyed by depth and optionally `legal_moves`. A move is either `null` (a pass) or
-        `{"piece": "ant", "from": [q, r] | null, "to": [q, r]}`.
+        The file holds serialized `rules` (see `hive.engine.serialization`, missing
+        fields keep their default) and a list of `positions`, each with a `name`, a list
+        of serialized `moves`, `counts` keyed by depth and optionally `legal_moves`.
 
         Args:
             path: The path of the JSON file.
@@ -184,22 +182,19 @@ class PerftSuite:
             The suite described by the file.
 
         Raises:
-            ValueError: If the file has an unknown piece type or player.
+            ValueError: If the rules or a move cannot be deserialized.
         """
         data = json.loads(path.read_text())
 
-        rules_data = dict(data["rules"])
-        if "starting_player" in rules_data:
-            rules_data["starting_player"] = _decode_player(rules_data["starting_player"])
-        rules = Rules(**rules_data)
+        rules = deserialize_rules(data["rules"])
 
         positions = [
             PerftPosition(
                 name=position["name"],
-                moves=[_decode_move(move) for move in position["moves"]],
+                moves=[deserialize_move(move) for move in position["moves"]],
                 counts={int(depth): count for depth, count in position["counts"].items()},
                 legal_moves=(
-                    [_decode_move(move) for move in position["legal_moves"]]
+                    [deserialize_move(move) for move in position["legal_moves"]]
                     if "legal_moves" in position
                     else None
                 ),
@@ -226,40 +221,3 @@ class PerftSuite:
 
         msg = f"Unknown perft position `{name}`."
         raise KeyError(msg)
-
-
-def _decode_player(name: str) -> Player:
-    """Decode a player from its lower case name.
-
-    Raises:
-        ValueError: If the player is unknown.
-    """
-    try:
-        return Player[name.upper()]
-    except KeyError as e:
-        msg = f"Unknown player `{name}`."
-        raise ValueError(msg) from e
-
-
-def _decode_move(data: dict[str, Any] | None) -> Move | None:
-    """Decode a move from its JSON form, where `None` is a pass.
-
-    Raises:
-        ValueError: If the piece type is unknown.
-    """
-    if data is None:
-        return None
-
-    try:
-        piece_type = PieceType[data["piece"].upper()]
-    except KeyError as e:
-        msg = f"Unknown piece type `{data['piece']}`."
-        raise ValueError(msg) from e
-
-    source = data["from"]
-    target = data["to"]
-    return Move(
-        piece_type=piece_type,
-        source_coord=None if source is None else (source[0], source[1]),
-        target_coord=(target[0], target[1]),
-    )
