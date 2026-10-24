@@ -670,6 +670,27 @@ class TestGetArticulationPoints:
         assert state.get_articulation_points() == {(-1, 0), (0, 0), (1, 0)}
 
 
+class TestIsConnected:
+    """Test the `is_connected` DFS connectivity check."""
+
+    def test_empty_board(self, default_state: GameState) -> None:
+        """Test that an empty board counts as connected."""
+        assert default_state.is_connected()
+
+    def test_connected_layouts(
+        self, line_3_state: GameState, ring_6_state: GameState
+    ) -> None:
+        """Test that a line and a ring are connected."""
+        assert line_3_state.is_connected()
+        assert ring_6_state.is_connected()
+
+    def test_split_board(self, line_3_state: GameState) -> None:
+        """Test that a board with two separate groups is not connected."""
+        state = line_3_state
+        with state.piece_lifted((0, 0)):
+            assert not state.is_connected()
+
+
 class TestIsConnectedAfterRemoving:
     """Test the `is_connected_after_removing` DFS connectivity check."""
 

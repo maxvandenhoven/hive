@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import ClassVar
 
+from hive.engine.errors import IllegalMoveError, InvalidBoardError
 from hive.engine.grid import HEX_DIRECTIONS, Coordinate, add, get_neighbors
-from hive.engine.state import GameState, Move, PieceType, Player
+from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
 
 BASE_PIECE_COUNTS: Mapping[PieceType, int] = MappingProxyType(
     {
@@ -112,6 +113,153 @@ class Rules:
         return GameState(
             piece_type_count=self.piece_counts, starting_player=self.starting_player
         )
+
+    def from_board(
+        self, board: GameBoard, current_player: Player, current_ply: int | None = None
+    ) -> GameState:
+        """Create a validated game state from a board.
+
+        The board is copied, so later changes to `board` do not affect the state. The
+        hands and queen coordinates are derived from the pieces on the board.
+
+        The ply must be consistent with the board: the current player alternates every
+        ply starting with `starting_player`, and a player cannot have more pieces on the
+        board than turns taken. If `current_ply` is `None`, the lowest consistent ply is
+        used. For a game with placements only, this is the number of pieces on the board.
+
+        Args:
+            board: The pieces on each occupied coordinate, ordered bottom to top.
+            current_player: The player to move.
+            current_ply: The number of plies played so far, or `None` to derive it.
+
+        Returns:
+            The game state with the given board, player and ply.
+
+        Raises:
+            InvalidBoardError: If a stack is empty, a player has more pieces of a type
+                than `piece_counts` allows, the pieces are not connected, or the ply is
+                inconsistent with the board and current player.
+        """
+        state = self.create_initial_state()
+
+        for coord, stack in board.items():
+            if not stack:
+                msg = f"The stack at coordinate `{coord}` is empty."
+                raise InvalidBoardError(msg)
+
+            state.board[coord] = [
+                Piece(type=piece.type, owner=piece.owner) for piece in stack
+            ]
+            for piece in stack:
+                state.hand[piece.owner][piece.type] = (
+                    state.hand[piece.owner].get(piece.type, 0) - 1
+                )
+                if piece.type is PieceType.QUEEN:
+                    state.queen_coord[piece.owner] = coord
+
+        # A negative count in hand means more pieces on the board than allowed. This also
+        # limits each player to one queen, since `piece_counts` has exactly one.
+        for player, hand in state.hand.items():
+            for piece_type, count in hand.items():
+                if count < 0:
+                    allowed = self.piece_counts.get(piece_type, 0)
+                    msg = (
+                        f"Player `{player.name}` has `{allowed - count}` pieces of type "
+                        f"`{piece_type.name}` on the board, but at most `{allowed}` are "
+                        "allowed."
+                    )
+                    raise InvalidBoardError(msg)
+
+        if not state.is_connected():
+            msg = "The pieces on the board do not form one connected hive."
+            raise InvalidBoardError(msg)
+
+        state.current_player = current_player
+        state.current_ply = self._validate_ply(state, current_ply)
+
+        return state
+
+    def _validate_ply(self, state: GameState, current_ply: int | None) -> int:
+        """Validate the ply of a state built from a board, or derive the lowest valid one.
+
+        Args:
+            state: The state with its board and current player already set.
+            current_ply: The ply to validate, or `None` to derive it.
+
+        Returns:
+            The validated or derived ply.
+
+        Raises:
+            InvalidBoardError: If `current_ply` is negative, does not match the current
+                player, or leaves a player with more pieces on the board than turns taken.
+        """
+        piece_count = {player: 0 for player in Player}
+        for stack in state.board.values():
+            for piece in stack:
+                piece_count[piece.owner] += 1
+
+        # After `ply` plies, the starting player has taken `(ply + 1) // 2` turns and the
+        # other player `ply // 2`. Each turn places at most one piece.
+        starting_player = self.starting_player
+        second_player = starting_player.opponent
+        expect_even = state.current_player is starting_player
+
+        if current_ply is None:
+            current_ply = max(
+                2 * piece_count[starting_player] - 1, 2 * piece_count[second_player], 0
+            )
+            if (current_ply % 2 == 0) != expect_even:
+                current_ply += 1
+            return current_ply
+
+        if current_ply < 0:
+            msg = f"The ply must not be negative, but got `{current_ply}`."
+            raise InvalidBoardError(msg)
+
+        if (current_ply % 2 == 0) != expect_even:
+            msg = (
+                f"Player `{state.current_player.name}` cannot be to move at ply "
+                f"`{current_ply}` when `{starting_player.name}` starts the game."
+            )
+            raise InvalidBoardError(msg)
+
+        turns_taken = {
+            starting_player: (current_ply + 1) // 2,
+            second_player: current_ply // 2,
+        }
+        for player in Player:
+            if piece_count[player] > turns_taken[player]:
+                msg = (
+                    f"Player `{player.name}` has `{piece_count[player]}` pieces on the "
+                    f"board, but has only taken `{turns_taken[player]}` turns at ply "
+                    f"`{current_ply}`."
+                )
+                raise InvalidBoardError(msg)
+
+        return current_ply
+
+    def play(self, state: GameState, move: Move | None) -> None:
+        """Apply a move to the state after checking that it is legal.
+
+        Use this for moves from outside the engine, such as user input or game records.
+        Search code that takes moves from `legal_moves` can call `state.apply_move`
+        directly.
+
+        Args:
+            state: The current game state, which is modified in place.
+            move: The move to apply, or `None` to pass.
+
+        Raises:
+            IllegalMoveError: If the move is not in `legal_moves(state)`.
+        """
+        if move not in self.legal_moves(state):
+            msg = (
+                f"Move `{move}` is not legal for player `{state.current_player.name}` at "
+                f"ply `{state.current_ply}`."
+            )
+            raise IllegalMoveError(msg)
+
+        state.apply_move(move)
 
     def legal_moves(self, state: GameState) -> list[Move | None]:
         """Get all legal moves for the current player.
