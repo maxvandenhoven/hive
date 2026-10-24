@@ -62,9 +62,18 @@ class Rules:
 
 Notes:
 
-- `piece_counts` must be immutable for the dataclass to be hashable. Use a
-  `types.MappingProxyType` or a tuple of pairs internally; validate in `__post_init__`
-  (exactly one queen, every positive count has movement behaviour).
+- `piece_counts` must be immutable for the dataclass to be hashable. `__post_init__`
+  stores any given mapping as a `types.MappingProxyType` ordered by piece type, and
+  validates it (exactly one queen, every positive count has movement behaviour). A
+  `MappingProxyType` is not hashable itself, so `Rules` defines `__hash__` explicitly,
+  hashing `piece_counts` as a tuple of its items; the generated `__eq__` is kept. The
+  default is a `default_factory`, because dataclasses reject unhashable defaults.
+- `__post_init__` also rejects `queen_by_turn=1` with `allow_queen_first_turn=False`,
+  which would leave the first player without a legal placement.
+- `target_coords` raises `ValueError` for an unoccupied coordinate and returns `[]` for a
+  piece that is not in `movable_pieces`, so the frontend can call it for any tile.
+  `movement_moves` dispatches to the per-piece methods directly, so it does not recompute
+  articulation points per piece.
 - Per-piece movement becomes private methods (`_queen_targets`, `_beetle_targets`,
   `_grasshopper_targets`, `_spider_targets`, `_ant_targets`) dispatched by piece type,
   sharing a private slide helper. Port the existing logic unchanged; correctness is proven
