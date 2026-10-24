@@ -30,6 +30,11 @@ test-slow:
 	@uv run pytest -m slow
 
 
+.PHONY: perft
+perft:
+	@uv run hive bench perft --depth 6
+
+
 .PHONY: check
 check: format lint type
 

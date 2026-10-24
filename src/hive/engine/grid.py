@@ -117,3 +117,24 @@ def get_direction(source_coord: Coordinate, target_coord: Coordinate) -> Directi
         The axial coordinate direction `(dq, dr)` to move from `(q, r)` to `(q', r')`.
     """
     return (target_coord[0] - source_coord[0], target_coord[1] - source_coord[1])
+
+
+def get_flanking_coords(
+    source_coord: Coordinate, target_coord: Coordinate
+) -> tuple[Coordinate, Coordinate]:
+    """Get the two coordinates that neighbor both a coordinate and its neighbor.
+
+    A piece sliding from the source to the target passes between these coordinates.
+
+    Args:
+        source_coord: The axial coordinate `(q, r)` from which the piece moves.
+        target_coord: The neighboring axial coordinate `(q', r')` the piece moves to.
+
+    Returns:
+        The anti-clockwise and the clockwise flanking coordinate, seen from the source.
+    """
+    direction = get_direction(source_coord, target_coord)
+    return (
+        add(source_coord, get_anti_clockwise_direction(direction)),
+        add(source_coord, get_clockwise_direction(direction)),
+    )

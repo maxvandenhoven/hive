@@ -4,7 +4,13 @@ from types import MappingProxyType
 from typing import ClassVar
 
 from hive.engine.errors import IllegalMoveError, InvalidBoardError
-from hive.engine.grid import HEX_DIRECTIONS, Coordinate, add, get_neighbors
+from hive.engine.grid import (
+    HEX_DIRECTIONS,
+    Coordinate,
+    add,
+    get_flanking_coords,
+    get_neighbors,
+)
 from hive.engine.state import GameBoard, GameState, Move, PieceType, Player
 
 BASE_PIECE_COUNTS: Mapping[PieceType, int] = MappingProxyType(
@@ -493,8 +499,8 @@ class Rules:
         """Get the neighboring coordinates that a piece can slide into.
 
         A neighbor is slideable if it is unoccupied, not blocked by the gate rule (both
-        flanking coordinates occupied), and has at least one occupied neighbor of its own
-        to maintain hive contact.
+        flanking coordinates occupied), and at least one flanking coordinate is occupied,
+        so the piece keeps contact with the hive while it slides.
 
         Args:
             state: The current game state.
@@ -512,8 +518,8 @@ class Rules:
                 continue
 
             if not any(
-                state.is_occupied(other_neighbor_coord)
-                for other_neighbor_coord in get_neighbors(neighbor_coord)
+                state.is_occupied(flanking_coord)
+                for flanking_coord in get_flanking_coords(coord, neighbor_coord)
             ):
                 continue
 
@@ -535,25 +541,41 @@ class Rules:
             return self._slideable_neighbors(state, coord)
 
     def _beetle_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
-        """Get the targets of a beetle, which slides one space or climbs onto the hive.
+        """Get the targets of a beetle, which moves one space and may climb the hive.
+
+        On the ground, the beetle slides like the queen. A move where the beetle is on
+        the hive before or after, at the higher of the source height (without the beetle)
+        and the target height, is blocked only by a gate of two flanking stacks that are
+        both higher than that.
 
         Args:
             state: The current game state.
             coord: The axial coordinate `(q, r)` of the beetle.
 
         Returns:
-            The unoccupied coordinates the beetle can slide to, followed by the occupied
-            neighbors it can climb onto.
+            The coordinates the beetle can slide to on the ground, followed by the
+            coordinates it can reach on the hive.
         """
         with state.piece_lifted(coord):
-            slideable_destinations = self._slideable_neighbors(state, coord)
+            source_height = state.get_stack_height(coord)
+            destinations = (
+                [] if source_height else self._slideable_neighbors(state, coord)
+            )
 
-            climbable_destinations: list[Coordinate] = []
             for neighbor_coord in get_neighbors(coord):
-                if state.is_occupied(neighbor_coord):
-                    climbable_destinations.append(neighbor_coord)
+                height = max(source_height, state.get_stack_height(neighbor_coord))
+                if height == 0:
+                    continue
 
-        return slideable_destinations + climbable_destinations
+                if all(
+                    state.get_stack_height(flanking_coord) > height
+                    for flanking_coord in get_flanking_coords(coord, neighbor_coord)
+                ):
+                    continue
+
+                destinations.append(neighbor_coord)
+
+        return destinations
 
     def _grasshopper_targets(
         self, state: GameState, coord: Coordinate

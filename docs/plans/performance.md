@@ -48,7 +48,16 @@ package until the data says so.
 
 ## Baseline numbers
 
-To be filled in by WP 05 and WP 27.
+Measured with `hive bench perft` (WP 05) on an otherwise idle machine, single process,
+Python 3.13. The rules are the reference rules in `tests/data/perft/base.json`.
 
 | Date | Commit | Machine | Position | Depth | Nodes | Seconds | Nodes/s |
 |---|---|---|---|---|---|---|---|
+| 2026-10-24 | `18a5d3f` | AMD Ryzen 7 5800H, Linux | start | 5 | 516,240 | 0.94 | 549,000 |
+| 2026-10-24 | `18a5d3f` | AMD Ryzen 7 5800H, Linux | start | 6 | 12,219,480 | 22.5 | 543,000 |
+| 2026-10-24 | `18a5d3f` | AMD Ryzen 7 5800H, Linux | start | 7 | 181,641,900 | 559 | 325,000 |
+
+Perft counts every leaf by applying and undoing the last move (no bulk counting at depth
+one), so nodes/s compares apply, undo and move generation together. Nodes/s drops at depth
+7 because deeper positions have more movement moves (ant flood fills, articulation
+points). The depth 7 number is the `make test-slow` duration of the same walk.

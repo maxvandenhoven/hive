@@ -7,14 +7,18 @@ from hive.agents.search.negamax import NegamaxAgent
 from hive.engine.rules import Rules
 from hive.engine.state import Player
 
+# Random and greedy play can shuffle forever without surrounding a queen, so the turn
+# limit ends such games in a draw.
+_MAX_TURNS = 300
+
 # Safety cap so a regression that prevents games from ending fails instead of hanging.
-_MAX_PLIES = 2000
+_MAX_PLIES = 2 * _MAX_TURNS + 2
 
 
 @pytest.mark.parametrize("seed", range(3))
 def test_random_vs_negamax_completes(seed: int) -> None:
     """Test that random and negamax depth 1 play a game to completion."""
-    rules = Rules()
+    rules = Rules(max_turns=_MAX_TURNS)
     agents: dict[Player, Agent] = {
         Player.WHITE: RandomAgent(rules, random_seed=seed),
         Player.BLACK: NegamaxAgent(rules, QueenSafetyEvaluator(), depth=1),

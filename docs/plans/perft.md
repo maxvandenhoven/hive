@@ -64,6 +64,40 @@ If the reference rules differ from ours in a way `Rules` cannot express, documen
 difference in `tests/data/perft/README.md` and add a `Rules` option only if it is a real
 rule variant.
 
+## Outcome (WP 05)
+
+What the reference search found, recorded in `tests/data/perft/README.md` in full:
+
+- Mzinga's wiki publishes base game counts for the start position only (depth 0 to 9,
+  `MzingaPerft v0.12.9`). No published perft counts exist for other base game positions.
+- nokamute's UHP test suite (`data/uhp_tests.txt`) provides 13 base game positions (piece
+  movement, gates, game end, pass) with the complete list of legal moves. They are stored
+  with depth 0 and 1 counts plus the exact move set, which the test compares as sets.
+  Deeper counts for them need a local nokamute build (`nokamute perft "<game string>"`);
+  WP 05 did not run external engines.
+- Reference rules: tournament opening (`allow_queen_first_turn=False`), queen by turn 4,
+  no movement before the queen, one placement per piece type, symmetric positions counted
+  separately, a pass only without other moves, and no moves in a finished game. The last
+  rule lives in `perft` (it returns 0 below a finished position), not in
+  `Rules.legal_moves`. nokamute's threefold repetition draw has no `Rules` equivalent and
+  its test case is left out.
+- Engine bugs found, each fixed with a regression test in `tests/engine/test_rules.py`:
+  - Sliding pieces only checked that the target touched some piece, so a slide could
+    "jump" to a piece across an empty gap. A slide now needs one occupied flanking
+    coordinate (`grid.get_flanking_coords`), which affects queen, spider and ant, and the
+    beetle on the ground.
+  - The beetle ignored gates on the hive. Following nokamute and the BoardGameGeek ruling
+    it cites, a beetle move at height `h = max(source height without the beetle, target
+    height)` is blocked when both flanking stacks are higher than `h`. Before, climbing
+    was never blocked and moving down from the hive was blocked by any two flanking
+    pieces.
+- Agreed depths: the start position runs depth 0 to 5 in `make test` (about 1 second) and
+  depth 6 and 7 under `slow` (about 23 seconds and 9 minutes). Depth 8 and 9 are stored but
+  not run (hours in Python). The nokamute positions run in `make test`.
+- `hive bench perft --depth N [--position NAME] [--divide] [--suite PATH]` reads the
+  positions and rules from `tests/data/perft/base.json` and exits with an error when the
+  count differs from a stored reference count. `make perft` runs it at depth 6.
+
 ## Code
 
 - `src/hive/bench.py`: `perft(state, rules, depth)`, `divide(state, rules, depth)` and a

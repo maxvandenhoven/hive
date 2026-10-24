@@ -36,6 +36,7 @@ make type           # ty check
 make check          # format + lint + type (no tests)
 make test           # pytest with coverage, excluding `slow` tests
 make test-slow      # pytest -m slow
+make perft          # perft speed benchmark (start position, depth 6)
 make install-hooks  # install pre-commit hooks (including commit-msg)
 ```
 
