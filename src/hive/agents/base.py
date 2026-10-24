@@ -1,25 +1,106 @@
+import random
 from abc import ABC, abstractmethod
+from typing import Protocol
 
+from hive.engine.rules import Rules
+from hive.engine.serialization import JsonValue
 from hive.engine.state import GameState, Move
+
+type SearchInfoValue = JsonValue
+"""A value in a search progress report, such as a depth, a score or a serialized move."""
+
+
+class TurnContext(Protocol):
+    """The whole capability an agent holds during one decision.
+
+    The runner creates one context per turn and hands it to `Agent.think`. Submissions
+    are proposals: the runner keeps the latest legal one and closes the turn at the
+    deadline, or as soon as a submission is marked final.
+    """
+
+    def submit(self, move: Move | None, *, final: bool = False) -> None:
+        """Propose a move as the current answer for this turn.
+
+        Illegal submissions are rejected and logged by the runner, leaving the previous
+        candidate standing.
+
+        Args:
+            move: The proposed move, or `None` to pass.
+            final: Whether the agent is done, which closes the turn immediately.
+        """
+        ...
+
+    def remaining_seconds(self) -> float:
+        """Get the time left until the deadline of this turn.
+
+        Returns:
+            The number of seconds until the deadline, which is negative once it passed.
+        """
+        ...
+
+    def should_stop(self) -> bool:
+        """Check whether the agent should stop thinking and return.
+
+        Returns:
+            `True` once the deadline passed, the runner cancelled the turn or a final move
+            was submitted.
+        """
+        ...
+
+    def info(self, **fields: SearchInfoValue) -> None:
+        """Report search progress, modelled on UCI `info` lines.
+
+        Common fields are `depth`, `nodes`, `score`, `pv` (the principal variation as
+        serialized moves) and `nps`; agents may add free-form extras. The call is
+        fire-and-forget and may be rate-limited by the context.
+
+        Args:
+            **fields: The progress values to report.
+        """
+        ...
 
 
 class Agent(ABC):
     """Base class for all agents.
 
-    Provides a common interface for agents that choose moves in a Hive game. Each agent
-    receives `Rules` at construction time, which it uses to query legal moves and
-    check game termination during its search.
+    An agent decides moves under a time budget through `think`, which submits candidate
+    moves to a `TurnContext` as the search improves. The contract every agent follows:
 
-    Subclasses must implement `choose_move` to define their move selection strategy.
+    - `think` receives a copy of the state, which it may mutate freely while searching.
+    - `think` submits a cheap legal move immediately, then improves on it. Returning is
+      the answer, since the latest candidate is already submitted.
+    - `think` checks `TurnContext.should_stop` regularly (every few nodes or between
+      iterative deepening iterations) and returns soon after it turns `True`.
+    - All randomness comes from `_rng`, so a fixed seed gives reproducible decisions.
+
+    An agent object lives for a whole match, so it may keep caches across turns. `reset`
+    is called between matches when the agent is reused.
+
+    Attributes:
+        rules: The rules governing the game, used to search the game tree.
     """
 
-    @abstractmethod
-    def choose_move(self, state: GameState) -> Move | None:
-        """Choose the best move for the current player.
+    def __init__(self, rules: Rules, *, seed: int) -> None:
+        """Initialize the agent.
 
         Args:
-            state: The current game state.
+            rules: The rules governing the game.
+            seed: The seed for the random number generator of the agent.
+        """
+        self.rules = rules
+        self._rng = random.Random(seed)
 
-        Returns:
-            The chosen move, or `None` to pass the turn.
+    @abstractmethod
+    def think(self, state: GameState, turn: TurnContext) -> None:
+        """Decide a move for the current player by submitting candidates to `turn`.
+
+        Args:
+            state: A copy of the current game state, which the agent may mutate.
+            turn: The context to submit moves and report progress to.
+        """
+
+    def reset(self) -> None:  # noqa: B027
+        """Clear state kept across turns before the agent plays a new match.
+
+        The default keeps nothing across turns, so there is nothing to clear.
         """
