@@ -25,8 +25,8 @@ game
   id            uuid pk
   name          text
   status        text      -- active | finished | abandoned
-  rules         jsonb     -- codec-encoded Rules
-  setup         jsonb     -- "initial" or codec-encoded board from the editor
+  rules         jsonb     -- serialized Rules
+  setup         jsonb     -- "initial" or serialized BoardSetup from the editor
   white_player  jsonb     -- {"type": "human"} or {"type": "agent", "spec": AgentSpec, "budget_s": 5.0}
   black_player  jsonb
   result        text null -- white | black | draw
@@ -36,7 +36,7 @@ game
 move
   game_id       uuid fk → game (on delete cascade)
   ply           int       -- pk (game_id, ply)
-  move          jsonb     -- codec-encoded Move or null (pass)
+  move          jsonb     -- serialized Move or null (pass)
   source        text      -- manual | photo | agent
   photo_id      uuid null fk → photo
   decision      jsonb null -- DecisionRecord for agent moves
@@ -72,7 +72,7 @@ the generated frontend client.
 | GET | `/games/{id}` | 10 | Game metadata and move list. |
 | PATCH | `/games/{id}` | 10 | Rename, change status. |
 | DELETE | `/games/{id}` | 10 | Delete game, moves, photos (including objects). |
-| GET | `/games/{id}/export` | 10 | Codec `GameRecord` as JSON download. |
+| GET | `/games/{id}/export` | 10 | Serialized `GameRecord` as JSON download. |
 | GET | `/games/{id}/state?ply=N` | 11 | Board (stacks), hands, side to move, ply, result, last move, movable pieces, placeable coords and piece types. `ply` enables replay. |
 | GET | `/games/{id}/targets?q=&r=` | 11 | Legal targets for the tile at `(q, r)`. |
 | POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply}`. Validated with `Rules.apply_checked_move`; `expected_ply` gives optimistic concurrency (409 on mismatch). Updates status/result when the game ends. |

@@ -113,6 +113,21 @@ class GameState:
             Player.BLACK: None,
         }
 
+    def copy(self) -> "GameState":
+        """Copy the state, so moves applied to the copy do not affect the original.
+
+        Pieces are immutable, so only the stacks and the per-player mappings are copied.
+
+        Returns:
+            A state with the same board, player, ply, hands and queen coordinates.
+        """
+        state = GameState(piece_type_count={}, starting_player=self.current_player)
+        state.board = {coord: list(stack) for coord, stack in self.board.items()}
+        state.current_ply = self.current_ply
+        state.hand = {player: dict(hand) for player, hand in self.hand.items()}
+        state.queen_coord = dict(self.queen_coord)
+        return state
+
     def _calculate_boundary_coords(self) -> set[Coordinate]:
         """Determine which unoccupied coordinates have at least one occupied neighbor.
 

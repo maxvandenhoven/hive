@@ -41,7 +41,7 @@ Contract:
   every N nodes or between iterative-deepening iterations and return. Returning is the
   answer, since the latest candidate is already submitted.
 - `info(...)` reports search progress, modelled on UCI `info` lines: `depth`, `nodes`,
-  `score`, `pv` (principal variation as codec-encoded moves), `nps`, free-form extras. It
+  `score`, `pv` (principal variation as serialized moves), `nps`, free-form extras. It
   is fire-and-forget and rate-limited by the context.
 - All randomness comes from `self._rng`; the seed is recorded by the runner.
 - Perfect information means no `PlayerView`: agents see the full state. Agents receive
@@ -127,11 +127,11 @@ Every decision produces a `DecisionRecord`:
 | `budget_s`, `elapsed_s`, `overrun_s` | time accounting (`overrun_s` = time past deadline until Idle) |
 | `close_reason` | `final`, `deadline`, `worker_failed`, `no_candidate` |
 | `candidates`, `illegal_submissions` | counts |
-| `move` | the applied move (codec-encoded) |
+| `move` | the applied move (serialized) |
 | `last_info` | the last `info` payload (depth, nodes, score, pv) |
 | `worker_restarted`, `failure` | safety-net events with a truncated message |
 
-A `MatchResult` holds the rules, both specs, the game record (codec), decision records, the
+A `MatchResult` holds the rules, both specs, the game record (serialized), decision records, the
 result (winner, draw, turn cap) and timing totals.
 
 ## Gauntlets (WP 09)

@@ -125,21 +125,38 @@ checking invariants 1 to 5. Games are drawn with `hypothesis` (moves sampled fro
 (100 games of up to 100 plies) runs in `make test`; the slow profile (500 games of up to 300
 plies) is marked `slow`.
 
-## Codec (WP 06)
+## Serialization (WP 06)
 
-`src/hive/engine/codec.py` converts engine values to and from JSON-compatible dicts. It is
-used by match records, gauntlet reports, the API and the database:
+`src/hive/engine/serialization.py` converts engine values to and from JSON-compatible
+values. It is used by match records, gauntlet reports, the API, the database and the perft
+suite. Each value has a pair of plain functions, `serialize_<value>` and
+`deserialize_<value>`, rather than methods: a pass is `None`, and `Coordinate` and
+`GameBoard` are type aliases, so not every value has a type to hang a method on. A single
+generic `serialize` / `deserialize(data, type)` pair was rejected because dispatching on
+`None`, tuples and dicts is fragile and its overloads do not type-check cleanly.
 
-- `Move` ↔ `{"piece": "ant", "from": [q, r] | null, "to": [q, r]}`; pass ↔ `null`.
-- `Rules` ↔ dict of its fields, so rules can be stored per game and per gauntlet.
-- `GameRecord` (setup + rules + moves) ↔ dict, with `GameRecord.replay()` returning the
-  final `GameState` (using `Rules.apply_checked_move`, so invalid records are rejected)
-  and `GameRecord.states()` iterating states per ply for replay views.
-- Setup is either `"initial"` or a board produced by the board editor (validated through
-  `from_board`).
+| Value | JSON |
+|---|---|
+| `Player`, `PieceType` | lower case name, for example `"white"`, `"ant"` |
+| `Coordinate` | `[q, r]` |
+| `Move \| None` | `{"piece": "ant", "from": [q, r] \| null, "to": [q, r]}`; pass is `null` |
+| `Rules` | object with every field, `piece_counts` keyed by piece type name; missing fields take their default when deserializing |
+| `GameBoard` | list of `{"coord": [q, r], "stack": [{"piece": ..., "owner": ...}]}`, ordered by coordinate (object keys cannot be coordinates) |
+| `BoardSetup \| None` | `"initial"`, or `{"board": ..., "current_player": ..., "current_ply": int \| null}` |
+| `GameRecord` | `{"rules": ..., "setup": ..., "moves": [...]}` |
 
-Decoders validate their input and raise `ValueError` with clear messages. Encoders are
-total. Round-trip property tests cover all of it.
+- `BoardSetup(board, current_player, current_ply=None)` is a board editor position. The
+  plan first said a setup is just a board, but `Rules.from_board` also needs the player to
+  move (and optionally the ply), so the setup carries both.
+- `GameRecord(rules, setup, moves)` has `replay()`, returning the final `GameState`, and
+  `states()`, yielding an independent copy of the state per ply for replay views. Both
+  start from `Rules.from_board` for editor setups and use `Rules.apply_checked_move` for
+  every move, so invalid records raise `InvalidBoardError` or `IllegalMoveError`.
+  `GameState.copy()` was added for `states()`.
+- Deserializers check only the shape of their input and raise `ValueError` with a clear
+  message (unknown or missing keys, wrong types, unknown names, booleans where integers
+  are expected). Legality is checked by `replay()`. Serializers are total.
+- Round-trip property tests (through `json.dumps` / `json.loads`) cover every value.
 
 ## Invariants
 

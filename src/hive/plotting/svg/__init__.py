@@ -20,10 +20,14 @@ HEX_SIZE = 50.0
 
 
 def _hand_panel_natural_size(state: GameState) -> tuple[float, float]:
-    """Compute the hand panel's natural width and height in HEX_SIZE units.
+    """Compute the natural width and height of the hand panel.
 
-    Returns `(width, height)` in the same coordinate space used by `draw_hand_panel`
-    (centered at x = 0).
+    Args:
+        state: The game state whose hands are drawn.
+
+    Returns:
+        The `(width, height)` of the panel in the coordinate space of `draw_hand_panel`,
+        which is centered at x = 0 and scaled by `HEX_SIZE`.
     """
     all_types = sorted(
         set(state.hand[Player.WHITE].keys()) | set(state.hand[Player.BLACK].keys())
