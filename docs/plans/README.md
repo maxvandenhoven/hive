@@ -181,8 +181,8 @@ M6 depends only on M1 (perft and gauntlet) and can be interleaved with M2–M5 a
 ## 7. Work packages and implementation order
 
 Each work package is one session and one PR. The GitHub issue is the source of truth for the
-session prompt. Dependencies are
-set as GitHub "blocked by" relationships, so a blocked issue should not be started.
+session prompt. Dependencies are set as GitHub "blocked by" relationships, so a blocked
+issue should not be started.
 
 | WP | Title | Milestone | Depends on | Issue |
 |---|---|---|---|---|
