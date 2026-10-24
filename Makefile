@@ -1,39 +1,39 @@
-.PHONY: install-pre-commit
-install-pre-commit:
-	@pre-commit install
-	@pre-commit install --hook-type commit-msg
-
-
 .PHONY: sync
 sync:
-	@$(MAKE) --no-print-directory --directory=packages/hive-agents sync
-	@$(MAKE) --no-print-directory --directory=packages/hive-engine sync
-	@$(MAKE) --no-print-directory --directory=services/hive-api sync
+	@uv sync --all-groups --all-extras
 
 
 .PHONY: format
 format:
-	@$(MAKE) --no-print-directory --directory=packages/hive-agents format
-	@$(MAKE) --no-print-directory --directory=packages/hive-engine format
-	@$(MAKE) --no-print-directory --directory=services/hive-api format
+	@uv run ruff format
+	@uv run ruff check --fix --select I --output-format concise
 
 
 .PHONY: lint
 lint:
-	@$(MAKE) --no-print-directory --directory=packages/hive-agents lint
-	@$(MAKE) --no-print-directory --directory=packages/hive-engine lint
-	@$(MAKE) --no-print-directory --directory=services/hive-api lint
+	@uv run ruff check --fix --output-format concise
 
 
 .PHONY: type
 type:
-	@$(MAKE) --no-print-directory --directory=packages/hive-agents type
-	@$(MAKE) --no-print-directory --directory=packages/hive-engine type
-	@$(MAKE) --no-print-directory --directory=services/hive-api type
+	@uv run ty check
+
+
+.PHONY: test
+test:
+	@uv run pytest -m "not slow" --cov --cov-report term-missing
+
+
+.PHONY: test-slow
+test-slow:
+	@uv run pytest -m slow
 
 
 .PHONY: check
-check:
-	@$(MAKE) --no-print-directory --directory=packages/hive-agents check
-	@$(MAKE) --no-print-directory --directory=packages/hive-engine check
-	@$(MAKE) --no-print-directory --directory=services/hive-api check
+check: format lint type
+
+
+.PHONY: install-hooks
+install-hooks:
+	@uv run pre-commit install
+	@uv run pre-commit install --hook-type commit-msg
