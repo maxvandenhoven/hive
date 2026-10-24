@@ -136,7 +136,7 @@ hive/
 ├─ .github/workflows/          # ci.yaml (checks), release.yaml (image + tag bump)
 ├─ docs/plans/                 # this folder
 ├─ src/hive/
-│  ├─ engine/                  # grid.py, state.py, rules.py, codec.py, errors.py
+│  ├─ engine/                  # grid.py, state.py, rules.py, serialization.py, errors.py
 │  ├─ agents/                  # base.py, factory.py, random.py, minimax.py, negamax.py, evaluators/
 │  ├─ match/                   # turn.py, worker.py, runner.py, records.py, gauntlet.py
 │  ├─ vision/                  # [vision] reader.py, classical/, yolo/, grid_fit.py, matcher.py, eval/
@@ -191,7 +191,7 @@ issue should not be started.
 | 03 | Replace `Ruleset` with frozen `Rules` | M1 | 02 | #14 |
 | 04 | Validated entry points and invariant property tests | M1 | 03 | #15 |
 | 05 | Perft harness and reference parity | M1 | 03 | #16 |
-| 06 | JSON codec for moves, rules and game records | M1 | 04 | #17 |
+| 06 | JSON serialization for moves, rules and game records | M1 | 04 | #17 |
 | 07 | Timed agent interface and agent factory | M1 | 03 | #18 |
 | 08 | Persistent workers and timed match runner | M1 | 06, 07 | #19 |
 | 09 | Gauntlet CLI and reports | M1 | 08 | #20 |
