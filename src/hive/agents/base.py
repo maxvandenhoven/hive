@@ -7,7 +7,7 @@ class Agent(ABC):
     """Base class for all agents.
 
     Provides a common interface for agents that choose moves in a Hive game. Each agent
-    receives a `Ruleset` at construction time, which it uses to query legal moves and
+    receives `Rules` at construction time, which it uses to query legal moves and
     check game termination during its search.
 
     Subclasses must implement `choose_move` to define their move selection strategy.

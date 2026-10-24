@@ -3,7 +3,7 @@ from typing import override
 
 from hive.agents.base import Agent
 from hive.agents.evaluators.base import Evaluator
-from hive.engine.ruleset import Ruleset
+from hive.engine.rules import Rules
 from hive.engine.state import GameState, Move
 
 
@@ -15,15 +15,15 @@ class NegamaxAgent(Agent):
     opponent. This eliminates the need for separate maximizing and minimizing branches.
     """
 
-    def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
+    def __init__(self, rules: Rules, evaluator: Evaluator, depth: int) -> None:
         """Initialize the negamax agent.
 
         Args:
-            ruleset: The ruleset governing the game.
+            rules: The rules governing the game.
             evaluator: The position evaluator used to score leaf nodes.
             depth: The maximum search depth in plies.
         """
-        self.ruleset = ruleset
+        self.rules = rules
         self.evaluator = evaluator
         self.depth = depth
 
@@ -42,12 +42,12 @@ class NegamaxAgent(Agent):
             The best score and the corresponding move. The move is `None` at leaf nodes or
             when the best action is to pass.
         """
-        if depth == 0 or self.ruleset.is_finished(state):
+        if depth == 0 or self.rules.is_finished(state):
             return self.evaluator.evaluate(state, state.current_player), None
 
         max_score = -math.inf
         best_move: Move | None = None
-        for move in self.ruleset.get_legal_moves(state):
+        for move in self.rules.legal_moves(state):
             state.apply_move(move)
             score, _ = self._negamax(state, depth - 1)
             score = -score
@@ -80,15 +80,15 @@ class AlphaBetaNegamaxAgent(Agent):
     decision, significantly reducing the number of nodes evaluated.
     """
 
-    def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
+    def __init__(self, rules: Rules, evaluator: Evaluator, depth: int) -> None:
         """Initialize the alpha-beta negamax agent.
 
         Args:
-            ruleset: The ruleset governing the game.
+            rules: The rules governing the game.
             evaluator: The position evaluator used to score leaf nodes.
             depth: The maximum search depth in plies.
         """
-        self.ruleset = ruleset
+        self.rules = rules
         self.evaluator = evaluator
         self.depth = depth
 
@@ -107,12 +107,12 @@ class AlphaBetaNegamaxAgent(Agent):
             The best score and the corresponding move. The move is `None` at leaf nodes or
             when the best action is to pass.
         """
-        if depth == 0 or self.ruleset.is_finished(state):
+        if depth == 0 or self.rules.is_finished(state):
             return self.evaluator.evaluate(state, state.current_player), None
 
         max_score = -math.inf
         best_move: Move | None = None
-        for move in self.ruleset.get_legal_moves(state):
+        for move in self.rules.legal_moves(state):
             state.apply_move(move)
             score, _ = self._negamax(state, depth - 1, -beta, -alpha)
             score = -score
