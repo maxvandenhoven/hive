@@ -14,7 +14,14 @@ app = typer.Typer(name="hive", no_args_is_help=True)
 
 
 def _print_version(value: bool) -> None:
-    """Print the package version and exit when `--version` is passed."""
+    """Print the package version and exit when `--version` is passed.
+
+    Args:
+        value: Whether `--version` was passed.
+
+    Raises:
+        typer.Exit: After printing the version.
+    """
     if value:
         typer.echo(f"hive {__version__}")
         raise typer.Exit
@@ -87,7 +94,15 @@ def bench_perft(
 
 
 def _format_move(move: Move | None) -> str:
-    """Format a move for the divide output, for example `ant (0, 0) -> (1, 0)`."""
+    """Format a move for the divide output, for example `ant (0, 0) -> (1, 0)`.
+
+    Args:
+        move: The move to format, or `None` for a pass.
+
+    Returns:
+        The piece type, the source coordinate for a movement and the target coordinate,
+        or `pass` for a pass.
+    """
     if move is None:
         return "pass"
 

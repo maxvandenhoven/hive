@@ -637,6 +637,14 @@ class Rules:
         def _dfs(
             current_coord: Coordinate, visited_coords: set[Coordinate], depth: int
         ) -> None:
+            """Add every coordinate reachable in the remaining slides to `destinations`.
+
+            Args:
+                current_coord: The coordinate the spider has reached so far.
+                visited_coords: The coordinates on the current path, including
+                    `current_coord`, which the path may not revisit.
+                depth: The number of slides taken so far.
+            """
             if depth == 3:
                 destinations.add(current_coord)
                 return
