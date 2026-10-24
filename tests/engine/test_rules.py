@@ -2,9 +2,10 @@ import dataclasses
 
 import pytest
 
+from hive.engine.errors import IllegalMoveError, InvalidBoardError
 from hive.engine.grid import Coordinate, get_neighbors
 from hive.engine.rules import BASE_PIECE_COUNTS, Rules
-from hive.engine.state import GameState, Move, PieceType, Player
+from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
 
 type Placement = tuple[Player, PieceType, Coordinate]
 
@@ -637,3 +638,285 @@ class TestLegalMoves:
         )
 
         assert rules.legal_moves(state) == [None]
+
+
+def _build_board(placements: list[Placement]) -> GameBoard:
+    """Build a board by placing pieces in order, stacking on repeated coordinates."""
+    board: GameBoard = {}
+    for owner, piece_type, coord in placements:
+        board.setdefault(coord, []).append(Piece(type=piece_type, owner=owner))
+    return board
+
+
+class TestFromBoard:
+    """Test creating a validated state from a board."""
+
+    @pytest.fixture(scope="function")
+    def placements(self) -> list[Placement]:
+        """Build a four-piece opening with a white beetle on top of the black queen."""
+        return [
+            (Player.WHITE, PieceType.QUEEN, (0, 0)),
+            (Player.BLACK, PieceType.QUEEN, (1, 0)),
+            (Player.WHITE, PieceType.BEETLE, (1, 0)),
+            (Player.BLACK, PieceType.ANT, (2, 0)),
+        ]
+
+    def test_derives_hand_and_queen_coord(
+        self, rules: Rules, placements: list[Placement]
+    ) -> None:
+        """Test that hands and queen coordinates are derived from the board."""
+        state = rules.from_board(_build_board(placements), Player.WHITE)
+
+        assert state.current_player is Player.WHITE
+        assert state.current_ply == 4
+        assert state.queen_coord == {Player.WHITE: (0, 0), Player.BLACK: (1, 0)}
+        assert state.hand[Player.WHITE] == {
+            **BASE_PIECE_COUNTS,
+            PieceType.QUEEN: 0,
+            PieceType.BEETLE: 1,
+        }
+        assert state.hand[Player.BLACK] == {
+            **BASE_PIECE_COUNTS,
+            PieceType.QUEEN: 0,
+            PieceType.ANT: 2,
+        }
+        assert state.board == _build_board(placements)
+
+    def test_empty_board(self, rules: Rules) -> None:
+        """Test that an empty board gives the initial state."""
+        state = rules.from_board({}, Player.WHITE)
+        initial_state = rules.create_initial_state()
+
+        assert state.board == {}
+        assert state.current_ply == 0
+        assert state.hand == initial_state.hand
+        assert state.queen_coord == initial_state.queen_coord
+
+    @pytest.mark.parametrize(
+        ("current_player", "expected_ply"), [(Player.WHITE, 4), (Player.BLACK, 5)]
+    )
+    def test_derives_lowest_valid_ply(
+        self,
+        rules: Rules,
+        placements: list[Placement],
+        current_player: Player,
+        expected_ply: int,
+    ) -> None:
+        """Test that the derived ply is the lowest one consistent with the board."""
+        state = rules.from_board(_build_board(placements), current_player)
+
+        assert state.current_ply == expected_ply
+
+    def test_derives_ply_for_uneven_piece_counts(self, rules: Rules) -> None:
+        """Test that the derived ply gives the player with most pieces enough turns."""
+        board = _build_board(
+            [
+                (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                (Player.WHITE, PieceType.ANT, (-1, 0)),
+                (Player.WHITE, PieceType.ANT, (-2, 0)),
+                (Player.BLACK, PieceType.QUEEN, (1, 0)),
+            ]
+        )
+
+        assert rules.from_board(board, Player.BLACK).current_ply == 5
+        assert rules.from_board(board, Player.WHITE).current_ply == 6
+
+    def test_derives_ply_for_black_starting_player(self) -> None:
+        """Test that the derived ply follows a starting player other than white."""
+        rules = Rules(starting_player=Player.BLACK)
+        board = _build_board([(Player.BLACK, PieceType.QUEEN, (0, 0))])
+
+        assert rules.from_board(board, Player.WHITE).current_ply == 1
+
+    def test_explicit_ply(self, rules: Rules, placements: list[Placement]) -> None:
+        """Test that a valid explicit ply is kept."""
+        state = rules.from_board(_build_board(placements), Player.WHITE, current_ply=10)
+
+        assert state.current_ply == 10
+
+    def test_does_not_share_input(
+        self, rules: Rules, placements: list[Placement]
+    ) -> None:
+        """Test that moves on the state do not change the stacks of the input board."""
+        board = _build_board(placements)
+        expected = _build_board(placements)
+
+        state = rules.from_board(board, Player.WHITE)
+        state.apply_move(
+            Move(piece_type=PieceType.BEETLE, source_coord=(1, 0), target_coord=(1, -1))
+        )
+
+        assert board == expected
+
+    def test_playable(self, rules: Rules, placements: list[Placement]) -> None:
+        """Test that the state supports `legal_moves` and `apply_checked_move`."""
+        state = rules.from_board(_build_board(placements), Player.WHITE)
+        move = rules.legal_moves(state)[0]
+
+        rules.apply_checked_move(state, move)
+
+        assert state.current_player is Player.BLACK
+
+    def test_empty_stack(self, rules: Rules) -> None:
+        """Test that an empty stack is rejected."""
+        board = _build_board([(Player.WHITE, PieceType.QUEEN, (0, 0))])
+        board[(1, 0)] = []
+
+        with pytest.raises(InvalidBoardError, match=r"stack at coordinate `\(1, 0\)`"):
+            rules.from_board(board, Player.BLACK)
+
+    def test_too_many_pieces(self, rules: Rules) -> None:
+        """Test that more pieces of a type than `piece_counts` allows are rejected."""
+        board = _build_board([(Player.BLACK, PieceType.SPIDER, (q, 0)) for q in range(3)])
+
+        with pytest.raises(
+            InvalidBoardError,
+            match="`BLACK` has `3` pieces of type `SPIDER`.*at most `2`",
+        ):
+            rules.from_board(board, Player.WHITE, current_ply=6)
+
+    def test_two_queens(self, rules: Rules) -> None:
+        """Test that a second queen for the same player is rejected."""
+        board = _build_board(
+            [
+                (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                (Player.WHITE, PieceType.QUEEN, (1, 0)),
+            ]
+        )
+
+        with pytest.raises(
+            InvalidBoardError, match="`WHITE` has `2` pieces of type `QUEEN`"
+        ):
+            rules.from_board(board, Player.WHITE, current_ply=4)
+
+    def test_piece_type_not_in_piece_counts(self) -> None:
+        """Test that a piece type with no copies in `piece_counts` is rejected."""
+        rules = Rules(piece_counts={PieceType.QUEEN: 1, PieceType.ANT: 3})
+        board = _build_board([(Player.WHITE, PieceType.BEETLE, (0, 0))])
+
+        with pytest.raises(
+            InvalidBoardError, match="`1` pieces of type `BEETLE`.*at most `0`"
+        ):
+            rules.from_board(board, Player.BLACK)
+
+    def test_disconnected(self, rules: Rules) -> None:
+        """Test that a board split into two groups is rejected."""
+        board = _build_board(
+            [
+                (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                (Player.BLACK, PieceType.QUEEN, (2, 0)),
+            ]
+        )
+
+        with pytest.raises(InvalidBoardError, match="connected hive"):
+            rules.from_board(board, Player.WHITE)
+
+    def test_negative_ply(self, rules: Rules) -> None:
+        """Test that a negative ply is rejected."""
+        with pytest.raises(InvalidBoardError, match="must not be negative"):
+            rules.from_board({}, Player.WHITE, current_ply=-2)
+
+    @pytest.mark.parametrize(
+        ("current_player", "current_ply"), [(Player.WHITE, 5), (Player.BLACK, 4)]
+    )
+    def test_ply_parity_mismatch(
+        self,
+        rules: Rules,
+        placements: list[Placement],
+        current_player: Player,
+        current_ply: int,
+    ) -> None:
+        """Test that a ply at which the other player would be to move is rejected."""
+        with pytest.raises(InvalidBoardError, match="cannot be to move at ply"):
+            rules.from_board(_build_board(placements), current_player, current_ply)
+
+    def test_more_pieces_than_turns(
+        self, rules: Rules, placements: list[Placement]
+    ) -> None:
+        """Test that a ply too low for the number of pieces on the board is rejected."""
+        with pytest.raises(
+            InvalidBoardError, match="`WHITE` has `2` pieces.*only taken `1` turns"
+        ):
+            rules.from_board(_build_board(placements), Player.WHITE, current_ply=2)
+
+
+class TestApplyCheckedMove:
+    """Test applying moves with legality checks."""
+
+    def test_applies_legal_move(self, rules: Rules) -> None:
+        """Test that a legal move is applied and advances the turn."""
+        state = rules.create_initial_state()
+        move = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
+
+        rules.apply_checked_move(state, move)
+
+        assert state.board == {(0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)]}
+        assert state.current_player is Player.BLACK
+        assert state.current_ply == 1
+
+    def test_applies_pass(self, rules: Rules) -> None:
+        """Test that a pass is applied when it is the only legal move."""
+        state = rules.from_board(
+            _build_board(
+                [
+                    (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                    (Player.BLACK, PieceType.QUEEN, (1, 0)),
+                    (Player.WHITE, PieceType.ANT, (-1, 0)),
+                    (Player.BLACK, PieceType.BEETLE, (-1, 0)),
+                ]
+            ),
+            Player.WHITE,
+        )
+
+        rules.apply_checked_move(state, None)
+
+        assert state.current_player is Player.BLACK
+
+    @pytest.mark.parametrize(
+        "move",
+        [
+            pytest.param(
+                Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0)),
+                id="placement-off-origin",
+            ),
+            pytest.param(
+                Move(piece_type=PieceType.ANT, source_coord=(0, 0), target_coord=(1, 0)),
+                id="movement-on-empty-board",
+            ),
+            pytest.param(None, id="pass-with-moves"),
+        ],
+    )
+    def test_rejects_illegal_move(self, rules: Rules, move: Move | None) -> None:
+        """Test that an illegal move raises and leaves the state unchanged."""
+        state = rules.create_initial_state()
+
+        with pytest.raises(IllegalMoveError, match="not legal for player `WHITE`"):
+            rules.apply_checked_move(state, move)
+
+        assert state.board == {}
+        assert state.current_ply == 0
+
+    def test_rejects_queen_on_first_turn(self) -> None:
+        """Test that a placement forbidden by the rules is rejected."""
+        rules = Rules(allow_queen_first_turn=False)
+        state = rules.create_initial_state()
+        move = Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
+
+        with pytest.raises(IllegalMoveError):
+            rules.apply_checked_move(state, move)
+
+    def test_rejects_move_of_opponent_piece(self, rules: Rules) -> None:
+        """Test that moving an opponent's piece is rejected."""
+        state = rules.from_board(
+            _build_board(
+                [
+                    (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                    (Player.BLACK, PieceType.QUEEN, (1, 0)),
+                ]
+            ),
+            Player.WHITE,
+        )
+        move = Move(piece_type=PieceType.QUEEN, source_coord=(1, 0), target_coord=(1, -1))
+
+        with pytest.raises(IllegalMoveError):
+            rules.apply_checked_move(state, move)

@@ -40,9 +40,12 @@ class PieceType(IntEnum):
     ANT = 4
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Piece:
     """A game piece with a type and an owner.
+
+    Pieces are immutable, so boards can share them and copying a board only needs to copy
+    its stacks.
 
     Attributes:
         type: The type of the piece.
@@ -334,6 +337,30 @@ class GameState:
         return {
             coord for coord in articulation_coords if self.get_stack_height(coord) == 1
         }
+
+    def is_connected(self) -> bool:
+        """Check if all occupied coordinates on the board form one connected group.
+
+        Returns:
+            True if every occupied coordinate can be reached from every other one by
+            moving between direct neighbors, or if the board is empty.
+        """
+        occupied_coords = self.get_occupied_coords()
+        if not occupied_coords:
+            return True
+
+        start_coord: Coordinate = next(iter(occupied_coords))
+        seen: set[Coordinate] = {start_coord}
+        stack: list[Coordinate] = [start_coord]
+
+        while stack:
+            candidate_coord = stack.pop()
+            for neighbor_coord in get_neighbors(candidate_coord):
+                if neighbor_coord in occupied_coords and neighbor_coord not in seen:
+                    seen.add(neighbor_coord)
+                    stack.append(neighbor_coord)
+
+        return len(seen) == len(occupied_coords)
 
     def is_connected_after_removing(self, coord: Coordinate) -> bool:
         """Check if the game board remains connected after removing a piece.

@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -12,6 +13,13 @@ def _assert_state_equal(state: GameState, expected: GameState) -> None:
     assert state.current_ply == expected.current_ply
     assert state.hand == expected.hand
     assert state.queen_coord == expected.queen_coord
+
+
+def test_piece_frozen() -> None:
+    """Test that piece fields cannot be reassigned."""
+    piece = Piece(type=PieceType.ANT, owner=Player.WHITE)
+    with pytest.raises(FrozenInstanceError):
+        piece.owner = Player.BLACK  # ty: ignore[invalid-assignment]
 
 
 def test_player_opponent() -> None:
@@ -668,6 +676,27 @@ class TestGetArticulationPoints:
         """Test that all interior pieces in a five-piece chain are flagged."""
         state = long_chain_state
         assert state.get_articulation_points() == {(-1, 0), (0, 0), (1, 0)}
+
+
+class TestIsConnected:
+    """Test the `is_connected` DFS connectivity check."""
+
+    def test_empty_board(self, default_state: GameState) -> None:
+        """Test that an empty board counts as connected."""
+        assert default_state.is_connected()
+
+    def test_connected_layouts(
+        self, line_3_state: GameState, ring_6_state: GameState
+    ) -> None:
+        """Test that a line and a ring are connected."""
+        assert line_3_state.is_connected()
+        assert ring_6_state.is_connected()
+
+    def test_split_board(self, line_3_state: GameState) -> None:
+        """Test that a board with two separate groups is not connected."""
+        state = line_3_state
+        with state.piece_lifted((0, 0)):
+            assert not state.is_connected()
 
 
 class TestIsConnectedAfterRemoving:
