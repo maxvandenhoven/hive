@@ -1,4 +1,5 @@
 import dataclasses
+import random
 
 import pytest
 
@@ -26,6 +27,16 @@ def _build_state(
     state.current_player = current_player
     state.current_ply = current_ply
     return state
+
+
+def _move_keys(
+    moves: list[Move] | list[Move | None],
+) -> set[tuple[PieceType, Coordinate | None, Coordinate] | None]:
+    """Get the moves as a set of hashable keys, since `Move` is not hashable."""
+    return {
+        None if move is None else (move.piece_type, move.source_coord, move.target_coord)
+        for move in moves
+    }
 
 
 def _targets(rules: Rules, state: GameState, coord: Coordinate) -> set[Coordinate]:
@@ -682,10 +693,65 @@ class TestLegalMoves:
 
         placement_moves = rules.placement_moves(state)
         movement_moves = rules.movement_moves(state)
+        legal_moves = rules.legal_moves(state)
+        placement_count = len(placement_moves)
 
         assert placement_moves
         assert movement_moves
-        assert rules.legal_moves(state) == [*placement_moves, *movement_moves]
+        assert _move_keys(legal_moves[:placement_count]) == _move_keys(placement_moves)
+        assert _move_keys(legal_moves[placement_count:]) == _move_keys(movement_moves)
+
+    def test_sorted_by_piece_type_and_coordinates(self, rules: Rules) -> None:
+        """Test that each group of moves is sorted by piece type and coordinates."""
+        state = _build_state(
+            rules,
+            [
+                (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                (Player.BLACK, PieceType.QUEEN, (1, 0)),
+                (Player.WHITE, PieceType.ANT, (-1, 0)),
+                (Player.BLACK, PieceType.ANT, (2, 0)),
+            ],
+            Player.WHITE,
+            current_ply=4,
+        )
+
+        legal_moves = rules.legal_moves(state)
+        placement_keys = [
+            (move.piece_type, move.target_coord)
+            for move in legal_moves
+            if move is not None and move.source_coord is None
+        ]
+        movement_keys = [
+            (move.piece_type, move.source_coord, move.target_coord)
+            for move in legal_moves
+            if move is not None and move.source_coord is not None
+        ]
+
+        assert placement_keys == sorted(placement_keys)
+        assert movement_keys == sorted(movement_keys)
+
+    @pytest.mark.parametrize("seed", range(5))
+    def test_order_independent_of_history(self, rules: Rules, seed: int) -> None:
+        """Test that the order depends on the position, not on earlier calls.
+
+        Generating moves lifts pieces and undoing a move re-adds coordinates, which
+        changes the iteration order of the board dict without changing the position.
+        """
+        rng = random.Random(seed)
+        state = rules.create_initial_state()
+
+        for _ in range(60):
+            if rules.is_finished(state):
+                break
+
+            legal_moves = rules.legal_moves(state)
+            for move in legal_moves:
+                state.apply_move(move)
+                rules.legal_moves(state)
+                state.undo_move(move)
+
+            assert rules.legal_moves(state) == legal_moves
+            state.apply_move(rng.choice(legal_moves))
 
     def test_pass_when_no_moves(self, rules: Rules) -> None:
         """Test that the only legal move is a pass when nothing can be placed or moved."""
