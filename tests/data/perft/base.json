@@ -1,0 +1,518 @@
+{
+  "source": "see README.md",
+  "rules": {
+    "starting_player": "white",
+    "queen_by_turn": 4,
+    "allow_queen_first_turn": false,
+    "move_before_queen": false,
+    "max_turns": null
+  },
+  "positions": [
+    {
+      "name": "start",
+      "source": "mzinga",
+      "moves": [],
+      "counts": {
+        "0": 1,
+        "1": 4,
+        "2": 96,
+        "3": 1440,
+        "4": 21600,
+        "5": 516240,
+        "6": 12219480,
+        "7": 181641900,
+        "8": 2657392800,
+        "9": 99376027356
+      }
+    },
+    {
+      "name": "queen_moves",
+      "uhp": "Base;InProgress;White[12];wG1;bG1 wG1-;wQ \\wG1;bQ bG1-;wG2 /wG1;bA1 bQ/;wG3 /wG2;bA1 bQ-;wB1 -wG3;bA1 bQ/;wB2 \\wB1;bA1 bQ-;wS1 \\wB2;bA1 bQ/;wS2 wS1/;bA1 bQ-;wA1 \\wS2;bA1 bQ/;wA2 wA1/;bA1 bQ-;wA3 wA2/;bA1 wA3-",
+      "moves": [
+        {"piece": "grasshopper", "from": null, "to": [0, 0]},
+        {"piece": "grasshopper", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [0, -1]},
+        {"piece": "queen", "from": null, "to": [2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [-1, 1]},
+        {"piece": "ant", "from": null, "to": [3, -1]},
+        {"piece": "grasshopper", "from": null, "to": [-2, 2]},
+        {"piece": "ant", "from": [3, -1], "to": [3, 0]},
+        {"piece": "beetle", "from": null, "to": [-3, 2]},
+        {"piece": "ant", "from": [3, 0], "to": [3, -1]},
+        {"piece": "beetle", "from": null, "to": [-3, 1]},
+        {"piece": "ant", "from": [3, -1], "to": [3, 0]},
+        {"piece": "spider", "from": null, "to": [-3, 0]},
+        {"piece": "ant", "from": [3, 0], "to": [3, -1]},
+        {"piece": "spider", "from": null, "to": [-2, -1]},
+        {"piece": "ant", "from": [3, -1], "to": [3, 0]},
+        {"piece": "ant", "from": null, "to": [-2, -2]},
+        {"piece": "ant", "from": [3, 0], "to": [3, -1]},
+        {"piece": "ant", "from": null, "to": [-1, -3]},
+        {"piece": "ant", "from": [3, -1], "to": [3, 0]},
+        {"piece": "ant", "from": null, "to": [0, -4]},
+        {"piece": "ant", "from": [3, 0], "to": [1, -4]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 2
+      },
+      "legal_moves": [
+        {"piece": "queen", "from": [0, -1], "to": [1, -1]},
+        {"piece": "queen", "from": [0, -1], "to": [-1, 0]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "grasshopper_moves",
+      "uhp": "Base;InProgress;White[11];wG1;bG1 wG1-;wQ /wG1;bQ bG1-;wS1 wQ\\;bA1 bQ-;wB1 /wS1;bA1 -wQ;wB1 wS1\\;bA2 bQ-;wB1 /wS1;bA2 wG1\\;wB1 wS1\\;bA3 bQ-;wB1 /wS1;bS1 bQ\\;wB1 wS1;bS1 wB1\\;wB1 /wB1;bA3 -wB1",
+      "moves": [
+        {"piece": "grasshopper", "from": null, "to": [0, 0]},
+        {"piece": "grasshopper", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 1]},
+        {"piece": "queen", "from": null, "to": [2, 0]},
+        {"piece": "spider", "from": null, "to": [-1, 2]},
+        {"piece": "ant", "from": null, "to": [3, 0]},
+        {"piece": "beetle", "from": null, "to": [-2, 3]},
+        {"piece": "ant", "from": [3, 0], "to": [-2, 1]},
+        {"piece": "beetle", "from": [-2, 3], "to": [-1, 3]},
+        {"piece": "ant", "from": null, "to": [3, 0]},
+        {"piece": "beetle", "from": [-1, 3], "to": [-2, 3]},
+        {"piece": "ant", "from": [3, 0], "to": [0, 1]},
+        {"piece": "beetle", "from": [-2, 3], "to": [-1, 3]},
+        {"piece": "ant", "from": null, "to": [3, 0]},
+        {"piece": "beetle", "from": [-1, 3], "to": [-2, 3]},
+        {"piece": "spider", "from": null, "to": [2, 1]},
+        {"piece": "beetle", "from": [-2, 3], "to": [-1, 2]},
+        {"piece": "spider", "from": [2, 1], "to": [-1, 3]},
+        {"piece": "beetle", "from": [-1, 2], "to": [-2, 3]},
+        {"piece": "ant", "from": [3, 0], "to": [-3, 3]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 7
+      },
+      "legal_moves": [
+        {"piece": "grasshopper", "from": [0, 0], "to": [3, 0]},
+        {"piece": "grasshopper", "from": [0, 0], "to": [0, 2]},
+        {"piece": "grasshopper", "from": [0, 0], "to": [-2, 2]},
+        {"piece": "grasshopper", "from": null, "to": [0, -1]},
+        {"piece": "spider", "from": null, "to": [0, -1]},
+        {"piece": "ant", "from": null, "to": [0, -1]},
+        {"piece": "beetle", "from": null, "to": [0, -1]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "ant_moves",
+      "uhp": "Base;InProgress;White[13];wS1;bB1 wS1-;wQ -wS1;bQ bB1-;wB1 \\wQ;bG1 bQ/;wB2 \\wB1;bG2 bG1/;wS2 \\wB2;bS1 bG2/;wA1 \\wS1;bB2 bS1/;wA2 \\wS2;bG3 \\bB2;wA1 -bG1;bA1 \\bG3;wG1 wA2/;bS2 -bA1;wG2 wG1/;bA2 -bS2;wA3 wG2-;bA3 bS2\\;wG3 wA3\\;bA3 wG3\\",
+      "moves": [
+        {"piece": "spider", "from": null, "to": [0, 0]},
+        {"piece": "beetle", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 0]},
+        {"piece": "queen", "from": null, "to": [2, 0]},
+        {"piece": "beetle", "from": null, "to": [-1, -1]},
+        {"piece": "grasshopper", "from": null, "to": [3, -1]},
+        {"piece": "beetle", "from": null, "to": [-1, -2]},
+        {"piece": "grasshopper", "from": null, "to": [4, -2]},
+        {"piece": "spider", "from": null, "to": [-1, -3]},
+        {"piece": "spider", "from": null, "to": [5, -3]},
+        {"piece": "ant", "from": null, "to": [0, -1]},
+        {"piece": "beetle", "from": null, "to": [6, -4]},
+        {"piece": "ant", "from": null, "to": [-1, -4]},
+        {"piece": "grasshopper", "from": null, "to": [6, -5]},
+        {"piece": "ant", "from": [0, -1], "to": [2, -1]},
+        {"piece": "ant", "from": null, "to": [6, -6]},
+        {"piece": "grasshopper", "from": null, "to": [0, -5]},
+        {"piece": "spider", "from": null, "to": [5, -6]},
+        {"piece": "grasshopper", "from": null, "to": [1, -6]},
+        {"piece": "ant", "from": null, "to": [4, -6]},
+        {"piece": "ant", "from": null, "to": [2, -6]},
+        {"piece": "ant", "from": null, "to": [5, -5]},
+        {"piece": "grasshopper", "from": null, "to": [2, -5]},
+        {"piece": "ant", "from": [5, -5], "to": [2, -4]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 16
+      },
+      "legal_moves": [
+        {"piece": "ant", "from": [2, -1], "to": [3, -2]},
+        {"piece": "ant", "from": [2, -1], "to": [4, -3]},
+        {"piece": "ant", "from": [2, -1], "to": [5, -4]},
+        {"piece": "ant", "from": [2, -1], "to": [5, -5]},
+        {"piece": "ant", "from": [2, -1], "to": [4, -5]},
+        {"piece": "ant", "from": [2, -1], "to": [3, -5]},
+        {"piece": "ant", "from": [2, -1], "to": [3, -4]},
+        {"piece": "ant", "from": [2, -1], "to": [2, -3]},
+        {"piece": "ant", "from": [2, -1], "to": [1, -3]},
+        {"piece": "ant", "from": [2, -1], "to": [1, -4]},
+        {"piece": "ant", "from": [2, -1], "to": [1, -5]},
+        {"piece": "ant", "from": [2, -1], "to": [0, -4]},
+        {"piece": "ant", "from": [2, -1], "to": [0, -3]},
+        {"piece": "ant", "from": [2, -1], "to": [0, -2]},
+        {"piece": "ant", "from": [2, -1], "to": [0, -1]},
+        {"piece": "ant", "from": [2, -1], "to": [1, -1]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "spider_moves",
+      "uhp": "Base;InProgress;White[12];wG1;bA1 wG1-;wS1 \\wG1;bQ bA1-;wQ /wG1;bG1 bQ\\;wG2 wQ\\;bB1 /bG1;wB1 /wG2;bG2 bG1\\;wG3 /wB1;bG2 -bB1;wB2 wG3\\;bA1 bG1\\;wA1 wB2-;bA1 bB1\\;wA2 wA1/;bA1 bG1-;wS2 wA2-;bA1 bG1\\;wA3 wS2\\;bA1 wA3-",
+      "moves": [
+        {"piece": "grasshopper", "from": null, "to": [0, 0]},
+        {"piece": "ant", "from": null, "to": [1, 0]},
+        {"piece": "spider", "from": null, "to": [0, -1]},
+        {"piece": "queen", "from": null, "to": [2, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 1]},
+        {"piece": "grasshopper", "from": null, "to": [2, 1]},
+        {"piece": "grasshopper", "from": null, "to": [-1, 2]},
+        {"piece": "beetle", "from": null, "to": [1, 2]},
+        {"piece": "beetle", "from": null, "to": [-2, 3]},
+        {"piece": "grasshopper", "from": null, "to": [2, 2]},
+        {"piece": "grasshopper", "from": null, "to": [-3, 4]},
+        {"piece": "grasshopper", "from": [2, 2], "to": [0, 2]},
+        {"piece": "beetle", "from": null, "to": [-3, 5]},
+        {"piece": "ant", "from": [1, 0], "to": [2, 2]},
+        {"piece": "ant", "from": null, "to": [-2, 5]},
+        {"piece": "ant", "from": [2, 2], "to": [1, 3]},
+        {"piece": "ant", "from": null, "to": [-1, 4]},
+        {"piece": "ant", "from": [1, 3], "to": [3, 1]},
+        {"piece": "spider", "from": null, "to": [0, 4]},
+        {"piece": "ant", "from": [3, 1], "to": [2, 2]},
+        {"piece": "ant", "from": null, "to": [0, 5]},
+        {"piece": "ant", "from": [2, 2], "to": [1, 5]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 4
+      },
+      "legal_moves": [
+        {"piece": "spider", "from": [0, -1], "to": [2, -1]},
+        {"piece": "spider", "from": [0, -1], "to": [1, 1]},
+        {"piece": "spider", "from": [0, -1], "to": [0, 1]},
+        {"piece": "spider", "from": [0, -1], "to": [-2, 2]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "spider_moves_2",
+      "uhp": "Base;InProgress;White[12];wG1;bA1 wG1/;wB1 /wG1;bA2 bA1-;wQ wB1\\;bQ bA2\\;wB2 /wQ;bG1 bQ\\;wS1 wG1\\;bB1 /bG1;wG2 /wB2;bG2 bG1\\;wG3 wG2\\;bG2 wS1\\;wA1 wG3-;bA1 -wB1;wS2 wA1/;bA3 bG1\\;wA2 wS2-;bA2 \\wG1;wA3 wA2\\;bA3 wA3-",
+      "moves": [
+        {"piece": "grasshopper", "from": null, "to": [0, 0]},
+        {"piece": "ant", "from": null, "to": [1, -1]},
+        {"piece": "beetle", "from": null, "to": [-1, 1]},
+        {"piece": "ant", "from": null, "to": [2, -1]},
+        {"piece": "queen", "from": null, "to": [-1, 2]},
+        {"piece": "queen", "from": null, "to": [2, 0]},
+        {"piece": "beetle", "from": null, "to": [-2, 3]},
+        {"piece": "grasshopper", "from": null, "to": [2, 1]},
+        {"piece": "spider", "from": null, "to": [0, 1]},
+        {"piece": "beetle", "from": null, "to": [1, 2]},
+        {"piece": "grasshopper", "from": null, "to": [-3, 4]},
+        {"piece": "grasshopper", "from": null, "to": [2, 2]},
+        {"piece": "grasshopper", "from": null, "to": [-3, 5]},
+        {"piece": "grasshopper", "from": [2, 2], "to": [0, 2]},
+        {"piece": "ant", "from": null, "to": [-2, 5]},
+        {"piece": "ant", "from": [1, -1], "to": [-2, 1]},
+        {"piece": "spider", "from": null, "to": [-1, 4]},
+        {"piece": "ant", "from": null, "to": [2, 2]},
+        {"piece": "ant", "from": null, "to": [0, 4]},
+        {"piece": "ant", "from": [2, -1], "to": [0, -1]},
+        {"piece": "ant", "from": null, "to": [0, 5]},
+        {"piece": "ant", "from": [2, 2], "to": [1, 5]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 4
+      },
+      "legal_moves": [
+        {"piece": "spider", "from": [0, 1], "to": [1, -2]},
+        {"piece": "spider", "from": [0, 1], "to": [3, -1]},
+        {"piece": "spider", "from": [0, 1], "to": [1, -1]},
+        {"piece": "spider", "from": [0, 1], "to": [2, -1]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "beetle_moves",
+      "uhp": "Base;InProgress;White[12];wB1;bB1 wB1-;wQ \\wB1;bQ bB1/;wG1 /wB1;bB2 bB1\\;wA1 /wG1;bA1 bQ\\;wG2 -wA1;bQ \\bB1;wB2 /wG2;bA2 \\bA1;wG3 wB2\\;bA2 \\wQ;wA2 wG3-;bB2 wB1\\;wS1 wA2\\;bA1 bB1\\;wS2 wS1-;bA1 bB1-;wA3 wS2/;bA1 \\wA3",
+      "moves": [
+        {"piece": "beetle", "from": null, "to": [0, 0]},
+        {"piece": "beetle", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [0, -1]},
+        {"piece": "queen", "from": null, "to": [2, -1]},
+        {"piece": "grasshopper", "from": null, "to": [-1, 1]},
+        {"piece": "beetle", "from": null, "to": [1, 1]},
+        {"piece": "ant", "from": null, "to": [-2, 2]},
+        {"piece": "ant", "from": null, "to": [2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [-3, 2]},
+        {"piece": "queen", "from": [2, -1], "to": [1, -1]},
+        {"piece": "beetle", "from": null, "to": [-4, 3]},
+        {"piece": "ant", "from": null, "to": [2, -1]},
+        {"piece": "grasshopper", "from": null, "to": [-4, 4]},
+        {"piece": "ant", "from": [2, -1], "to": [0, -2]},
+        {"piece": "ant", "from": null, "to": [-3, 4]},
+        {"piece": "beetle", "from": [1, 1], "to": [0, 1]},
+        {"piece": "spider", "from": null, "to": [-3, 5]},
+        {"piece": "ant", "from": [2, 0], "to": [1, 1]},
+        {"piece": "spider", "from": null, "to": [-2, 5]},
+        {"piece": "ant", "from": [1, 1], "to": [2, 0]},
+        {"piece": "ant", "from": null, "to": [-1, 4]},
+        {"piece": "ant", "from": [2, 0], "to": [-1, 3]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 5
+      },
+      "legal_moves": [
+        {"piece": "beetle", "from": [0, 0], "to": [0, -1]},
+        {"piece": "beetle", "from": [0, 0], "to": [1, -1]},
+        {"piece": "beetle", "from": [0, 0], "to": [1, 0]},
+        {"piece": "beetle", "from": [0, 0], "to": [0, 1]},
+        {"piece": "beetle", "from": [0, 0], "to": [-1, 1]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "tournament_opening",
+      "uhp": "Base;NotStarted;White[1]",
+      "moves": [],
+      "counts": {
+        "0": 1,
+        "1": 4
+      },
+      "legal_moves": [
+        {"piece": "grasshopper", "from": null, "to": [0, 0]},
+        {"piece": "spider", "from": null, "to": [0, 0]},
+        {"piece": "ant", "from": null, "to": [0, 0]},
+        {"piece": "beetle", "from": null, "to": [0, 0]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "white_wins",
+      "uhp": "Base;WhiteWins;Black[8];wS1;bS1 wS1-;wQ -wS1;bQ bS1/;wG1 -wQ;bG1 \\bQ;wG1 bQ\\;bG2 bQ/;wA1 wQ\\;bA1 bG2/;wA1 bG2\\;bA1 \\bG2;wQ \\wS1;bA1 bG2/;wQ /bG1",
+      "moves": [
+        {"piece": "spider", "from": null, "to": [0, 0]},
+        {"piece": "spider", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 0]},
+        {"piece": "queen", "from": null, "to": [2, -1]},
+        {"piece": "grasshopper", "from": null, "to": [-2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [2, -2]},
+        {"piece": "grasshopper", "from": [-2, 0], "to": [2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [3, -2]},
+        {"piece": "ant", "from": null, "to": [-1, 1]},
+        {"piece": "ant", "from": null, "to": [4, -3]},
+        {"piece": "ant", "from": [-1, 1], "to": [3, -1]},
+        {"piece": "ant", "from": [4, -3], "to": [3, -3]},
+        {"piece": "queen", "from": [-1, 0], "to": [0, -1]},
+        {"piece": "ant", "from": [3, -3], "to": [4, -3]},
+        {"piece": "queen", "from": [0, -1], "to": [1, -1]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 0
+      },
+      "source": "nokamute"
+    },
+    {
+      "name": "black_suicide",
+      "uhp": "Base;WhiteWins;White[7];wS1;bS1 wS1-;wQ -wS1;bQ bS1/;wG1 -wQ;bG1 \\bQ;wG1 bQ\\;bG2 bQ/;wA1 wQ\\;bA1 bG2/;wA1 bG2\\;bA1 /bG1",
+      "moves": [
+        {"piece": "spider", "from": null, "to": [0, 0]},
+        {"piece": "spider", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 0]},
+        {"piece": "queen", "from": null, "to": [2, -1]},
+        {"piece": "grasshopper", "from": null, "to": [-2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [2, -2]},
+        {"piece": "grasshopper", "from": [-2, 0], "to": [2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [3, -2]},
+        {"piece": "ant", "from": null, "to": [-1, 1]},
+        {"piece": "ant", "from": null, "to": [4, -3]},
+        {"piece": "ant", "from": [-1, 1], "to": [3, -1]},
+        {"piece": "ant", "from": [4, -3], "to": [1, -1]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 0
+      },
+      "source": "nokamute"
+    },
+    {
+      "name": "draw",
+      "uhp": "Base;Draw;White[11];wS1;bS1 wS1-;wQ -wS1;bQ bS1/;wG1 -wQ;bG1 \\bQ;wG1 bQ\\;bG2 bQ/;wA1 wQ\\;bA1 bG2/;wA1 bG2\\;bA1 \\bG2;wQ \\wS1;bG1 wA1/;wQ -bQ;bA1 \\wQ;wB1 -wS1;bG3 bG1-;wB1 /bA1;bG3 -bG2",
+      "moves": [
+        {"piece": "spider", "from": null, "to": [0, 0]},
+        {"piece": "spider", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 0]},
+        {"piece": "queen", "from": null, "to": [2, -1]},
+        {"piece": "grasshopper", "from": null, "to": [-2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [2, -2]},
+        {"piece": "grasshopper", "from": [-2, 0], "to": [2, 0]},
+        {"piece": "grasshopper", "from": null, "to": [3, -2]},
+        {"piece": "ant", "from": null, "to": [-1, 1]},
+        {"piece": "ant", "from": null, "to": [4, -3]},
+        {"piece": "ant", "from": [-1, 1], "to": [3, -1]},
+        {"piece": "ant", "from": [4, -3], "to": [3, -3]},
+        {"piece": "queen", "from": [-1, 0], "to": [0, -1]},
+        {"piece": "grasshopper", "from": [2, -2], "to": [4, -2]},
+        {"piece": "queen", "from": [0, -1], "to": [1, -1]},
+        {"piece": "ant", "from": [3, -3], "to": [1, -2]},
+        {"piece": "beetle", "from": null, "to": [-1, 0]},
+        {"piece": "grasshopper", "from": null, "to": [5, -2]},
+        {"piece": "beetle", "from": [-1, 0], "to": [0, -1]},
+        {"piece": "grasshopper", "from": [5, -2], "to": [2, -2]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 0
+      },
+      "source": "nokamute"
+    },
+    {
+      "name": "pass",
+      "uhp": "Base;InProgress;White[7];wA1;bS1 wA1-;wQ -wA1;bQ bS1/;wQ \\wA1;bA1 bS1\\;wQ -wA1;bA2 bQ\\;wQ \\wA1;bA1 \\wQ;wG1 /wQ;bA2 /wG1",
+      "moves": [
+        {"piece": "ant", "from": null, "to": [0, 0]},
+        {"piece": "spider", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 0]},
+        {"piece": "queen", "from": null, "to": [2, -1]},
+        {"piece": "queen", "from": [-1, 0], "to": [0, -1]},
+        {"piece": "ant", "from": null, "to": [1, 1]},
+        {"piece": "queen", "from": [0, -1], "to": [-1, 0]},
+        {"piece": "ant", "from": null, "to": [2, 0]},
+        {"piece": "queen", "from": [-1, 0], "to": [0, -1]},
+        {"piece": "ant", "from": [1, 1], "to": [0, -2]},
+        {"piece": "grasshopper", "from": null, "to": [-1, 0]},
+        {"piece": "ant", "from": [2, 0], "to": [-2, 1]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 1
+      },
+      "legal_moves": [
+        null
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "long_hive",
+      "uhp": "Base;InProgress;White[12];wG1;bG1 wG1-;wQ -wG1;bQ bG1-;wS1 -wQ;bS1 bQ-;wS2 -wS1;bS2 bS1-;wB1 -wS2;bB1 bS2-;wB2 -wB1;bB2 bB1-;wG2 -wB2;bG2 bB2-;wG3 -wG2;bG3 bG2-;wA1 -wG3;bA1 bG3-;wA2 -wA1;bA2 bA1-;wA3 -wA2;bA3 bA2-",
+      "moves": [
+        {"piece": "grasshopper", "from": null, "to": [0, 0]},
+        {"piece": "grasshopper", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [-1, 0]},
+        {"piece": "queen", "from": null, "to": [2, 0]},
+        {"piece": "spider", "from": null, "to": [-2, 0]},
+        {"piece": "spider", "from": null, "to": [3, 0]},
+        {"piece": "spider", "from": null, "to": [-3, 0]},
+        {"piece": "spider", "from": null, "to": [4, 0]},
+        {"piece": "beetle", "from": null, "to": [-4, 0]},
+        {"piece": "beetle", "from": null, "to": [5, 0]},
+        {"piece": "beetle", "from": null, "to": [-5, 0]},
+        {"piece": "beetle", "from": null, "to": [6, 0]},
+        {"piece": "grasshopper", "from": null, "to": [-6, 0]},
+        {"piece": "grasshopper", "from": null, "to": [7, 0]},
+        {"piece": "grasshopper", "from": null, "to": [-7, 0]},
+        {"piece": "grasshopper", "from": null, "to": [8, 0]},
+        {"piece": "ant", "from": null, "to": [-8, 0]},
+        {"piece": "ant", "from": null, "to": [9, 0]},
+        {"piece": "ant", "from": null, "to": [-9, 0]},
+        {"piece": "ant", "from": null, "to": [10, 0]},
+        {"piece": "ant", "from": null, "to": [-10, 0]},
+        {"piece": "ant", "from": null, "to": [11, 0]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 45
+      },
+      "legal_moves": [
+        {"piece": "ant", "from": [-10, 0], "to": [-9, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-8, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-7, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-6, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-5, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-4, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-3, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-2, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-1, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [0, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [1, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [2, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [3, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [4, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [5, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [6, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [7, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [8, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [9, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [10, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [11, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [12, -1]},
+        {"piece": "ant", "from": [-10, 0], "to": [12, 0]},
+        {"piece": "ant", "from": [-10, 0], "to": [11, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [10, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [9, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [8, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [7, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [6, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [5, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [4, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [3, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [2, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [1, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [0, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-1, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-2, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-3, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-4, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-5, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-6, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-7, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-8, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-9, 1]},
+        {"piece": "ant", "from": [-10, 0], "to": [-10, 1]}
+      ],
+      "source": "nokamute"
+    },
+    {
+      "name": "beetle_gate",
+      "uhp": "Base;InProgress;White[12];wB1;bS1 wB1-;wQ \\wB1;bQ bS1/;wB2 -wQ;bB1 bQ\\;wS1 /wB2;bB1 bS1;wG1 /wS1;bQ \\bB1;wG2 wG1\\;bB2 bQ/;wG3 wG2\\;bB2 \\bQ;wA1 wG3-;bB2 wQ;wA2 wA1-;bA1 bQ/;wS2 wA2-;bA1 bB1/;wA3 wS2/;bA1 wA3/",
+      "moves": [
+        {"piece": "beetle", "from": null, "to": [0, 0]},
+        {"piece": "spider", "from": null, "to": [1, 0]},
+        {"piece": "queen", "from": null, "to": [0, -1]},
+        {"piece": "queen", "from": null, "to": [2, -1]},
+        {"piece": "beetle", "from": null, "to": [-1, -1]},
+        {"piece": "beetle", "from": null, "to": [2, 0]},
+        {"piece": "spider", "from": null, "to": [-2, 0]},
+        {"piece": "beetle", "from": [2, 0], "to": [1, 0]},
+        {"piece": "grasshopper", "from": null, "to": [-3, 1]},
+        {"piece": "queen", "from": [2, -1], "to": [1, -1]},
+        {"piece": "grasshopper", "from": null, "to": [-3, 2]},
+        {"piece": "beetle", "from": null, "to": [2, -2]},
+        {"piece": "grasshopper", "from": null, "to": [-3, 3]},
+        {"piece": "beetle", "from": [2, -2], "to": [1, -2]},
+        {"piece": "ant", "from": null, "to": [-2, 3]},
+        {"piece": "beetle", "from": [1, -2], "to": [0, -1]},
+        {"piece": "ant", "from": null, "to": [-1, 3]},
+        {"piece": "ant", "from": null, "to": [2, -2]},
+        {"piece": "spider", "from": null, "to": [0, 3]},
+        {"piece": "ant", "from": [2, -2], "to": [2, -1]},
+        {"piece": "ant", "from": null, "to": [1, 2]},
+        {"piece": "ant", "from": [2, -1], "to": [2, 1]}
+      ],
+      "counts": {
+        "0": 1,
+        "1": 4
+      },
+      "legal_moves": [
+        {"piece": "beetle", "from": [0, 0], "to": [0, -1]},
+        {"piece": "beetle", "from": [0, 0], "to": [1, 0]},
+        {"piece": "beetle", "from": [0, 0], "to": [0, 1]},
+        {"piece": "beetle", "from": [0, 0], "to": [-1, 0]}
+      ],
+      "source": "nokamute"
+    }
+  ]
+}

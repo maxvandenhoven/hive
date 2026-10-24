@@ -87,7 +87,7 @@ One root `Makefile`; every command a session needs is a target.
 | `make test` | `pytest` with coverage (excludes `slow`, `core = "sysmon"` keeps tracing cheap); `vitest run` in `frontend/` |
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
 | `make check` | `format lint type` (no tests) |
-| `make perft` | `hive bench perft` at the standard depth |
+| `make perft` | `hive bench perft --depth 6` on the start position: a speed baseline that also fails on a count mismatch |
 | `make dev` | compose up (Postgres, Garage), uvicorn `--reload`, vite dev server |
 | `make api-client` | regenerate the OpenAPI TypeScript client |
 | `make install-hooks` | install pre-commit hooks (including commit-msg) |
