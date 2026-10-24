@@ -19,6 +19,8 @@ One Python package `hive` with a single `pyproject.toml` and `uv.lock` at the re
 - `src/hive/assets/` — insect SVG/PNG assets
 - `src/hive/cli.py` — `hive` command line entry point (Typer)
 - `tests/` — mirrors `src/hive/`, for example `tests/engine/` for `src/hive/engine/`
+- `scripts/tooling/` — development tooling such as the comment checker (tests in
+  `tests/tooling/`)
 
 Heavy dependencies live behind extras: `plotting`, `api`, `vision`, `train`.
 
@@ -29,7 +31,7 @@ Dependency management uses `uv`. Python 3.13.x is required (no other minor versi
 ```
 make sync           # uv sync --all-groups --all-extras
 make format         # ruff format and import sorting
-make lint           # ruff check --fix
+make lint           # ruff check --fix and the comment checker
 make type           # ty check
 make check          # format + lint + type (no tests)
 make test           # pytest with coverage, excluding `slow` tests
@@ -51,10 +53,12 @@ See `docs/plans/tooling.md` for the full rules and how each one is enforced.
 - Type annotations on every function and method, including private ones and tests (ruff
   `ANN`, no test exemptions). Test functions return `-> None`.
 - Google-style docstrings on public classes and functions (ruff `D`, `convention =
-  "google"`). Existing docstrings are still NumPy style until WP 02 converts them.
+  "google"`). Do not repeat types in `Args:` or `Returns:`; the annotations carry them.
 - Use single backticks (`` `code` ``) for inline code in docstrings, not double backticks.
-- Reflow docstring text to fill up to the 90-character limit; do not wrap earlier.
+- Fill docstring prose and comments up to the 90-character limit by hand; do not wrap
+  earlier. No tool reflows them, and ruff `E501` flags lines past 90 characters.
 - Comments start with a capital letter and end with a period, unless shorter than 5 words.
+  Checked by `scripts/tooling/check_comments.py` (part of `make lint`).
 - No `print` statements (ruff `T20`); use `logging` instead.
 - Do not split lines manually or add trailing commas to force splits; let `ruff format`
   wrap (`skip-magic-trailing-comma = true`).
@@ -70,8 +74,8 @@ Uses `ty` (Astral) — not mypy. Run via `make type`.
 ## Claude Code hooks
 
 - PostToolUse on `Edit|Write|MultiEdit` runs `.claude/hooks/format-file.sh`, which formats
-  the edited `.py` file with `ruff format` and `ruff check --fix`. Remaining lint errors are
-  reported back on stderr; fix them.
+  the edited `.py` file with `ruff format` and `ruff check --fix`, then runs the comment
+  checker. Remaining errors are reported back on stderr; fix them.
 - Stop runs `make check`.
 
 ## Git workflow
