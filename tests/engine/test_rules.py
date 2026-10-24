@@ -439,6 +439,70 @@ class TestMovement:
             piece_type=PieceType.BEETLE, source_coord=(0, 0), target_coord=(1, 0)
         ) in free_rules.movement_moves(state)
 
+    def test_slide_keeps_hive_contact(self, free_rules: Rules) -> None:
+        r"""Test that a slide must pass along a piece, not jump to a distant one.
+
+        Layout:
+        ```text
+                (0, -2) --- (1, -2)
+                /                 \
+        (-1, -1)     (0, -1)     (1, -1)
+                         \         /
+                (-1, 0)    (0, 0) Q
+        ```
+
+        The target `(-1, 0)` touches `(-1, -1)`, but both coordinates flanking the slide
+        from `(0, 0)`, `(0, -1)` and `(-1, 1)`, are empty, so the queen loses contact.
+        """
+        state = _build_state(
+            free_rules,
+            [
+                (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                (Player.BLACK, PieceType.ANT, (1, -1)),
+                (Player.BLACK, PieceType.ANT, (1, -2)),
+                (Player.BLACK, PieceType.ANT, (0, -2)),
+                (Player.BLACK, PieceType.ANT, (-1, -1)),
+            ],
+            Player.WHITE,
+            current_ply=5,
+        )
+
+        assert _targets(free_rules, state, (0, 0)) == {(1, 0), (0, -1)}
+
+    def test_beetle_cannot_climb_through_high_gate(self, free_rules: Rules) -> None:
+        """Test that two stacks higher than the source and target block a climb."""
+        state = _build_state(
+            free_rules,
+            [
+                (Player.WHITE, PieceType.BEETLE, (0, 0)),
+                (Player.BLACK, PieceType.ANT, (1, 0)),
+                (Player.BLACK, PieceType.ANT, (1, -1)),
+                (Player.BLACK, PieceType.BEETLE, (1, -1)),
+                (Player.BLACK, PieceType.ANT, (0, 1)),
+                (Player.BLACK, PieceType.BEETLE, (0, 1)),
+            ],
+            Player.WHITE,
+            current_ply=6,
+        )
+
+        assert (1, 0) not in _targets(free_rules, state, (0, 0))
+
+    def test_beetle_on_hive_passes_low_gate(self, free_rules: Rules) -> None:
+        """Test that a beetle on the hive can move down between two single pieces."""
+        state = _build_state(
+            free_rules,
+            [
+                (Player.BLACK, PieceType.ANT, (0, 0)),
+                (Player.BLACK, PieceType.ANT, (1, -1)),
+                (Player.BLACK, PieceType.ANT, (0, 1)),
+                (Player.WHITE, PieceType.BEETLE, (0, 0)),
+            ],
+            Player.WHITE,
+            current_ply=4,
+        )
+
+        assert (1, 0) in _targets(free_rules, state, (0, 0))
+
     def test_grasshopper_jumps(self, free_rules: Rules) -> None:
         """Test that the grasshopper jumps over lines of pieces to the first gap."""
         state = _build_state(

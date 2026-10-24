@@ -3,14 +3,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntEnum
 
-from hive.engine.grid import (
-    Coordinate,
-    add,
-    get_anti_clockwise_direction,
-    get_clockwise_direction,
-    get_direction,
-    get_neighbors,
-)
+from hive.engine.grid import Coordinate, get_flanking_coords, get_neighbors
 
 
 class Player(IntEnum):
@@ -218,15 +211,16 @@ class GameState:
         return self.board[coord][-1]
 
     def get_stack_height(self, coord: Coordinate) -> int:
-        """Get the height of the stack on an occupied coordinate.
+        """Get the height of the stack on a coordinate.
 
         Args:
             coord: The axial coordinate `(q, r)` to check.
 
         Returns:
-            The height of the stack.
+            The height of the stack, or zero if the coordinate is unoccupied.
         """
-        return len(self.board[coord])
+        stack = self.board.get(coord)
+        return len(stack) if stack is not None else 0
 
     def get_occupied_coords(self) -> set[Coordinate]:
         """Get all occupied coordinates on the board.
@@ -415,16 +409,11 @@ class GameState:
         if self.is_occupied(target_coord):
             return False
 
-        # Determine the direction to move from the source to the target coordinate.
-        direction = get_direction(source_coord, target_coord)
-
-        # Use the anti-clockwise and clockwise direction to get the two coordinates
-        # flanking the source and target coordinates. These should be empty.
-        anti_clockwise_direction = get_anti_clockwise_direction(direction)
-        anti_clockwise_coord = add(source_coord, anti_clockwise_direction)
-        clockwise_direction = get_clockwise_direction(direction)
-        clockwise_coord = add(source_coord, clockwise_direction)
-
+        # The two coordinates flanking the source and target coordinates should not both
+        # be occupied.
+        anti_clockwise_coord, clockwise_coord = get_flanking_coords(
+            source_coord, target_coord
+        )
         return not (
             self.is_occupied(anti_clockwise_coord) and self.is_occupied(clockwise_coord)
         )

@@ -4,6 +4,7 @@ from hive.engine.grid import (
     get_anti_clockwise_direction,
     get_clockwise_direction,
     get_direction,
+    get_flanking_coords,
     get_neighbors,
 )
 
@@ -94,3 +95,20 @@ class TestGetDirection:
     def test_non_neighboring_coordinates(self) -> None:
         """Test that `get_direction` works for non-neighboring coordinates."""
         assert get_direction((0, 0), (2, -2)) == (2, -2)
+
+
+class TestGetFlankingCoords:
+    """Test the `get_flanking_coords` calculation."""
+
+    def test_east_slide(self) -> None:
+        """Test the flanks of a slide east, which are north-east and south-east."""
+        assert get_flanking_coords((0, 0), (1, 0)) == ((1, -1), (0, 1))
+
+    def test_flanks_neighbor_both(self) -> None:
+        """Test that both flanks neighbor the source and the target in every direction."""
+        source_coord = (2, -3)
+        for direction in HEX_DIRECTIONS:
+            target_coord = add(source_coord, direction)
+            for flanking_coord in get_flanking_coords(source_coord, target_coord):
+                assert flanking_coord in get_neighbors(source_coord)
+                assert flanking_coord in get_neighbors(target_coord)
