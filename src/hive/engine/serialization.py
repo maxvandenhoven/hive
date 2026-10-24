@@ -466,7 +466,14 @@ def deserialize_record(data: object) -> GameRecord:
 
 
 def _serialize_piece(piece: Piece) -> JsonValue:
-    """Serialize a piece as an object with its `piece` type and `owner`."""
+    """Serialize a piece as an object with its `piece` type and `owner`.
+
+    Args:
+        piece: The piece to serialize.
+
+    Returns:
+        An object with the lower case names of the piece type and owner.
+    """
     return {
         "piece": serialize_piece_type(piece.type),
         "owner": serialize_player(piece.owner),
@@ -475,6 +482,12 @@ def _serialize_piece(piece: Piece) -> JsonValue:
 
 def _deserialize_piece(data: object) -> Piece:
     """Deserialize a piece from an object with its `piece` type and `owner`.
+
+    Args:
+        data: The serialized piece.
+
+    Returns:
+        The piece.
 
     Raises:
         ValueError: If `data` is not a valid piece object.
@@ -488,6 +501,12 @@ def _deserialize_piece(data: object) -> Piece:
 
 def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
     """Deserialize piece counts from an object keyed by piece type name.
+
+    Args:
+        data: The serialized piece counts.
+
+    Returns:
+        The number of copies of each piece type.
 
     Raises:
         ValueError: If `data` is not an object, a key is not a piece type, or a count is
@@ -513,6 +532,14 @@ def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
 def _deserialize_enum[E: IntEnum](data: object, enum: type[E], kind: str) -> E:
     """Deserialize an enum member from its lower case name.
 
+    Args:
+        data: The serialized member.
+        enum: The enum to look the member up in.
+        kind: The name of the value in error messages, for example `player`.
+
+    Returns:
+        The member whose name is `data` in upper case.
+
     Raises:
         ValueError: If `data` is not the lower case name of a member.
     """
@@ -534,6 +561,15 @@ def _expect_object(
     optional: Set[str] = frozenset(),
 ) -> dict[str, object]:
     """Check that a value is an object with the required and no unknown keys.
+
+    Args:
+        data: The value to check.
+        kind: The name of the object in error messages, for example `move`.
+        required: The keys the object must have.
+        optional: The keys the object may have in addition to `required`.
+
+    Returns:
+        The value as an object keyed by string.
 
     Raises:
         ValueError: If `data` is not an object, misses a required key or has an unknown
@@ -559,6 +595,13 @@ def _expect_object(
 def _expect_optional_int(value: object, name: str) -> int | None:
     """Check that a field value is an integer or `None`.
 
+    Args:
+        value: The value to check.
+        name: The name of the field in error messages.
+
+    Returns:
+        The value as an integer or `None`.
+
     Raises:
         ValueError: If `value` is neither an integer nor `None`.
     """
@@ -572,6 +615,13 @@ def _expect_optional_int(value: object, name: str) -> int | None:
 def _expect_bool(value: object, name: str) -> bool:
     """Check that a field value is a boolean.
 
+    Args:
+        value: The value to check.
+        name: The name of the field in error messages.
+
+    Returns:
+        The value as a boolean.
+
     Raises:
         ValueError: If `value` is not a boolean.
     """
@@ -583,5 +633,15 @@ def _expect_bool(value: object, name: str) -> bool:
 
 
 def _is_int(value: object) -> TypeIs[int]:
-    """Check that a value is an integer, excluding booleans."""
+    """Check that a value is an integer, excluding booleans.
+
+    `bool` is a subclass of `int`, so `isinstance(True, int)` alone would accept `true`
+    where JSON expects a number.
+
+    Args:
+        value: The value to check.
+
+    Returns:
+        True if the value is an `int` but not a `bool`, otherwise False.
+    """
     return isinstance(value, int) and not isinstance(value, bool)
