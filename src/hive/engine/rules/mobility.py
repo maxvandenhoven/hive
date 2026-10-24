@@ -11,8 +11,8 @@ class MobilityRule(ABC):
     The `Ruleset` class holds a single `MobilityRule` instance. When generating legal
     movement moves via `Ruleset.get_legal_movement_moves`, the ruleset calls
     `get_movable_pieces` to obtain the list of pieces that are eligible to move. Each
-    returned coordinate and piece type is then passed to the corresponding
-    `MovementRule` to determine the specific target coordinates.
+    returned coordinate and piece type is then passed to the corresponding `MovementRule`
+    to determine the specific target coordinates.
 
     Subclasses must implement `get_movable_pieces` to define the criteria under which a
     piece on the board is allowed to move.
@@ -22,14 +22,10 @@ class MobilityRule(ABC):
     def get_movable_pieces(self, state: GameState) -> list[tuple[Coordinate, PieceType]]:
         """Get all pieces on the board that are allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
+        Args:
+            state: The current state of the game.
 
-        Returns
-        -------
-        list[tuple[Coordinate, PieceType]]
+        Returns:
             A list of tuples, each containing the axial coordinate `(q, r)` of a movable
             piece and its `PieceType`.
         """
@@ -48,10 +44,9 @@ class BaseMobilityRule(MobilityRule):
     def __init__(self, can_move_before_queen_placed: bool = False) -> None:
         """Initialize the default mobility rule.
 
-        Parameters
-        ----------
-        can_move_before_queen_placed : bool, optional
-            Whether pieces can be moved before the queen is placed. Defaults to `False`.
+        Args:
+            can_move_before_queen_placed: Whether pieces can be moved before the queen is
+                placed. Defaults to `False`.
         """
         self.can_move_before_queen_placed = can_move_before_queen_placed
 
@@ -59,14 +54,10 @@ class BaseMobilityRule(MobilityRule):
     def get_movable_pieces(self, state: GameState) -> list[tuple[Coordinate, PieceType]]:
         """Get all pieces on the board that are allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
+        Args:
+            state: The current state of the game.
 
-        Returns
-        -------
-        list[tuple[Coordinate, PieceType]]
+        Returns:
             A list of tuples, each containing the axial coordinate `(q, r)` of a movable
             piece and its `PieceType`.
         """

@@ -28,14 +28,10 @@ SVG_SPRITE_FILENAMES: dict[PieceType, str] = {
 def load_svg_sprite(piece_type: PieceType) -> str:
     """Load an SVG sprite from the bundled assets and return its path.
 
-    Parameters
-    ----------
-    piece_type : PieceType
-        The type of piece whose sprite should be loaded.
+    Args:
+        piece_type: The type of piece whose sprite should be loaded.
 
-    Returns
-    -------
-    str
+    Returns:
         The filesystem path to the SVG sprite file.
     """
     sprite_folder = importlib.resources.files("hive.assets.svg")

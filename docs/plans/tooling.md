@@ -7,12 +7,12 @@ linting, typing and tests for free.
 
 | Rule | Enforced by |
 |---|---|
-| Line length 90 for code, docstrings and comments | `ruff format`, ruff `E501`, docstring/comment formatter |
+| Line length 90 for code, docstrings and comments | `ruff format`, ruff `E501` |
 | Type annotations on every function and method, including private ones and tests | ruff `ANN` (no test exemptions), `ty check` |
 | Google-style docstrings on public modules' classes and functions | ruff `D` with `convention = "google"` |
 | Single backticks for inline code in docstrings | review (documented in `CLAUDE.md`) |
-| Docstring prose reflowed to fill up to 90 characters | docstring formatter (WP 02) |
-| Comments: start with a capital letter and end with a period, unless shorter than 5 words; wrapped at 90 | comment formatter and checker (WP 02) |
+| Docstring prose and comments filled up to 90 characters (not wrapped earlier) | manual; ruff `E501` flags overlong lines (see below) |
+| Comments: start with a capital letter and end with a period, unless shorter than 5 words | `scripts/tooling/check_comments.py` |
 | No `print`, use `logging` | ruff `T20` |
 | No manual line splitting or trailing commas to force splits; let the formatter wrap | `skip-magic-trailing-comma = true` |
 | Pytest fixtures always state `scope="function"` (or another explicit scope) | review (documented in `CLAUDE.md`) |
@@ -44,22 +44,35 @@ def target_coords(self, state: GameState, coord: Coordinate) -> list[Coordinate]
 
 ### Docstring and comment formatting (WP 02)
 
-`ruff format` does not wrap docstring prose or comments, and no standard tool enforces the
-comment capitalisation rule. WP 02 resolves this:
+`ruff format` does not wrap docstring prose or comments. WP 02 evaluated the available
+tools for reflowing Google-style docstrings to 90 characters:
 
-1. Evaluate `docformatter` (and alternatives) for reflowing Google-style docstrings to 90
-   characters without breaking `Args:`/`Returns:` sections, lists or code blocks. Use it if
-   it handles the codebase cleanly.
-2. Otherwise, and for comments in any case, write a small formatter in
-   `scripts/tooling/` (tested in `tests/tooling/`) using `tokenize`/`ast` that:
-   - reflows block comments (consecutive `#` lines at the same indentation) to 90
-     characters, preserving lists, code-like lines and `# noqa`/`# type:` pragmas;
-   - reflows docstring paragraphs if `docformatter` is not adopted;
-   - in check mode, reports comments that do not start with a capital letter or (for 5 or
-     more words) do not end with a period.
-3. Wire both into `make format` (fix) and `make lint` (check).
+- `docformatter` 1.7.8 (`--style google --wrap-summaries 90 --wrap-descriptions 90`)
+  refills plain paragraphs but skips every docstring that contains a section (`Args:`,
+  `Returns:`, ...) or a list. That covers most docstrings in the codebase, so their
+  paragraphs and argument descriptions are never refilled. It also breaks words at hyphens
+  (`anti-` / `clockwise`), splits long summary lines into two-line summaries, and removes
+  blank lines that `ruff format` adds back, so the two do not agree.
+- `pydocstringformatter` 1.0.0 only wraps summaries by default. With
+  `--linewrap-full-docstring` it inserted a period in the middle of a long summary and left
+  the body unchanged.
 
-WP 02 also converts all existing NumPy-style docstrings to Google style.
+Neither is adopted, and writing a custom reflow tool is out of scope. Instead:
+
+1. Docstring prose and comments are filled up to 90 characters by hand (and by Claude when
+   it writes them). Do not wrap earlier.
+2. Ruff `E501` flags any line longer than 90 characters, including docstrings and
+   comments, so overlong lines fail `make lint` and the PostToolUse hook.
+3. `scripts/tooling/check_comments.py` (tested in `tests/tooling/`) checks the comment
+   rule with `tokenize`. Consecutive full-line comments at the same indentation form one
+   block, and an empty `#` line starts a new one. Each block and each inline comment must
+   not start with a lowercase letter and, at 5 or more words, must end with a period.
+   Pragmas (`noqa`, `type:`, `pragma:`, `fmt:`, `ruff:`, `ty:`, `isort:`), shebangs and
+   leading or trailing URLs are exempt. Violations are printed as `path:line: message`
+   with a non-zero exit code. `make lint` and the PostToolUse hook run it.
+
+WP 02 also converted all NumPy-style docstrings to Google style. Return types are no longer
+repeated in `Returns:` because the annotations carry them.
 
 ## Makefile
 
@@ -68,8 +81,8 @@ One root `Makefile`; every command a session needs is a target.
 | Target | Does |
 |---|---|
 | `make sync` | `uv sync --all-groups --all-extras` |
-| `make format` | `ruff format`, `ruff check --fix --select I`, docstring + comment formatter; `prettier --write` in `frontend/` once it exists |
-| `make lint` | `ruff check`, comment checker; `eslint` in `frontend/` |
+| `make format` | `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` once it exists |
+| `make lint` | `ruff check --fix`, comment checker; `eslint` in `frontend/` |
 | `make type` | `ty check`; `tsc --noEmit` in `frontend/` |
 | `make test` | `pytest` with coverage (excludes `slow`); `vitest run` in `frontend/` |
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
@@ -87,10 +100,10 @@ Frontend targets are added by WP 13; dev targets by WP 10.
 
 - **PostToolUse** on `Edit|Write|MultiEdit`: `.claude/hooks/format-file.sh` reads the hook
   JSON from stdin, takes `tool_input.file_path`, and for `*.py` runs `ruff format`,
-  `ruff check --fix` and the docstring/comment formatter on that file only; for
+  `ruff check --fix` and the comment checker on that file only; for
   `frontend/**/*.{ts,tsx,css}` runs `prettier --write` (once the frontend exists). It exits
-  0 when the file is not formattable and prints remaining lint errors to stderr with exit
-  code 2, so Claude sees and fixes them.
+  0 when the file is not formattable and prints remaining lint and comment errors to stderr
+  with exit code 2, so Claude sees and fixes them.
 - **Stop**: `make check`, so type errors surface before a session ends. (Replaces the
   current `make format lint`.)
 

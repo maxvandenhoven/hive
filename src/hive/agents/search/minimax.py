@@ -10,22 +10,18 @@ from hive.engine.state import GameState, Move, Player
 class MinimaxAgent(Agent):
     """Agent that selects moves using the minimax algorithm.
 
-    Searches the game tree to a fixed depth, maximizing the evaluated score when it is
-    the root player's turn and minimizing when it is the opponent's turn. The search
-    uses a provided evaluator to score leaf positions.
+    Searches the game tree to a fixed depth, maximizing the evaluated score when it is the
+    root player's turn and minimizing when it is the opponent's turn. The search uses a
+    provided evaluator to score leaf positions.
     """
 
     def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
         """Initialize the minimax agent.
 
-        Parameters
-        ----------
-        ruleset : Ruleset
-            The ruleset governing the game.
-        evaluator : Evaluator
-            The position evaluator used to score leaf nodes.
-        depth : int
-            The maximum search depth in plies.
+        Args:
+            ruleset: The ruleset governing the game.
+            evaluator: The position evaluator used to score leaf nodes.
+            depth: The maximum search depth in plies.
         """
         self.ruleset = ruleset
         self.evaluator = evaluator
@@ -36,28 +32,23 @@ class MinimaxAgent(Agent):
     ) -> tuple[float, Move | None]:
         """Recursively search the game tree using minimax.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        depth : int
-            The remaining search depth.
-        root_player : Player
-            The player who initiated the search (maximizing player at the root).
+        Args:
+            state: The current game state.
+            depth: The remaining search depth.
+            root_player: The player who initiated the search (maximizing player at the
+                root).
 
-        Returns
-        -------
-        tuple[float, Move | None]
-            The best score and the corresponding move. The move is `None` at leaf nodes
-            or when the best action is to pass.
+        Returns:
+            The best score and the corresponding move. The move is `None` at leaf nodes or
+            when the best action is to pass.
         """
         if depth == 0 or self.ruleset.is_finished(state):
             return self.evaluator.evaluate(state, root_player), None
 
         best_move: Move | None = None
 
-        # If the player whose turn it is at the node is the same as the player whose
-        # turn it is at the root of the tree, maximize the score from child nodes.
+        # If the player whose turn it is at the node is the same as the player whose turn
+        # it is at the root of the tree, maximize the score from child nodes.
         if state.current_player == root_player:
             max_score = -math.inf
             for move in self.ruleset.get_legal_moves(state):
@@ -85,14 +76,10 @@ class MinimaxAgent(Agent):
     def choose_move(self, state: GameState) -> Move | None:
         """Choose the best move using minimax search.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        Move | None
+        Returns:
             The move with the highest minimax value, or `None` to pass.
         """
         root_player = state.current_player
@@ -111,14 +98,10 @@ class AlphaBetaMinimaxAgent(Agent):
     def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
         """Initialize the alpha-beta minimax agent.
 
-        Parameters
-        ----------
-        ruleset : Ruleset
-            The ruleset governing the game.
-        evaluator : Evaluator
-            The position evaluator used to score leaf nodes.
-        depth : int
-            The maximum search depth in plies.
+        Args:
+            ruleset: The ruleset governing the game.
+            evaluator: The position evaluator used to score leaf nodes.
+            depth: The maximum search depth in plies.
         """
         self.ruleset = ruleset
         self.evaluator = evaluator
@@ -129,24 +112,17 @@ class AlphaBetaMinimaxAgent(Agent):
     ) -> tuple[float, Move | None]:
         """Recursively search the game tree using minimax with alpha-beta pruning.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        depth : int
-            The remaining search depth.
-        root_player : Player
-            The player who initiated the search (maximizing player at the root).
-        alpha : float
-            The best score the maximizing player can guarantee so far.
-        beta : float
-            The best score the minimizing player can guarantee so far.
+        Args:
+            state: The current game state.
+            depth: The remaining search depth.
+            root_player: The player who initiated the search (maximizing player at the
+                root).
+            alpha: The best score the maximizing player can guarantee so far.
+            beta: The best score the minimizing player can guarantee so far.
 
-        Returns
-        -------
-        tuple[float, Move | None]
-            The best score and the corresponding move. The move is `None` at leaf nodes
-            or when the best action is to pass.
+        Returns:
+            The best score and the corresponding move. The move is `None` at leaf nodes or
+            when the best action is to pass.
         """
         if depth == 0 or self.ruleset.is_finished(state):
             return self.evaluator.evaluate(state, root_player), None
@@ -188,14 +164,10 @@ class AlphaBetaMinimaxAgent(Agent):
     def choose_move(self, state: GameState) -> Move | None:
         """Choose the best move using alpha-beta minimax search.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        Move | None
+        Returns:
             The move with the highest minimax value, or `None` to pass.
         """
         root_player = state.current_player

@@ -149,7 +149,7 @@ hive/
 ├─ tests/                      # mirrors src/hive/; tests/data/ holds perft references and fixtures
 ├─ scripts/
 │  ├─ train/                   # [train] YOLO training and ONNX export
-│  └─ tooling/                 # docstring/comment formatters and checkers used by `make format`
+│  └─ tooling/                 # comment checker used by `make lint`
 ├─ blender/
 │  ├─ render.py                # runs under Blender's Python, no `hive` import
 │  └─ tilesets/<tileset-id>/   # tileset.toml, one .blend per tile, textures/ (Git LFS)

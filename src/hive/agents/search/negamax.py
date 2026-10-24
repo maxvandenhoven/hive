@@ -18,14 +18,10 @@ class NegamaxAgent(Agent):
     def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
         """Initialize the negamax agent.
 
-        Parameters
-        ----------
-        ruleset : Ruleset
-            The ruleset governing the game.
-        evaluator : Evaluator
-            The position evaluator used to score leaf nodes.
-        depth : int
-            The maximum search depth in plies.
+        Args:
+            ruleset: The ruleset governing the game.
+            evaluator: The position evaluator used to score leaf nodes.
+            depth: The maximum search depth in plies.
         """
         self.ruleset = ruleset
         self.evaluator = evaluator
@@ -38,18 +34,13 @@ class NegamaxAgent(Agent):
         node. Child scores are negated on return, since a good position for the opponent
         is bad for the current player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        depth : int
-            The remaining search depth.
+        Args:
+            state: The current game state.
+            depth: The remaining search depth.
 
-        Returns
-        -------
-        tuple[float, Move | None]
-            The best score and the corresponding move. The move is `None` at leaf nodes
-            or when the best action is to pass.
+        Returns:
+            The best score and the corresponding move. The move is `None` at leaf nodes or
+            when the best action is to pass.
         """
         if depth == 0 or self.ruleset.is_finished(state):
             return self.evaluator.evaluate(state, state.current_player), None
@@ -71,14 +62,10 @@ class NegamaxAgent(Agent):
     def choose_move(self, state: GameState) -> Move | None:
         """Choose the best move using negamax search.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        Move | None
+        Returns:
             The move with the highest negamax value, or `None` to pass.
         """
         _, best_move = self._negamax(state, self.depth)
@@ -96,14 +83,10 @@ class AlphaBetaNegamaxAgent(Agent):
     def __init__(self, ruleset: Ruleset, evaluator: Evaluator, depth: int) -> None:
         """Initialize the alpha-beta negamax agent.
 
-        Parameters
-        ----------
-        ruleset : Ruleset
-            The ruleset governing the game.
-        evaluator : Evaluator
-            The position evaluator used to score leaf nodes.
-        depth : int
-            The maximum search depth in plies.
+        Args:
+            ruleset: The ruleset governing the game.
+            evaluator: The position evaluator used to score leaf nodes.
+            depth: The maximum search depth in plies.
         """
         self.ruleset = ruleset
         self.evaluator = evaluator
@@ -114,22 +97,15 @@ class AlphaBetaNegamaxAgent(Agent):
     ) -> tuple[float, Move | None]:
         """Recursively search the game tree using negamax with alpha-beta pruning.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        depth : int
-            The remaining search depth.
-        alpha : float
-            The best score the current player can guarantee so far.
-        beta : float
-            The best score the opponent can guarantee so far.
+        Args:
+            state: The current game state.
+            depth: The remaining search depth.
+            alpha: The best score the current player can guarantee so far.
+            beta: The best score the opponent can guarantee so far.
 
-        Returns
-        -------
-        tuple[float, Move | None]
-            The best score and the corresponding move. The move is `None` at leaf nodes
-            or when the best action is to pass.
+        Returns:
+            The best score and the corresponding move. The move is `None` at leaf nodes or
+            when the best action is to pass.
         """
         if depth == 0 or self.ruleset.is_finished(state):
             return self.evaluator.evaluate(state, state.current_player), None
@@ -155,14 +131,10 @@ class AlphaBetaNegamaxAgent(Agent):
     def choose_move(self, state: GameState) -> Move | None:
         """Choose the best move using alpha-beta negamax search.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        Move | None
+        Returns:
             The move with the highest negamax value, or `None` to pass.
         """
         _, best_move = self._negamax(state, self.depth, -math.inf, math.inf)

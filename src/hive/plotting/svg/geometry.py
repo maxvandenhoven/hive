@@ -16,20 +16,13 @@ def axial_to_pixel(
 ) -> tuple[float, float]:
     """Convert axial hex coordinates to pixel `(x, y)` positions.
 
-    Parameters
-    ----------
-    q : int
-        The column coordinate in the axial system.
-    r : int
-        The row coordinate in the axial system.
-    orientation : HexOrientation
-        Whether hexagons are pointy-top or flat-top.
-    size : float
-        The radius of each hexagon (center to vertex), by default 1.0.
+    Args:
+        q: The column coordinate in the axial system.
+        r: The row coordinate in the axial system.
+        orientation: Whether hexagons are pointy-top or flat-top.
+        size: The radius of each hexagon (center to vertex), by default 1.0.
 
-    Returns
-    -------
-    tuple[float, float]
+    Returns:
         The `(x, y)` pixel position of the hex center.
     """
     if orientation is HexOrientation.POINTY_TOP:
@@ -47,20 +40,13 @@ def get_hex_points(
 ) -> list[float]:
     """Compute the flat list of hex corner coordinates for drawsvg.
 
-    Parameters
-    ----------
-    cx : float
-        The x-coordinate of the hex center.
-    cy : float
-        The y-coordinate of the hex center.
-    orientation : HexOrientation
-        Whether hexagons are pointy-top or flat-top.
-    size : float
-        The radius of the hexagon (center to vertex), by default 1.0.
+    Args:
+        cx: The x-coordinate of the hex center.
+        cy: The y-coordinate of the hex center.
+        orientation: Whether hexagons are pointy-top or flat-top.
+        size: The radius of the hexagon (center to vertex), by default 1.0.
 
-    Returns
-    -------
-    list[float]
+    Returns:
         A flat list `[x0, y0, x1, y1, ..., x5, y5]` of the six corner coordinates.
     """
     angle_offset = 30.0 if orientation is HexOrientation.POINTY_TOP else 0.0
@@ -77,14 +63,10 @@ def get_hex_points(
 def get_grid_coords(radius: int) -> list[Coordinate]:
     """Generate all axial coordinates within a given hex radius of the origin.
 
-    Parameters
-    ----------
-    radius : int
-        The maximum hex distance from `(0, 0)` to include.
+    Args:
+        radius: The maximum hex distance from `(0, 0)` to include.
 
-    Returns
-    -------
-    list[Coordinate]
+    Returns:
         All axial coordinates `(q, r)` within the specified radius.
     """
     coords: list[Coordinate] = []
@@ -100,16 +82,11 @@ def get_grid_coords(radius: int) -> list[Coordinate]:
 def get_distance(source_coord: Coordinate, target_coord: Coordinate) -> int:
     """Compute the hex distance between two axial coordinates.
 
-    Parameters
-    ----------
-    source_coord : Coordinate
-        The first axial coordinate `(q, r)`.
-    target_coord : Coordinate
-        The second axial coordinate `(q', r')`.
+    Args:
+        source_coord: The first axial coordinate `(q, r)`.
+        target_coord: The second axial coordinate `(q', r')`.
 
-    Returns
-    -------
-    int
+    Returns:
         The number of hex steps between `source_coord` and `target_coord`.
     """
     dq = source_coord[0] - target_coord[0]

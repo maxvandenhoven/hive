@@ -9,8 +9,8 @@ class Ruleset:
     """Class representing a set of rules for a Hive game.
 
     This class aggregates the different types of rules (movement, placement, mobility,
-    termination) and provides methods to determine valid moves, placements, and check
-    for game termination based on the current game state.
+    termination) and provides methods to determine valid moves, placements, and check for
+    game termination based on the current game state.
     """
 
     def __init__(
@@ -24,28 +24,22 @@ class Ruleset:
     ) -> None:
         """Initialize a new ruleset.
 
-        Parameters
-        ----------
-        mobility_rule : MobilityRule
-            The rule that determines which pieces on the board are allowed to move.
-        movement_rules : dict[PieceType, MovementRule]
-            A mapping from each piece type to the rule that governs how that piece type
-            moves on the board.
-        placement_rule : PlacementRule
-            The rule that determines where and which pieces are allowed to be placed.
-        termination_rule : TerminationRule
-            The rule that determines when the game ends and which player(s) win.
-        piece_type_count : dict[PieceType, int]
-            A mapping from each piece type to the number of copies each player receives
-            at the start of the game.
-        starting_player : Player
-            The player who takes the first turn.
+        Args:
+            mobility_rule: The rule that determines which pieces on the board are allowed
+                to move.
+            movement_rules: A mapping from each piece type to the rule that governs how
+                that piece type moves on the board.
+            placement_rule: The rule that determines where and which pieces are allowed to
+                be placed.
+            termination_rule: The rule that determines when the game ends and which
+                player(s) win.
+            piece_type_count: A mapping from each piece type to the number of copies each
+                player receives at the start of the game.
+            starting_player: The player who takes the first turn.
 
-        Raises
-        ------
-        ValueError
-            If the queen piece count is not exactly one, or if a piece type
-            with a positive count has no corresponding movement rule.
+        Raises:
+            ValueError: If the queen piece count is not exactly one, or if a piece type
+                with a positive count has no corresponding movement rule.
         """
         self.mobility_rule = mobility_rule
         self.movement_rules = movement_rules
@@ -77,9 +71,7 @@ class Ruleset:
         This method initializes the game state with the starting player and the piece
         counts for each player as defined in the ruleset.
 
-        Returns
-        -------
-        GameState
+        Returns:
             The initial game state ready for play.
         """
         return GameState(
@@ -92,14 +84,10 @@ class Ruleset:
         Combines each placeable coordinate with each placeable piece type to produce the
         full list of valid placement moves.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        list[Move]
+        Returns:
             A list of all legal placement moves. Each move has `source_coord` set to
             `None`.
         """
@@ -118,17 +106,12 @@ class Ruleset:
         """Get all legal movement moves for the current player.
 
         Iterates over all movable pieces determined by the mobility rule, then queries
-        each piece's movement rule for its reachable target
-        coordinates.
+        each piece's movement rule for its reachable target coordinates.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        list[Move]
+        Returns:
             A list of all legal movement moves.
         """
         moves: list[Move] = []
@@ -151,17 +134,12 @@ class Ruleset:
         `get_legal_movement_moves`. If there are no legal moves, the returned list will
         contain only `None` to represent a pass.
 
-        and always includes `None` as the first element to
-        represent a pass move.
+        and always includes `None` as the first element to represent a pass move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        list[Move | None]
+        Returns:
             A list of all legal moves. May contain `None` if there are no legal moves,
             representing a pass. The remaining elements are placement and movement moves.
         """
@@ -180,14 +158,10 @@ class Ruleset:
         Delegates to the termination rule to check whether the game has ended and which
         players are the winners.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        list[Player] | None
+        Returns:
             A list of winning players if the game has ended, or `None` if the game is
             still in progress. A list with multiple players indicates a draw.
         """
@@ -196,14 +170,10 @@ class Ruleset:
     def is_finished(self, state: GameState) -> bool:
         """Check whether the game has ended.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        bool
+        Returns:
             `True` if the game has ended according to the termination rule, otherwise
             `False`.
         """

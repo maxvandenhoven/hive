@@ -8,11 +8,11 @@ from hive.engine.state import GameState
 class MovementRule(ABC):
     """Base class for movement rules that govern how a piece type moves on the board.
 
-    The `Ruleset` class maps each `PieceType` to exactly one `MovementRule` instance
-    via the `movement_rules` dictionary. When generating legal movement moves,
+    The `Ruleset` class maps each `PieceType` to exactly one `MovementRule` instance via
+    the `movement_rules` dictionary. When generating legal movement moves,
     `Ruleset.get_legal_movement_moves` iterates over all movable pieces (as determined by
-    the mobility rule) and calls `get_target_coords` on the corresponding movement rule
-    to obtain the set of coordinates that piece can reach.
+    the mobility rule) and calls `get_target_coords` on the corresponding movement rule to
+    obtain the set of coordinates that piece can reach.
 
     Subclasses must implement `get_target_coords` to define the movement behavior for a
     specific piece type.
@@ -22,16 +22,11 @@ class MovementRule(ABC):
     def get_target_coords(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get all coordinates a piece can move to, assuming it is allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
-        coord : Coordinate
-            The current axial coordinate `(q, r)` of the piece to move.
+        Args:
+            state: The current state of the game.
+            coord: The current axial coordinate `(q, r)` of the piece to move.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All possible axial coordinates `(q', r')` the piece can move to.
         """
 
@@ -40,9 +35,9 @@ class BaseSlidingMovementRule(MovementRule):
     """Base class for piece types that slide along the hive surface.
 
     Sliding pieces move by shifting into an unoccupied neighboring coordinate while
-    remaining in contact with at least one other piece. A slide is only valid if the
-    piece is not physically blocked by two occupied flanking coordinates (the gate rule)
-    and if the destination has at least one occupied neighbor to maintain hive contact.
+    remaining in contact with at least one other piece. A slide is only valid if the piece
+    is not physically blocked by two occupied flanking coordinates (the gate rule) and if
+    the destination has at least one occupied neighbor to maintain hive contact.
 
     Subclasses inherit `get_slideable_neighbors`, which encapsulates this shared sliding
     logic, and use it within their `get_target_coords` implementations.
@@ -57,16 +52,11 @@ class BaseSlidingMovementRule(MovementRule):
         flanking coordinates occupied), and has at least one occupied neighbor of its own
         to maintain hive contact.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
-        coord : Coordinate
-            The axial coordinate `(q, r)` to slide from.
+        Args:
+            state: The current state of the game.
+            coord: The axial coordinate `(q, r)` to slide from.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             The neighboring coordinates that satisfy all sliding constraints.
         """
         slideable_neighbors: list[Coordinate] = []
@@ -91,26 +81,21 @@ class BaseSlidingMovementRule(MovementRule):
 class BaseQueenMovementRule(BaseSlidingMovementRule):
     """Default movement rule for queen pieces.
 
-    The queen moves by sliding exactly one space along the hive surface. It can only
-    slide into an unoccupied neighboring coordinate that is not blocked by the gate rule
-    and that maintains contact with the hive. The piece is temporarily lifted from the
-    board before computing slideable neighbors to avoid self-obstruction.
+    The queen moves by sliding exactly one space along the hive surface. It can only slide
+    into an unoccupied neighboring coordinate that is not blocked by the gate rule and
+    that maintains contact with the hive. The piece is temporarily lifted from the board
+    before computing slideable neighbors to avoid self-obstruction.
     """
 
     @override
     def get_target_coords(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get all coordinates a piece can move to, assuming it is allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
-        coord : Coordinate
-            The current axial coordinate `(q, r)` of the piece to move.
+        Args:
+            state: The current state of the game.
+            coord: The current axial coordinate `(q, r)` of the piece to move.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All possible axial coordinates `(q', r')` the piece can move to.
         """
         with state.piece_lifted(coord):
@@ -131,16 +116,11 @@ class BaseBeetleMovementRule(BaseSlidingMovementRule):
     def get_target_coords(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get all coordinates a piece can move to, assuming it is allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
-        coord : Coordinate
-            The current axial coordinate `(q, r)` of the piece to move.
+        Args:
+            state: The current state of the game.
+            coord: The current axial coordinate `(q, r)` of the piece to move.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All possible axial coordinates `(q', r')` the piece can move to.
         """
         with state.piece_lifted(coord):
@@ -167,16 +147,11 @@ class BaseGrasshopperMovementRule(MovementRule):
     def get_target_coords(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get all coordinates a piece can move to, assuming it is allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
-        coord : Coordinate
-            The current axial coordinate `(q, r)` of the piece to move.
+        Args:
+            state: The current state of the game.
+            coord: The current axial coordinate `(q, r)` of the piece to move.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All possible axial coordinates `(q', r')` the piece can move to.
         """
         destinations = []
@@ -208,16 +183,11 @@ class BaseSpiderMovementRule(BaseSlidingMovementRule):
     def get_target_coords(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get all coordinates a piece can move to, assuming it is allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
-        coord : Coordinate
-            The current axial coordinate `(q, r)` of the piece to move.
+        Args:
+            state: The current state of the game.
+            coord: The current axial coordinate `(q, r)` of the piece to move.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All possible axial coordinates `(q', r')` the piece can move to.
         """
         destinations = set()
@@ -252,26 +222,21 @@ class BaseSpiderMovementRule(BaseSlidingMovementRule):
 class BaseAntMovementRule(BaseSlidingMovementRule):
     """Default movement rule for ant pieces.
 
-    The ant moves by sliding any number of spaces along the hive surface. It can reach
-    any unoccupied coordinate that is connected to its starting position through a chain
-    of valid slides. A breadth-first search explores all reachable coordinates. The piece
-    is temporarily lifted before computing destinations to avoid self-obstruction.
+    The ant moves by sliding any number of spaces along the hive surface. It can reach any
+    unoccupied coordinate that is connected to its starting position through a chain of
+    valid slides. A breadth-first search explores all reachable coordinates. The piece is
+    temporarily lifted before computing destinations to avoid self-obstruction.
     """
 
     @override
     def get_target_coords(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get all coordinates a piece can move to, assuming it is allowed to move.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
-        coord : Coordinate
-            The current axial coordinate `(q, r)` of the piece to move.
+        Args:
+            state: The current state of the game.
+            coord: The current axial coordinate `(q, r)` of the piece to move.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All possible axial coordinates `(q', r')` the piece can move to.
         """
         destinations = set()

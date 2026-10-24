@@ -49,39 +49,28 @@ def draw_board(
 ) -> dw.Drawing:
     """Draw the Hive game board as an SVG using drawsvg.
 
-    Parameters
-    ----------
-    state : GameState
-        The game state to visualize. The board layout, player hands, and current player
-        are all read from this object.
-    orientation : HexOrientation
-        Whether hexagons are pointy-top or flat-top, by default pointy-top.
-    highlights : dict[str, list[Coordinate]] or None
-        Color string to list of coordinates that should receive a colored highlight ring,
-        by default `None`, which disables highlighting.
-    use_sprites : bool
-        Whether to load SVG piece sprites from the bundled assets or fall back to
-        character labels, by default `True`.
-    show_hands : bool
-        Whether to draw a hand panel below the board showing each player's remaining
-        pieces and whose turn it is, by default `True`.
-    title : str or None
-        An optional title displayed above the board, by default `None`.
-    canvas_width : float
-        The width of the SVG canvas in pixels, by default 800.
-    min_radius : int
-        The minimum radius of the hex grid in hexes, by default 3.
+    Args:
+        state: The game state to visualize. The board layout, player hands, and current
+            player are all read from this object.
+        orientation: Whether hexagons are pointy-top or flat-top, by default pointy-top.
+        highlights: Color string to list of coordinates that should receive a colored
+            highlight ring, by default `None`, which disables highlighting.
+        use_sprites: Whether to load SVG piece sprites from the bundled assets or fall
+            back to character labels, by default `True`.
+        show_hands: Whether to draw a hand panel below the board showing each player's
+            remaining pieces and whose turn it is, by default `True`.
+        title: An optional title displayed above the board, by default `None`.
+        canvas_width: The width of the SVG canvas in pixels, by default 800.
+        min_radius: The minimum radius of the hex grid in hexes, by default 3.
 
-    Returns
-    -------
-    dw.Drawing
+    Returns:
         The drawsvg `Drawing` containing the rendered board.
     """
     if highlights is None:
         highlights = {}
 
-    # Determine the grid extent based on the furthest occupied coordinate. Always show
-    # at least min_radius to give some breathing room around the starting pieces.
+    # Determine the grid extent based on the furthest occupied coordinate. Always show at
+    # least min_radius to give some breathing room around the starting pieces.
     max_distance = max(get_distance((0, 0), coord) for coord in state.board)
     grid_radius = max(min_radius, max_distance + 1)
     grid_coords = get_grid_coords(grid_radius)
@@ -95,8 +84,8 @@ def draw_board(
     all_y = [pixel[1] for pixel in all_xy]
 
     # Compute the visual bounding box from hex centers plus the actual hex extent. For
-    # pointy-top the horizontal extent is the inradius (sqrt(3)/2 * size) and the
-    # vertical extent is the circumradius (size); vice-versa for flat-top.
+    # pointy-top the horizontal extent is the inradius (sqrt(3)/2 * size) and the vertical
+    # extent is the circumradius (size); vice-versa for flat-top.
     if orientation is HexOrientation.POINTY_TOP:
         horizontal_extent = math.sqrt(3) / 2 * HEX_SIZE
         vertical_extent = HEX_SIZE
@@ -114,8 +103,8 @@ def draw_board(
     grid_cx = (grid_left + grid_right) / 2
     grid_cy = (grid_top + grid_bottom) / 2
 
-    # Uniform padding (fraction of the larger dimension) so the gap between the
-    # outermost hexes and the canvas edge looks the same on every side.
+    # Uniform padding (fraction of the larger dimension) so the gap between the outermost
+    # hexes and the canvas edge looks the same on every side.
     padding = max(grid_width, grid_height) * 0.04
     padded_width = grid_width + 2 * padding
     padded_height = grid_height + 2 * padding
@@ -156,8 +145,8 @@ def draw_board(
             )
         )
 
-    # Translate the center of the visual bounding box to the center of the allocated
-    # board region, then scale uniformly.
+    # Translate the center of the visual bounding box to the center of the allocated board
+    # region, then scale uniformly.
     board_group = dw.Group(
         transform=(
             f"translate({canvas_width / 2}, "

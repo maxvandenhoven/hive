@@ -18,16 +18,11 @@ class Evaluator(ABC):
     def evaluate(self, state: GameState, player: Player) -> float:
         """Evaluate the game state from the perspective of the given player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player from whose perspective the evaluation is performed.
+        Args:
+            state: The current game state.
+            player: The player from whose perspective the evaluation is performed.
 
-        Returns
-        -------
-        float
+        Returns:
             A score where positive values favor `player` and negative values favor the
             opponent.
         """
@@ -43,11 +38,9 @@ class WeightedCompositeEvaluator(Evaluator):
     def __init__(self, components: list[tuple[Evaluator, float]]) -> None:
         """Initialize the composite evaluator.
 
-        Parameters
-        ----------
-        components : list[tuple[Evaluator, float]]
-            A list of (evaluator, weight) pairs. Each evaluator's score is multiplied by
-            its weight and the results are summed.
+        Args:
+            components: A list of (evaluator, weight) pairs. Each evaluator's score is
+                multiplied by its weight and the results are summed.
         """
         self.components = components
 
@@ -55,16 +48,11 @@ class WeightedCompositeEvaluator(Evaluator):
     def evaluate(self, state: GameState, player: Player) -> float:
         """Evaluate the game state as a weighted sum of sub-evaluator scores.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player from whose perspective the evaluation is performed.
+        Args:
+            state: The current game state.
+            player: The player from whose perspective the evaluation is performed.
 
-        Returns
-        -------
-        float
+        Returns:
             The weighted sum of all sub-evaluator scores.
         """
         score = 0.0

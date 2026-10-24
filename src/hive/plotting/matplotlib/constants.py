@@ -31,16 +31,11 @@ SPRITE_FILENAMES: dict[PieceType, str] = {
 def load_sprite(piece_type: PieceType, resolution: int = 256) -> np.ndarray:
     """Load and resize a piece sprite from the bundled assets.
 
-    Parameters
-    ----------
-    piece_type : PieceType
-        The type of piece whose sprite should be loaded.
-    resolution : int
-        The pixel size to which the sprite is resized.
+    Args:
+        piece_type: The type of piece whose sprite should be loaded.
+        resolution: The pixel size to which the sprite is resized.
 
-    Returns
-    -------
-    np.ndarray
+    Returns:
         An RGBA image array of shape `(resolution, resolution, 4)`.
     """
     sprite_folder = importlib.resources.files("hive.assets.png")

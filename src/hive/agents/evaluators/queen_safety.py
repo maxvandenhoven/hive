@@ -16,18 +16,13 @@ class QueenSafetyEvaluator(Evaluator):
     def _count_queen_pressure(self, state: GameState, player: Player) -> float:
         """Count how many neighbors of a player's queen are occupied.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player whose queen to inspect.
+        Args:
+            state: The current game state.
+            player: The player whose queen to inspect.
 
-        Returns
-        -------
-        float
-            The number of occupied neighbors around the queen, or 0.0 if the queen has
-            not been placed.
+        Returns:
+            The number of occupied neighbors around the queen, or 0.0 if the queen has not
+            been placed.
         """
         queen_coord = state.get_queen_coord(player)
         if queen_coord is None:
@@ -44,16 +39,11 @@ class QueenSafetyEvaluator(Evaluator):
     def evaluate(self, state: GameState, player: Player) -> float:
         """Evaluate queen safety for the given player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player from whose perspective the evaluation is performed.
+        Args:
+            state: The current game state.
+            player: The player from whose perspective the evaluation is performed.
 
-        Returns
-        -------
-        float
+        Returns:
             A score in the range [-6.0, 6.0]. Positive values indicate the opponent's
             queen is more surrounded than the player's queen.
         """
