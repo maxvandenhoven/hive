@@ -271,6 +271,11 @@ class Rules:
         Combines the results of `placement_moves` and `movement_moves`. If there are no
         legal moves, the returned list contains only `None`, which represents a pass.
 
+        Both are sorted, so the order depends only on the position: placements first, then
+        movements. Without sorting, the order follows the board dict, which move
+        generation and `undo_move` reorder, and seeded agents that pick moves by index
+        would not be reproducible.
+
         Args:
             state: The current game state.
 
@@ -296,7 +301,8 @@ class Rules:
             state: The current game state.
 
         Returns:
-            All legal placement moves. Each move has `source_coord` set to `None`.
+            All legal placement moves, sorted by piece type and target coordinate. Each
+            move has `source_coord` set to `None`.
         """
         placeable_piece_types = self.placeable_piece_types(state)
 
@@ -306,6 +312,8 @@ class Rules:
                 moves.append(
                     Move(piece_type=piece_type, source_coord=None, target_coord=coord)
                 )
+
+        moves.sort(key=lambda move: (move.piece_type, move.target_coord))
         return moves
 
     def movement_moves(self, state: GameState) -> list[Move]:
@@ -315,7 +323,8 @@ class Rules:
             state: The current game state.
 
         Returns:
-            All legal movement moves of the pieces returned by `movable_pieces`.
+            All legal movement moves of the pieces returned by `movable_pieces`, sorted by
+            piece type, source and target coordinate.
         """
         moves: list[Move] = []
         for coord, piece_type in self.movable_pieces(state):
@@ -327,6 +336,10 @@ class Rules:
                         target_coord=target_coord,
                     )
                 )
+
+        moves.sort(
+            key=lambda move: (move.piece_type, move.source_coord, move.target_coord)
+        )
         return moves
 
     def movable_pieces(self, state: GameState) -> list[tuple[Coordinate, PieceType]]:

@@ -151,3 +151,9 @@ These hold for every `GameState` reachable through the entry points:
 3. For each player and piece type: pieces on board + pieces in hand = `piece_counts`.
 4. `queen_coord[p]` is the coordinate of `p`'s queen if placed, else `None`.
 5. `current_player` alternates every ply, including passes.
+
+Move order: `placement_moves` and `movement_moves` return sorted lists (by piece type, then
+source and target coordinate), and `legal_moves` returns placements before movements. The
+order therefore depends only on the position. The board dict's iteration order does not:
+`piece_lifted` and `undo_move` delete and re-add coordinates, which moves them to the end
+(#47). Seeded agents that pick moves by index rely on the sorted order.
