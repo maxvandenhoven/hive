@@ -2,13 +2,13 @@
 
 import pytest
 
-from hive.agents.factory import AgentSpec, agent_kinds, build_agent
+from hive.agents.factory import AgentSpec, build_agent, list_agents
 from hive.agents.testing import FakeClock, LocalTurnContext
 from hive.engine.rules import Rules
 from hive.engine.serialization import serialize_board
 from hive.engine.state import GameState
 
-_KINDS = [kind.name for kind in agent_kinds()]
+_KINDS = [agent.name for agent in list_agents()]
 
 
 def _snapshot(state: GameState) -> object:

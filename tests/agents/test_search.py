@@ -133,11 +133,6 @@ def test_single_legal_move_is_final(agent_class: type[SearchAgent], rules: Rules
     assert not turn.infos
 
 
-def test_rejects_non_positive_depth(rules: Rules) -> None:
-    with pytest.raises(ValueError, match="depth must be positive"):
-        NegamaxAgent(rules, seed=0, depth=0)
-
-
 @pytest.mark.parametrize("term", list(_ALL_TERMS))
 def test_evaluation_terms_are_zero_sum(
     term: str, rules: Rules, position: GameState

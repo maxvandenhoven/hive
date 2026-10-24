@@ -1,9 +1,11 @@
 from typing import override
 
 from hive.agents.base import Agent, TurnContext
+from hive.agents.factory import register_agent
 from hive.engine.state import GameState
 
 
+@register_agent("random")
 class RandomAgent(Agent):
     """Agent that selects moves uniformly at random from the set of legal moves."""
 

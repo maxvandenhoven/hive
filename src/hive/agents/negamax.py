@@ -1,10 +1,12 @@
 import math
 from typing import override
 
+from hive.agents.factory import register_agent
 from hive.agents.search import SearchAgent
 from hive.engine.state import GameState, Move
 
 
+@register_agent("negamax")
 class NegamaxAgent(SearchAgent):
     """Agent that selects moves using the negamax algorithm with iterative deepening.
 

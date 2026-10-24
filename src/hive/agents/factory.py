@@ -1,59 +1,43 @@
-"""Agent specifications, the registry of agent kinds and the agent factory."""
+"""Agent specifications, the registry of agent kinds and the agent factory.
 
-import json
-from collections.abc import Callable, Mapping
+Agent classes register a kind name with `register_agent`. The parameters of a kind are
+the keyword-only parameters of its constructor after `seed`: their annotations (with
+`Annotated` constraints such as `Field(ge=1)`) and defaults define a pydantic model that
+validates specs, and the `Args:` section of the constructor docstring describes them.
+"""
+
+import inspect
+import re
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, get_type_hints
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model
 
 from hive.agents.base import Agent
-from hive.agents.minimax import MinimaxAgent
-from hive.agents.negamax import NegamaxAgent
-from hive.agents.random import RandomAgent
 from hive.engine.rules import Rules
 from hive.engine.serialization import JsonValue
 
+_INJECTED_PARAMS = ("rules", "seed")
+"""The constructor parameters the factory passes itself, which are not agent params."""
 
-class AgentParams(BaseModel):
-    """Base class for the parameters of an agent kind, which rejects unknown names."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class RandomParams(AgentParams):
-    """Parameters of the `random` agent, which has none."""
+_ARG_PATTERN = re.compile(r"^    (\w+)(?: \(.*\))?: (.*)$")
+"""A line starting an argument description in a cleaned Google-style docstring."""
 
 
-class SearchParams(AgentParams):
-    """Parameters of the search agents: the depth limit and the evaluation weights."""
-
-    depth: int | None = Field(
-        default=None, ge=1, description="Maximum search depth in plies, or none."
-    )
-    queen_safety: float = Field(
-        default=1.0, description="Weight of how surrounded each queen is."
-    )
-    mobility: float = Field(
-        default=0.0, description="Weight of the difference in legal moves (slow)."
-    )
-    positioning: float = Field(
-        default=0.0, description="Weight of own pieces next to the opponent's queen."
-    )
-    material_on_board: float = Field(
-        default=0.0, description="Weight of the value of pieces on the board."
-    )
-    material_in_hand: float = Field(
-        default=0.0, description="Weight of the value of pieces in hand."
-    )
+class InvalidAgentSpecError(ValueError):
+    """Raised when an agent spec has an unknown kind, a bad shape or invalid params."""
 
 
 @dataclass(frozen=True, slots=True)
-class AgentKindInfo:
-    """A description of an agent kind, for listing agents and rendering param forms.
+class AgentInfo:
+    """A description of a registered agent kind, for listing agents and param forms.
 
     Attributes:
         name: The kind name used in `AgentSpec.kind`.
-        description: A one-line description of the agent.
+        description: The summary line of the agent class docstring.
         params_schema: The JSON schema of the parameters.
     """
 
@@ -63,41 +47,50 @@ class AgentKindInfo:
 
 
 @dataclass(frozen=True, slots=True)
-class _AgentKind:
+class _Registration:
     """A registered agent kind.
 
     Attributes:
-        build: The agent constructor, called with the rules, a keyword `seed` and the
+        agent_class: The agent class, called with the rules, a keyword `seed` and the
             validated parameters as keywords.
         params_model: The model that validates the parameters.
-        description: A one-line description of the agent.
     """
 
-    build: Callable[..., Agent]
-    params_model: type[AgentParams]
-    description: str
+    agent_class: type[Agent]
+    params_model: type[BaseModel]
 
 
-_KINDS: dict[str, _AgentKind] = {
-    "random": _AgentKind(
-        RandomAgent, RandomParams, "Plays a uniformly random legal move."
-    ),
-    "minimax": _AgentKind(
-        MinimaxAgent, SearchParams, "Minimax search with iterative deepening."
-    ),
-    "negamax": _AgentKind(
-        NegamaxAgent, SearchParams, "Negamax search with iterative deepening."
-    ),
-}
+_REGISTRY: dict[str, _Registration] = {}
+
+
+class _SpecDocument(BaseModel):
+    """The shape of a serialized agent spec, before its params are validated."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    label: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
 class AgentSpec:
-    """A named, configured agent, as chosen in the app or on the command line.
+    """A named, configured agent, as chosen in the app, a config file or the CLI.
+
+    The serialized form is a mapping with `kind`, an optional `label` and optional
+    `params`, for example in YAML:
+
+    ```yaml
+    kind: negamax
+    label: nm3
+    params:
+      depth: 3
+      mobility: 0.5
+    ```
 
     Attributes:
         kind: The registered kind of the agent, for example `negamax`.
-        params: The free-form JSON parameters, validated by the kind when building.
+        params: The JSON parameters, validated against the kind when loading or building.
         label: The display name in reports and the UI, or `None` for none.
     """
 
@@ -106,54 +99,147 @@ class AgentSpec:
     label: str | None = None
 
     @classmethod
-    def parse(cls, text: str) -> "AgentSpec":
-        """Parse a spec from a command line string like `negamax:depth=4,label=nm4`.
-
-        The kind comes before the optional colon, followed by comma-separated `key=value`
-        pairs. Values are read as JSON literals where possible (`4`, `0.5`, `true`,
-        `null`), and as plain strings otherwise. The `label` key sets the label.
+    def from_dict(cls, data: object, *, source: str | None = None) -> "AgentSpec":
+        """Read and validate a spec from its serialized form.
 
         Args:
-            text: The string to parse.
+            data: The decoded spec, a mapping with `kind`, `label` and `params`.
+            source: Where the spec came from, such as a file path, for error messages.
 
         Returns:
-            The parsed spec. Its parameters are not validated until it is built.
+            The spec, with the params as given (defaults are not filled in).
 
         Raises:
-            ValueError: If the kind is empty, or a pair has no `=`, an empty key or a key
-                that was given before.
+            InvalidAgentSpecError: If the shape is wrong, the kind is not registered or
+                the params are invalid. All problems are listed in the message.
         """
-        kind, _, pairs = text.partition(":")
-        kind = kind.strip()
-        if not kind:
-            msg = f"Missing agent kind in spec `{text}`."
+        try:
+            document = _SpecDocument.model_validate(data)
+        except ValidationError as e:
+            raise InvalidAgentSpecError(_format_errors(source, e.errors())) from e
+
+        spec = cls(document.kind, document.params, document.label)
+        spec.validate_params(source=source)
+        return spec
+
+    @classmethod
+    def from_yaml(cls, text: str, *, source: str | None = None) -> "AgentSpec":
+        """Read and validate a spec from YAML text.
+
+        A plain kind name such as `random` is a spec with default params, so the same
+        text works for a command line option and for the contents of a config file.
+
+        Args:
+            text: A YAML mapping in the serialized form, or a YAML string with the kind.
+            source: Where the text came from, such as a file path, for error messages.
+
+        Returns:
+            The spec.
+
+        Raises:
+            InvalidAgentSpecError: If the text is not valid YAML or not a valid spec.
+        """
+        try:
+            data = yaml.safe_load(text)
+        except yaml.YAMLError as e:
+            msg = f"Invalid YAML{_in(source)}: {e}"
+            raise InvalidAgentSpecError(msg) from e
+
+        if isinstance(data, str):
+            data = {"kind": data}
+        return cls.from_dict(data, source=source)
+
+    @classmethod
+    def load(cls, path: Path) -> "AgentSpec":
+        """Read and validate a spec from a YAML file.
+
+        Args:
+            path: The YAML file with the serialized spec.
+
+        Returns:
+            The spec.
+
+        Raises:
+            InvalidAgentSpecError: If the file is not valid YAML or not a valid spec.
+            OSError: If the file cannot be read.
+        """
+        return cls.from_yaml(path.read_text(), source=f"`{path}`")
+
+    def to_dict(self) -> dict[str, JsonValue]:
+        """Serialize the spec.
+
+        Returns:
+            A mapping with `kind`, `label` if set, and `params`.
+        """
+        data: dict[str, JsonValue] = {"kind": self.kind}
+        if self.label is not None:
+            data["label"] = self.label
+        data["params"] = dict(self.params)
+        return data
+
+    def validate_params(self, *, source: str | None = None) -> BaseModel:
+        """Check that the kind is registered and the params are valid for it.
+
+        Args:
+            source: Where the spec came from, such as a file path, for error messages.
+
+        Returns:
+            The validated params, with defaults filled in.
+
+        Raises:
+            InvalidAgentSpecError: If the kind is not registered or the params are
+                invalid. All invalid params are listed in the message.
+        """
+        registration = _REGISTRY.get(self.kind)
+        if registration is None:
+            msg = (
+                f"Unknown agent kind `{self.kind}`{_in(source)}, expected one of: "
+                f"{', '.join(_REGISTRY)}."
+            )
+            raise InvalidAgentSpecError(msg)
+
+        try:
+            return registration.params_model.model_validate(dict(self.params))
+        except ValidationError as e:
+            errors = [{**error, "loc": ("params", *error["loc"])} for error in e.errors()]
+            raise InvalidAgentSpecError(
+                _format_errors(source, errors, kind=self.kind)
+            ) from e
+
+
+def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:
+    """Register an agent class under a kind name, making it available to specs.
+
+    The constructor must take `rules` as its first parameter and everything else as
+    keyword-only parameters with annotations: `seed`, then the agent params.
+
+    Args:
+        kind: The kind name used in `AgentSpec.kind`.
+
+    Returns:
+        A class decorator that registers the class and returns it unchanged.
+
+    Raises:
+        ValueError: If `kind` is already registered.
+        TypeError: If the constructor does not have the expected parameters.
+    """
+
+    def register(agent_class: type[A]) -> type[A]:
+        if kind in _REGISTRY:
+            msg = f"Agent kind `{kind}` is already registered."
             raise ValueError(msg)
 
-        params: dict[str, JsonValue] = {}
-        label: str | None = None
-        for pair in pairs.split(",") if pairs.strip() else []:
-            key, sep, value = pair.partition("=")
-            key, value = key.strip(), value.strip()
-            if not sep or not key:
-                msg = f"Expected `key=value` in spec `{text}`, but got `{pair}`."
-                raise ValueError(msg)
-            if key in params or (key == "label" and label is not None):
-                msg = f"Duplicate key `{key}` in spec `{text}`."
-                raise ValueError(msg)
+        _REGISTRY[kind] = _Registration(agent_class, _params_model(agent_class))
+        return agent_class
 
-            if key == "label":
-                label = value
-            else:
-                params[key] = _parse_value(value)
-
-        return cls(kind, params, label)
+    return register
 
 
 def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent:
-    """Build an agent from a spec, validating its parameters.
+    """Build an agent from a spec, validating its params.
 
     Args:
-        spec: The kind and parameters of the agent.
+        spec: The kind and params of the agent.
         rules: The rules governing the game.
         seed: The seed for the random number generator of the agent.
 
@@ -161,44 +247,142 @@ def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent:
         The configured agent.
 
     Raises:
-        ValueError: If the kind is not registered or the parameters are invalid.
+        InvalidAgentSpecError: If the kind is not registered or the params are invalid.
     """
-    kind = _KINDS.get(spec.kind)
-    if kind is None:
-        msg = f"Unknown agent kind `{spec.kind}`, expected one of: {', '.join(_KINDS)}."
-        raise ValueError(msg)
-
-    try:
-        params = kind.params_model.model_validate(dict(spec.params))
-    except ValidationError as e:
-        msg = f"Invalid parameters for agent kind `{spec.kind}`: {e}"
-        raise ValueError(msg) from e
-
-    return kind.build(rules, seed=seed, **params.model_dump())
+    params = spec.validate_params()
+    agent_class = _REGISTRY[spec.kind].agent_class
+    return agent_class(rules, seed=seed, **dict(params))
 
 
-def agent_kinds() -> list[AgentKindInfo]:
+def list_agents() -> list[AgentInfo]:
     """List the registered agent kinds with their descriptions and parameter schemas.
 
     Returns:
         One entry per registered kind, in registration order.
     """
     return [
-        AgentKindInfo(name, kind.description, kind.params_model.model_json_schema())
-        for name, kind in _KINDS.items()
+        AgentInfo(
+            name,
+            (inspect.getdoc(registration.agent_class) or "").partition("\n")[0],
+            registration.params_model.model_json_schema(),
+        )
+        for name, registration in _REGISTRY.items()
     ]
 
 
-def _parse_value(value: str) -> JsonValue:
-    """Parse a spec value as a JSON literal, or keep it as a string.
+def _params_model(agent_class: type[Agent]) -> type[BaseModel]:
+    """Build the params model of an agent class from its constructor signature.
 
     Args:
-        value: The text after `=` in a `key=value` pair.
+        agent_class: The agent class to inspect.
 
     Returns:
-        The decoded JSON value, or `value` itself if it is not valid JSON.
+        A frozen model that rejects unknown params, with one field per agent param.
+
+    Raises:
+        TypeError: If the constructor does not take `rules` first, or an agent param is
+            not keyword-only or has no annotation.
     """
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError:
-        return value
+    init = agent_class.__init__
+    parameters = list(inspect.signature(init).parameters.values())[1:]
+    if [p.name for p in parameters[:2]] != list(_INJECTED_PARAMS):
+        msg = f"`{agent_class.__name__}.__init__` must start with `rules` and `seed`."
+        raise TypeError(msg)
+
+    hints = get_type_hints(init, include_extras=True)
+    descriptions = _arg_descriptions(inspect.getdoc(init))
+    fields: dict[str, Any] = {}
+    for parameter in parameters[2:]:
+        if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
+            msg = (
+                f"Agent param `{parameter.name}` of `{agent_class.__name__}` must be "
+                "keyword-only."
+            )
+            raise TypeError(msg)
+        if parameter.name not in hints:
+            msg = (
+                f"Agent param `{parameter.name}` of `{agent_class.__name__}` has no "
+                "annotation."
+            )
+            raise TypeError(msg)
+
+        default = (
+            ... if parameter.default is inspect.Parameter.empty else parameter.default
+        )
+        fields[parameter.name] = (
+            hints[parameter.name],
+            Field(default, description=descriptions.get(parameter.name)),
+        )
+
+    return create_model(
+        f"{agent_class.__name__}Params",
+        __config__=ConfigDict(frozen=True, extra="forbid"),
+        **fields,
+    )
+
+
+def _arg_descriptions(docstring: str | None) -> dict[str, str]:
+    """Read the argument descriptions from the `Args:` section of a Google docstring.
+
+    Args:
+        docstring: The cleaned docstring, as returned by `inspect.getdoc`.
+
+    Returns:
+        The description of each argument, with continuation lines joined by spaces.
+    """
+    descriptions: dict[str, str] = {}
+    in_args = False
+    name: str | None = None
+    for line in (docstring or "").splitlines():
+        if line == "Args:":
+            in_args = True
+        elif in_args and line and not line.startswith(" "):
+            break
+        elif in_args and (match := _ARG_PATTERN.match(line)):
+            name = match[1]
+            descriptions[name] = match[2]
+        elif in_args and name is not None and line.strip():
+            descriptions[name] += " " + line.strip()
+
+    return descriptions
+
+
+def _format_errors(
+    source: str | None, errors: Sequence[Mapping[str, Any]], *, kind: str | None = None
+) -> str:
+    """Format validation errors as one line per problem, with the path to the value.
+
+    Args:
+        source: Where the spec came from, such as a file path.
+        errors: The validation errors, with locations relative to the spec.
+        kind: The kind of the spec, to list the known params for an unknown one.
+
+    Returns:
+        The error message.
+    """
+    lines = [f"Invalid agent spec{_in(source)}:"]
+    for error in errors:
+        location = ".".join(str(part) for part in error["loc"]) or "spec"
+        if error["type"] == "extra_forbidden" and kind is not None:
+            known = ", ".join(_REGISTRY[kind].params_model.model_fields) or "none"
+            lines.append(f"  {location}: Unknown param, expected one of: {known}.")
+        elif error["type"] == "missing":
+            lines.append(f"  {location}: Field required.")
+        elif error["type"] == "extra_forbidden":
+            lines.append(f"  {location}: Unknown key, expected kind, label or params.")
+        else:
+            lines.append(f"  {location}: {error['msg']} (got {error['input']!r}).")
+
+    return "\n".join(lines)
+
+
+def _in(source: str | None) -> str:
+    """Describe where a spec came from, for the start of an error message.
+
+    Args:
+        source: Where the spec came from, such as a file path, or `None` if unknown.
+
+    Returns:
+        ` in <source>`, or an empty string if the source is unknown.
+    """
+    return "" if source is None else f" in {source}"

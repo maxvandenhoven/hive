@@ -1,10 +1,12 @@
 import math
 from typing import override
 
+from hive.agents.factory import register_agent
 from hive.agents.search import SearchAgent
 from hive.engine.state import GameState, Move, Player
 
 
+@register_agent("minimax")
 class MinimaxAgent(SearchAgent):
     """Agent that selects moves using the minimax algorithm with iterative deepening.
 

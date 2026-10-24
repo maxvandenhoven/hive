@@ -1,7 +1,9 @@
 import time
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import override
+from typing import Annotated, override
+
+from pydantic import Field
 
 from hive.agents.base import Agent, TurnContext
 from hive.engine.grid import get_neighbors
@@ -43,18 +45,16 @@ class SearchAgent(Agent):
     Subclasses implement `_search` for one fixed depth and call `_visit_node` at every
     node, which counts nodes and checks `should_stop` every `STOP_CHECK_INTERVAL` nodes.
 
+    Registered subclasses take the depth limit and the evaluation weights as agent
+    parameters, described in `__init__`.
+
     Attributes:
         depth: The maximum search depth in plies, or `None` to search until stopped.
-        queen_safety: The weight of the difference in occupied neighbours of the
-            opponent's queen and of the player's own queen.
-        mobility: The weight of the difference in the number of legal moves of the
-            player and of the opponent. Generating moves makes this term slow.
-        positioning: The weight of the difference in the player's pieces next to the
-            opponent's queen and the opponent's pieces next to the player's queen.
-        material_on_board: The weight of the difference in the value of the pieces on
-            the board, using `PIECE_VALUES`.
-        material_in_hand: The weight of the difference in the value of the pieces in
-            hand, using `PIECE_VALUES`.
+        queen_safety: The weight of the queen safety term.
+        mobility: The weight of the mobility term.
+        positioning: The weight of the positioning term.
+        material_on_board: The weight of the on-board material term.
+        material_in_hand: The weight of the in-hand material term.
     """
 
     STOP_CHECK_INTERVAL = 32
@@ -67,7 +67,7 @@ class SearchAgent(Agent):
         rules: Rules,
         *,
         seed: int,
-        depth: int | None = None,
+        depth: Annotated[int | None, Field(ge=1)] = None,
         queen_safety: float = 1.0,
         mobility: float = 0.0,
         positioning: float = 0.0,
@@ -80,20 +80,18 @@ class SearchAgent(Agent):
             rules: The rules governing the game.
             seed: The seed for the random number generator of the agent.
             depth: The maximum search depth in plies, or `None` to search until stopped.
-            queen_safety: The weight of the queen safety term.
-            mobility: The weight of the mobility term.
-            positioning: The weight of the positioning term.
-            material_on_board: The weight of the on-board material term.
-            material_in_hand: The weight of the in-hand material term.
-
-        Raises:
-            ValueError: If `depth` is not positive.
+            queen_safety: The weight of the occupied neighbours of the opponent's queen
+                minus those of the player's own queen.
+            mobility: The weight of the player's legal moves minus the opponent's. This
+                term generates moves at every leaf, which makes it slow.
+            positioning: The weight of the player's pieces next to the opponent's queen
+                minus the opponent's pieces next to the player's queen.
+            material_on_board: The weight of the value of the player's pieces on the
+                board minus the opponent's.
+            material_in_hand: The weight of the value of the player's pieces in hand
+                minus the opponent's.
         """
         super().__init__(rules, seed=seed)
-        if depth is not None and depth < 1:
-            msg = f"The search depth must be positive or `None`, but got `{depth}`."
-            raise ValueError(msg)
-
         self.depth = depth
         self.queen_safety = queen_safety
         self.mobility = mobility
