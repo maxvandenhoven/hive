@@ -93,8 +93,17 @@ come from these entry points:
 | Entry point | Validates | Used by |
 |---|---|---|
 | `Rules.create_initial_state()` | – | everything |
-| `Rules.from_board(board, current_player, current_ply=None)` | piece counts per type and owner do not exceed `piece_counts`, the hive is connected, at most one queen per player, no empty stacks; derives `hand`, `queen_coord`, and `current_ply` (defaults to the number of pieces on the board, matching a game with placements only) | board editor, synthetic data, tests |
+| `Rules.from_board(board, current_player, current_ply=None)` | piece counts per type and owner do not exceed `piece_counts` (which also limits each player to one queen), the hive is connected, no empty stacks, and the ply is consistent (see below); copies the board and derives `hand`, `queen_coord`, and `current_ply` | board editor, synthetic data, tests |
 | `Rules.play(state, move)` | the move is in `legal_moves(state)`; raises `IllegalMoveError` otherwise | API, match runner, photo matcher |
+
+Ply consistency in `from_board` (decided in WP 04): `current_player` must be
+`starting_player` exactly on even plies (invariant 5), and no player may have more pieces on
+the board than turns taken (`(ply + 1) // 2` for the starting player, `ply // 2` for the
+other). Without this, `placeable_coords` and `placeable_piece_types`, which read
+`current_ply`, misbehave. The default `current_ply` is the lowest ply that satisfies both,
+which is the number of pieces on the board for a game with placements only. Defaulting to
+the piece count alone, as first planned, gives an invalid state when the player to move does
+not match its parity (for example white to move with three pieces on the board).
 
 Search code calls `state.apply_move` / `state.undo_move` directly with moves taken from
 `legal_moves`, so it stays valid without re-checking.
@@ -109,6 +118,12 @@ Property tests guard the fast path (use `hypothesis` or seeded random games):
 - Random games: replaying the move list from the initial state gives the same state.
 - Random games: `from_board(state.board, ...)` reproduces `hand` and `queen_coord`.
 - Every move from `legal_moves` keeps the hive connected and piece counts consistent.
+
+These live in `tests/engine/test_properties.py`, with `assert_invariants(state, rules)`
+checking invariants 1 to 5. Games are drawn with `hypothesis` (moves sampled from
+`legal_moves`, so failures shrink to short games) over a few rule variants. The fast profile
+(100 games of up to 100 plies) runs in `make test`; the slow profile (500 games of up to 300
+plies) is marked `slow`.
 
 ## Codec (WP 06)
 

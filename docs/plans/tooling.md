@@ -84,7 +84,7 @@ One root `Makefile`; every command a session needs is a target.
 | `make format` | `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` once it exists |
 | `make lint` | `ruff check --fix`, comment checker; `eslint` in `frontend/` |
 | `make type` | `ty check`; `tsc --noEmit` in `frontend/` |
-| `make test` | `pytest` with coverage (excludes `slow`); `vitest run` in `frontend/` |
+| `make test` | `pytest` with coverage (excludes `slow`, `core = "sysmon"` keeps tracing cheap); `vitest run` in `frontend/` |
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
 | `make check` | `format lint type` (no tests) |
 | `make perft` | `hive bench perft` at the standard depth |
