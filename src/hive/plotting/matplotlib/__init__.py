@@ -33,41 +33,29 @@ def draw_board(
 ) -> Figure:
     """Draw the Hive game board with an optional hand panel.
 
-    Parameters
-    ----------
-    state : GameState
-        The game state to visualize. The board layout, player hands, and current player
-        are all read from this object.
-    orientation : HexOrientation
-        Whether hexagons are pointy-top or flat-top, by default pointy-top.
-    highlights : dict[str, list[Coordinate]] or None
-        Color string to list of coordinates that should receive a colored highlight ring,
-        by default `None`, which disables highlighting.
-    use_sprites : bool
-        Whether to load piece sprites from the bundled assets or fall back to character
-        sprites, by default True.
-    sprite_resolution : int
-        Pixel size for sprite rendering, by default 256.
-    show_hands : bool
-        Whether to draw a hand panel below the board showing each player's remaining
-        pieces and whose turn it is, by default True.
-    title : str or None
-        An optional title displayed above the board, by default None.
-    figsize : tuple[float, float]
-        The overall figure size in inches, by default (12, 12).
-    dpi : int
-        The figure resolution in dots per inch, by default 300.
+    Args:
+        state: The game state to visualize. The board layout, player hands, and current
+            player are all read from this object.
+        orientation: Whether hexagons are pointy-top or flat-top, by default pointy-top.
+        highlights: Color string to list of coordinates that should receive a colored
+            highlight ring, by default `None`, which disables highlighting.
+        use_sprites: Whether to load piece sprites from the bundled assets or fall back to
+            character sprites, by default True.
+        sprite_resolution: Pixel size for sprite rendering, by default 256.
+        show_hands: Whether to draw a hand panel below the board showing each player's
+            remaining pieces and whose turn it is, by default True.
+        title: An optional title displayed above the board, by default None.
+        figsize: The overall figure size in inches, by default (12, 12).
+        dpi: The figure resolution in dots per inch, by default 300.
 
-    Returns
-    -------
-    Figure
+    Returns:
         The matplotlib figure containing the rendered board.
     """
     if highlights is None:
         highlights = {}
 
-    # Determine the grid extent based on the furthest occupied coordinate. Always show
-    # at least a radius of 3 to give some breathing room around the starting pieces.
+    # Determine the grid extent based on the furthest occupied coordinate. Always show at
+    # least a radius of 3 to give some breathing room around the starting pieces.
     max_distance = max(get_distance((0, 0), c) for c in state.board)
     grid_radius = max(3, max_distance + 1)
     grid_coords = get_grid_coords(grid_radius)

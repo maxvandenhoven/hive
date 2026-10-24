@@ -38,7 +38,7 @@ dev = [
 [tool.ruff]
 line-length = 90
 indent-width = 4
-include = ["src/**/*.py", "tests/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
 
 [tool.ruff.format]
 skip-magic-trailing-comma = true
@@ -62,8 +62,6 @@ ignore = [
     "ANN002",  # Ignore missing *args type annotations
     "ANN003",  # Ignore missing **kwargs type annotations
     "ANN401",  # Ignore Any type annotations
-    # TODO(WP 02): Remove once docstrings are converted from NumPy to Google style.
-    "D416",  # Ignore section name not ending with a colon
 ]
 
 [tool.ruff.lint.isort]
@@ -84,12 +82,14 @@ convention = "google"
 
 [tool.ty.environment]
 python-version = "3.13"
+extra-paths = ["scripts/tooling"]
 
 [tool.ty.src]
-include = ["src", "tests"]
+include = ["src", "tests", "scripts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["scripts/tooling"]
 addopts = ["--strict-markers"]
 markers = ["slow: long-running tests, excluded from `make test` (run with `make test-slow`)"]
 

@@ -11,17 +11,15 @@ class MobilityEvaluator(Evaluator):
     Compares the number of legal moves available to each player. More legal moves for the
     evaluated player relative to the opponent yields a positive score.
 
-    This evaluator requires a `Ruleset` to generate legal moves. Note that computing
-    legal moves can be expensive, so this evaluator may be slower than simpler heuristics.
+    This evaluator requires a `Ruleset` to generate legal moves. Note that computing legal
+    moves can be expensive, so this evaluator may be slower than simpler heuristics.
     """
 
     def __init__(self, ruleset: Ruleset) -> None:
         """Initialize the mobility evaluator.
 
-        Parameters
-        ----------
-        ruleset : Ruleset
-            The ruleset used to generate legal moves for each player.
+        Args:
+            ruleset: The ruleset used to generate legal moves for each player.
         """
         self.ruleset = ruleset
 
@@ -31,16 +29,11 @@ class MobilityEvaluator(Evaluator):
         Temporarily sets the current player to count that player's legal moves, then
         restores the original current player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player whose legal moves to count.
+        Args:
+            state: The current game state.
+            player: The player whose legal moves to count.
 
-        Returns
-        -------
-        int
+        Returns:
             The number of legal moves, excluding the pass move.
         """
         original_player = state.current_player
@@ -60,16 +53,11 @@ class MobilityEvaluator(Evaluator):
         Temporarily switches the current player to count legal moves for each side, then
         restores the original current player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player from whose perspective the evaluation is performed.
+        Args:
+            state: The current game state.
+            player: The player from whose perspective the evaluation is performed.
 
-        Returns
-        -------
-        float
+        Returns:
             The difference in legal move counts (player minus opponent). The pass move
             (`None`) is excluded from the count.
         """

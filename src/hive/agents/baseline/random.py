@@ -12,13 +12,10 @@ class RandomAgent(Agent):
     def __init__(self, ruleset: Ruleset, random_seed: int | None = None) -> None:
         """Initialize the random agent.
 
-        Parameters
-        ----------
-        ruleset : Ruleset
-            The ruleset governing the game.
-        random_seed : int | None
-            Optional seed for the random number generator, enabling reproducible move
-            selection.
+        Args:
+            ruleset: The ruleset governing the game.
+            random_seed: Optional seed for the random number generator, enabling
+                reproducible move selection.
         """
         self.ruleset = ruleset
         self._rng = random.Random(random_seed)
@@ -27,14 +24,10 @@ class RandomAgent(Agent):
     def choose_move(self, state: GameState) -> Move | None:
         """Select a move uniformly at random from the set of legal moves.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        Move | None
+        Returns:
             A randomly selected legal move, or `None` if passing is the only option.
         """
         legal_moves = self.ruleset.get_legal_moves(state)

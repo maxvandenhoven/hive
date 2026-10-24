@@ -17,13 +17,9 @@ class Agent(ABC):
     def choose_move(self, state: GameState) -> Move | None:
         """Choose the best move for the current player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
+        Args:
+            state: The current game state.
 
-        Returns
-        -------
-        Move | None
+        Returns:
             The chosen move, or `None` to pass the turn.
         """

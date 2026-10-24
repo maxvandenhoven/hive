@@ -24,30 +24,21 @@ def _draw_piece_hex(
 ) -> None:
     """Draw a single piece as a colored hexagon with a sprite or text label.
 
-    Sprites are rendered using `dw.Image` with data-coordinate positioning so that
-    they scale naturally with the board rather than staying at a fixed pixel size.
+    Sprites are rendered using `dw.Image` with data-coordinate positioning so that they
+    scale naturally with the board rather than staying at a fixed pixel size.
 
-    Parameters
-    ----------
-    group : dw.Group
-        The drawsvg group to append the piece elements to.
-    cx : float
-        The x-coordinate of the hex center.
-    cy : float
-        The y-coordinate of the hex center.
-    piece_type : PieceType
-        The type of piece to draw.
-    owner : Player
-        The player that owns the piece.
-    size : float
-        The radius of the surrounding grid hexagon.
-    orientation : HexOrientation
-        The hex orientation (pointy-top or flat-top).
-    use_sprites : bool
-        Whether to render the piece as a sprite image or a single-character text label.
-    stroke_width : float or None
-        Override for the hex border stroke width. Defaults to `size * 0.03` when
-        `None`.
+    Args:
+        group: The drawsvg group to append the piece elements to.
+        cx: The x-coordinate of the hex center.
+        cy: The y-coordinate of the hex center.
+        piece_type: The type of piece to draw.
+        owner: The player that owns the piece.
+        size: The radius of the surrounding grid hexagon.
+        orientation: The hex orientation (pointy-top or flat-top).
+        use_sprites: Whether to render the piece as a sprite image or a single-character
+            text label.
+        stroke_width: Override for the hex border stroke width. Defaults to `size * 0.03`
+            when `None`.
     """
     # Slightly smaller hex so the grid lines remain visible.
     inner_size = size * 0.88
@@ -88,18 +79,12 @@ def _draw_stack_badge(
 ) -> None:
     """Draw a small badge indicating how many pieces are stacked at a position.
 
-    Parameters
-    ----------
-    group : dw.Group
-        The drawsvg group to append the badge elements to.
-    cx : float
-        The x-coordinate of the hex center.
-    cy : float
-        The y-coordinate of the hex center.
-    stack_height : int
-        The number of pieces in the stack (badge is only drawn if > 1).
-    size : float
-        The radius of the surrounding grid hexagon.
+    Args:
+        group: The drawsvg group to append the badge elements to.
+        cx: The x-coordinate of the hex center.
+        cy: The y-coordinate of the hex center.
+        stack_height: The number of pieces in the stack (badge is only drawn if > 1).
+        size: The radius of the surrounding grid hexagon.
     """
     if stack_height <= 1:
         return
@@ -139,16 +124,11 @@ def draw_grid(
 ) -> None:
     """Draw the background hex grid.
 
-    Parameters
-    ----------
-    group : dw.Group
-        The drawsvg group to append grid hexagons to.
-    grid_coords : list[Coordinate]
-        All axial coordinates in the grid.
-    orientation : HexOrientation
-        The hex orientation.
-    size : float
-        The radius of each hexagon.
+    Args:
+        group: The drawsvg group to append grid hexagons to.
+        grid_coords: All axial coordinates in the grid.
+        orientation: The hex orientation.
+        size: The radius of each hexagon.
     """
     for coord in grid_coords:
         cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
@@ -176,18 +156,12 @@ def draw_pieces(
     Only the top piece of each stack is rendered. Stacks taller than one piece receive a
     small red badge indicating the stack height.
 
-    Parameters
-    ----------
-    group : dw.Group
-        The drawsvg group to append piece elements to.
-    state : GameState
-        The current game state.
-    orientation : HexOrientation
-        The hex orientation.
-    size : float
-        The radius of each hexagon.
-    use_sprites : bool
-        If `True`, render pieces as SVG sprite images.
+    Args:
+        group: The drawsvg group to append piece elements to.
+        state: The current game state.
+        orientation: The hex orientation.
+        size: The radius of each hexagon.
+        use_sprites: If `True`, render pieces as SVG sprite images.
     """
     for coord in state.get_occupied_coords():
         cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
@@ -221,17 +195,12 @@ def draw_highlights(
 ) -> None:
     """Draw colored highlight rings around specified coordinates.
 
-    Parameters
-    ----------
-    group : dw.Group
-        The drawsvg group to append highlight elements to.
-    highlights : dict[str, list[Coordinate]]
-        A mapping from color strings to lists of coordinates that should receive a
-        colored ring.
-    orientation : HexOrientation
-        The hex orientation.
-    size : float
-        The radius of each hexagon.
+    Args:
+        group: The drawsvg group to append highlight elements to.
+        highlights: A mapping from color strings to lists of coordinates that should
+            receive a colored ring.
+        orientation: The hex orientation.
+        size: The radius of each hexagon.
     """
     for color, coords in highlights.items():
         for coord in coords:
@@ -265,26 +234,16 @@ def draw_hand_panel(
     column has a header with the player name and a turn indicator arrow, followed by a
     horizontal row of piece icons with remaining counts displayed below each.
 
-    Parameters
-    ----------
-    group : dw.Group
-        The drawsvg group to append hand panel elements to.
-    state : GameState
-        The current game state, used to read hands and the active player.
-    orientation : HexOrientation
-        The hex orientation used for piece icons.
-    size : float
-        The radius used for piece icons in the hand panel.
-    use_sprites : bool
-        If `True`, render pieces as SVG sprite images.
-    panel_y : float
-        The top y-coordinate where the hand panel begins.
-    panel_width : float
-        The total width available for the hand panel.
+    Args:
+        group: The drawsvg group to append hand panel elements to.
+        state: The current game state, used to read hands and the active player.
+        orientation: The hex orientation used for piece icons.
+        size: The radius used for piece icons in the hand panel.
+        use_sprites: If `True`, render pieces as SVG sprite images.
+        panel_y: The top y-coordinate where the hand panel begins.
+        panel_width: The total width available for the hand panel.
 
-    Returns
-    -------
-    float
+    Returns:
         The total height consumed by the hand panel.
     """
     # Collect piece types present in either hand, sorted by enum value.

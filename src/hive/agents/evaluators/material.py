@@ -22,11 +22,9 @@ class MaterialOnBoardEvaluator(Evaluator):
     def __init__(self, piece_values: dict[PieceType, float] | None = None) -> None:
         """Initialize the on-board material evaluator.
 
-        Parameters
-        ----------
-        piece_values : dict[PieceType, float] | None, optional
-            A mapping from each piece type to its heuristic value. Defaults to
-            `DEFAULT_PIECE_VALUES` if not provided.
+        Args:
+            piece_values: A mapping from each piece type to its heuristic value. Defaults
+                to `DEFAULT_PIECE_VALUES` if not provided.
         """
         self.piece_values = (
             piece_values if piece_values is not None else DEFAULT_PIECE_VALUES
@@ -36,16 +34,11 @@ class MaterialOnBoardEvaluator(Evaluator):
     def evaluate(self, state: GameState, player: Player) -> float:
         """Evaluate on-board material advantage for the given player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player from whose perspective the evaluation is performed.
+        Args:
+            state: The current game state.
+            player: The player from whose perspective the evaluation is performed.
 
-        Returns
-        -------
-        float
+        Returns:
             Positive if the player has more material on the board, negative otherwise.
         """
         scores: dict[Player, float] = {Player.WHITE: 0.0, Player.BLACK: 0.0}
@@ -66,11 +59,9 @@ class MaterialInHandEvaluator(Evaluator):
     def __init__(self, piece_values: dict[PieceType, float] | None = None) -> None:
         """Initialize the in-hand material evaluator.
 
-        Parameters
-        ----------
-        piece_values : dict[PieceType, float] | None, optional
-            A mapping from each piece type to its heuristic value. Defaults to
-            `DEFAULT_PIECE_VALUES` if not provided.
+        Args:
+            piece_values: A mapping from each piece type to its heuristic value. Defaults
+                to `DEFAULT_PIECE_VALUES` if not provided.
         """
         self.piece_values = (
             piece_values if piece_values is not None else DEFAULT_PIECE_VALUES
@@ -80,16 +71,11 @@ class MaterialInHandEvaluator(Evaluator):
     def evaluate(self, state: GameState, player: Player) -> float:
         """Evaluate in-hand material advantage for the given player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player from whose perspective the evaluation is performed.
+        Args:
+            state: The current game state.
+            player: The player from whose perspective the evaluation is performed.
 
-        Returns
-        -------
-        float
+        Returns:
             Positive if the player has more material in hand, negative otherwise.
         """
         scores: dict[Player, float] = {Player.WHITE: 0.0, Player.BLACK: 0.0}

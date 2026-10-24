@@ -7,28 +7,24 @@ from hive.engine.state import GameState, PieceType
 class PlacementRule(ABC):
     """Base class for placement rules that govern where and which pieces may be placed.
 
-    The `Ruleset` class holds a single `PlacementRule` instance. When generating
-    legal placement moves via `Ruleset.get_legal_placement_moves`, the ruleset calls
+    The `Ruleset` class holds a single `PlacementRule` instance. When generating legal
+    placement moves via `Ruleset.get_legal_placement_moves`, the ruleset calls
     `get_placeable_coords` to obtain valid board positions and `get_placeable_piece_types`
     to obtain the piece types available for placement. The Cartesian product of these two
     results forms the full set of legal placement moves.
 
-    Subclasses must implement both methods to define the placement constraints for a
-    given variant of Hive.
+    Subclasses must implement both methods to define the placement constraints for a given
+    variant of Hive.
     """
 
     @abstractmethod
     def get_placeable_coords(self, state: GameState) -> list[Coordinate]:
         """Get all coordinates where a piece may be placed from the hand.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
+        Args:
+            state: The current state of the game.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All axial coordinates `(q, r)` where a piece may be placed.
         """
 
@@ -36,14 +32,10 @@ class PlacementRule(ABC):
     def get_placeable_piece_types(self, state: GameState) -> list[PieceType]:
         """Get all piece types that the current player may place.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
+        Args:
+            state: The current state of the game.
 
-        Returns
-        -------
-        list[PieceType]
+        Returns:
             All piece types that the current player has in hand and is allowed to place.
         """
 
@@ -53,9 +45,9 @@ class BasePlacementRule(PlacementRule):
 
     On the very first turn of the game (ply 0), the first player places a piece at the
     origin `(0, 0)`. On the second turn (ply 1), the second player places a piece on any
-    coordinate neighboring the origin. On all subsequent turns, a piece may only be
-    placed on an unoccupied coordinate that is adjacent to at least one of the current
-    player's pieces and not adjacent to any of the opponent's pieces.
+    coordinate neighboring the origin. On all subsequent turns, a piece may only be placed
+    on an unoccupied coordinate that is adjacent to at least one of the current player's
+    pieces and not adjacent to any of the opponent's pieces.
 
     If `place_queen_on_turn` is set, the current player is forced to place their queen if
     they have not done so by the specified turn number. Otherwise, any piece type
@@ -65,25 +57,19 @@ class BasePlacementRule(PlacementRule):
     def __init__(self, place_queen_on_turn: int | None = 4) -> None:
         """Initialize the default placement rule.
 
-        Parameters
-        ----------
-        place_queen_on_turn : int | None, optional
-            The turn number (one-indexed, per player) by which the queen must be placed.
-            Defaults to `4`. If `None`, no deadline is enforced.
+        Args:
+            place_queen_on_turn: The turn number (one-indexed, per player) by which the
+                queen must be placed. Defaults to `4`. If `None`, no deadline is enforced.
         """
         self.place_queen_on_turn = place_queen_on_turn
 
     def get_placeable_coords(self, state: GameState) -> list[Coordinate]:
         """Get all coordinates where a piece may be placed from the hand.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
+        Args:
+            state: The current state of the game.
 
-        Returns
-        -------
-        list[Coordinate]
+        Returns:
             All axial coordinates `(q, r)` where a piece may be placed.
         """
         if state.current_ply == 0:
@@ -110,14 +96,10 @@ class BasePlacementRule(PlacementRule):
     def get_placeable_piece_types(self, state: GameState) -> list[PieceType]:
         """Get all piece types that the current player may place.
 
-        Parameters
-        ----------
-        state : GameState
-            The current state of the game.
+        Args:
+            state: The current state of the game.
 
-        Returns
-        -------
-        list[PieceType]
+        Returns:
             All piece types that the current player has in hand and is allowed to place.
         """
         if self.place_queen_on_turn is not None:

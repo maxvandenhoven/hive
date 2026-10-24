@@ -16,16 +16,12 @@ class PositioningEvaluator(Evaluator):
     def _count_pressure(self, state: GameState, attacker: Player) -> float:
         """Count the attacker's pieces adjacent to the defender's queen.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        attacker : Player
-            The player whose pieces are checked for proximity to the opponent's queen.
+        Args:
+            state: The current game state.
+            attacker: The player whose pieces are checked for proximity to the opponent's
+                queen.
 
-        Returns
-        -------
-        float
+        Returns:
             The number of the attacker's pieces adjacent to the defender's queen, or 0.0
             if the defender's queen has not been placed.
         """
@@ -47,16 +43,11 @@ class PositioningEvaluator(Evaluator):
     def evaluate(self, state: GameState, player: Player) -> float:
         """Evaluate positioning advantage for the given player.
 
-        Parameters
-        ----------
-        state : GameState
-            The current game state.
-        player : Player
-            The player from whose perspective the evaluation is performed.
+        Args:
+            state: The current game state.
+            player: The player from whose perspective the evaluation is performed.
 
-        Returns
-        -------
-        float
+        Returns:
             Positive if the player has more pieces adjacent to the opponent's queen than
             the opponent has adjacent to the player's queen.
         """

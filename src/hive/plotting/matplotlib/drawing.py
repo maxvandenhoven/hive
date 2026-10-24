@@ -32,26 +32,18 @@ def _draw_piece_hex(
     Sprites are rendered using `ax.imshow` with a data-coordinate `extent` so that they
     scale naturally with the board rather than staying at a fixed pixel size.
 
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib axes to draw on.
-    cx : float
-        The x-coordinate of the hex center.
-    cy : float
-        The y-coordinate of the hex center.
-    piece_type : PieceType
-        The type of piece to draw.
-    owner : Player
-        The player that owns the piece.
-    size : float
-        The radius of the surrounding grid hexagon.
-    orientation : HexOrientation
-        The hex orientation (pointy-top or flat-top).
-    use_sprites : bool
-        Whether to render the piece as a sprite image or a single-character text label.
-    sprite_resolution : int
-        The pixel size for sprite rendering. Only used when `use_sprites` is `True`.
+    Args:
+        ax: The matplotlib axes to draw on.
+        cx: The x-coordinate of the hex center.
+        cy: The y-coordinate of the hex center.
+        piece_type: The type of piece to draw.
+        owner: The player that owns the piece.
+        size: The radius of the surrounding grid hexagon.
+        orientation: The hex orientation (pointy-top or flat-top).
+        use_sprites: Whether to render the piece as a sprite image or a single-character
+            text label.
+        sprite_resolution: The pixel size for sprite rendering. Only used when
+            `use_sprites` is `True`.
     """
     # Slightly smaller hex so the grid lines remain visible.
     hex_verts = get_hex_verts(cx, cy, orientation=orientation, size=size * 0.88)
@@ -94,18 +86,12 @@ def _draw_stack_badge(
 ) -> None:
     """Draw a small badge indicating how many pieces are stacked at a position.
 
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib axes to draw on.
-    cx : float
-        The x-coordinate of the hex center.
-    cy : float
-        The y-coordinate of the hex center.
-    stack_height : int
-        The number of pieces in the stack (badge is only drawn if > 1).
-    size : float
-        The radius of the surrounding grid hexagon.
+    Args:
+        ax: The matplotlib axes to draw on.
+        cx: The x-coordinate of the hex center.
+        cy: The y-coordinate of the hex center.
+        stack_height: The number of pieces in the stack (badge is only drawn if > 1).
+        size: The radius of the surrounding grid hexagon.
     """
     if stack_height <= 1:
         return
@@ -134,16 +120,11 @@ def draw_grid(
 ) -> None:
     """Draw the background hex grid.
 
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib axes to draw on.
-    grid_coords : list[Coordinate]
-        All axial coordinates in the grid.
-    orientation : HexOrientation
-        The hex orientation.
-    size : float
-        The radius of each hexagon.
+    Args:
+        ax: The matplotlib axes to draw on.
+        grid_coords: All axial coordinates in the grid.
+        orientation: The hex orientation.
+        size: The radius of each hexagon.
     """
     for coord in grid_coords:
         cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
@@ -172,20 +153,13 @@ def draw_pieces(
     Only the top piece of each stack is rendered. Stacks taller than one piece receive a
     small red badge indicating the stack height.
 
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib axes to draw on.
-    state : GameState
-        The current game state.
-    orientation : HexOrientation
-        The hex orientation.
-    size : float
-        The radius of each hexagon.
-    use_sprites : bool
-        If `True`, render pieces as sprite images.
-    sprite_resolution : int
-        The pixel size for sprite rendering.
+    Args:
+        ax: The matplotlib axes to draw on.
+        state: The current game state.
+        orientation: The hex orientation.
+        size: The radius of each hexagon.
+        use_sprites: If `True`, render pieces as sprite images.
+        sprite_resolution: The pixel size for sprite rendering.
     """
     for coord in state.get_occupied_coords():
         cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
@@ -216,17 +190,12 @@ def draw_highlights(
 ) -> None:
     """Draw colored highlight rings around specified coordinates.
 
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib axes to draw on.
-    highlights : dict[str, list[Coordinate]]
-        A mapping from color strings to lists of coordinates that should
-        receive a colored ring.
-    orientation : HexOrientation
-        The hex orientation.
-    size : float
-        The radius of each hexagon.
+    Args:
+        ax: The matplotlib axes to draw on.
+        highlights: A mapping from color strings to lists of coordinates that should
+            receive a colored ring.
+        orientation: The hex orientation.
+        size: The radius of each hexagon.
     """
     for color, coords in highlights.items():
         for coord in coords:
@@ -250,16 +219,11 @@ def fit_axes_to_grid(
 ) -> None:
     """Set the axes limits to tightly frame the hex grid with a small margin.
 
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib axes to adjust.
-    grid_coords : list[Coordinate]
-        All axial coordinates in the grid.
-    orientation : HexOrientation
-        The hex orientation.
-    size : float
-        The radius of each hexagon.
+    Args:
+        ax: The matplotlib axes to adjust.
+        grid_coords: All axial coordinates in the grid.
+        orientation: The hex orientation.
+        size: The radius of each hexagon.
     """
     all_x, all_y = zip(
         *[
@@ -282,23 +246,16 @@ def draw_hand_panel(
 ) -> None:
     """Draw the hand panel showing remaining pieces for each player.
 
-    The panel is laid out as two side-by-side columns (White left, Black
-    right). Each column has a header with the player name and a turn
-    indicator arrow, followed by a horizontal row of piece icons with
-    remaining counts displayed below each.
+    The panel is laid out as two side-by-side columns (White left, Black right). Each
+    column has a header with the player name and a turn indicator arrow, followed by a
+    horizontal row of piece icons with remaining counts displayed below each.
 
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib axes to draw on.
-    state : GameState
-        The current game state, used to read hands and the active player.
-    orientation : HexOrientation
-        The hex orientation used for piece icons.
-    use_sprites : bool
-        If `True`, render pieces as sprite images.
-    sprite_resolution : int
-        The pixel size for sprite rendering.
+    Args:
+        ax: The matplotlib axes to draw on.
+        state: The current game state, used to read hands and the active player.
+        orientation: The hex orientation used for piece icons.
+        use_sprites: If `True`, render pieces as sprite images.
+        sprite_resolution: The pixel size for sprite rendering.
     """
     ax.set_aspect("equal")
     ax.axis("off")
