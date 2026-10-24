@@ -1,0 +1,98 @@
+[project]
+name = "hive"
+version = "0.1.0"
+description = "Hive engine, search agents and a web app for tracking physical games."
+readme = "README.md"
+requires-python = "~=3.13.0"
+dependencies = [
+    "typer>=0.27.3",
+]
+
+[project.optional-dependencies]
+plotting = [
+    "drawsvg>=2.4.2",
+    "matplotlib>=3.11.2",
+    "pillow>=13.0.0",
+]
+api = []
+vision = []
+train = []
+
+[project.scripts]
+hive = "hive.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.170.9",
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.2",
+    "ty>=0.0.91",
+]
+
+[tool.ruff]
+line-length = 90
+indent-width = 4
+include = ["src/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.format]
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint]
+select = [
+    "B",  # flake8-bugbear
+    "D",  # pydocstyle
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "I",  # isort
+    "EM",  # flake8-errmsg
+    "T20",  # flake8-print
+    "RET",  # flake8-return
+    "ANN",  # flake8-annotations
+    "UP",  # pyupgrade
+]
+ignore = [
+    "D100",  # Ignore missing docstring in public module
+    "D104",  # Ignore missing docstring in public package
+    "ANN002",  # Ignore missing *args type annotations
+    "ANN003",  # Ignore missing **kwargs type annotations
+    "ANN401",  # Ignore Any type annotations
+    # TODO(WP 02): Remove once docstrings are converted from NumPy to Google style.
+    "D416",  # Ignore section name not ending with a colon
+]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "D100",  # Ignore missing docstring in public module
+    "D101",  # Ignore missing docstring in public class
+    "D102",  # Ignore missing docstring in public method
+    "D103",  # Ignore missing docstring in public function
+    "D104",  # Ignore missing docstring in public package
+    "D107",  # Ignore missing docstring in __init__ method
+]
+
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.src]
+include = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = ["slow: long-running tests, excluded from `make test` (run with `make test-slow`)"]
+
+[tool.coverage.run]
+source = ["src/hive"]
+omit = ["src/hive/plotting/*", "src/hive/assets/*"]
