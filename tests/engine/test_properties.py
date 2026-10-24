@@ -14,11 +14,11 @@ from hypothesis import strategies as st
 
 from hive.engine.grid import Coordinate
 from hive.engine.rules import Rules
-from hive.engine.state import GameState, Move, PieceType, Player
+from hive.engine.state import GameState, Move, Piece, PieceType, Player
 
 type Game = tuple[Rules, list[Move | None]]
 type Snapshot = tuple[
-    dict[Coordinate, list[tuple[PieceType, Player]]],
+    dict[Coordinate, list[Piece]],
     Player,
     int,
     dict[Player, dict[PieceType, int]],
@@ -66,10 +66,7 @@ def _games(draw: st.DrawFn, max_plies: int) -> Game:
 def _snapshot(state: GameState) -> Snapshot:
     """Copy every field of the state into plain values for comparison."""
     return (
-        {
-            coord: [(piece.type, piece.owner) for piece in stack]
-            for coord, stack in state.board.items()
-        },
+        {coord: list(stack) for coord, stack in state.board.items()},
         state.current_player,
         state.current_ply,
         {player: dict(hand) for player, hand in state.hand.items()},

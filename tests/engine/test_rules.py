@@ -737,7 +737,7 @@ class TestFromBoard:
     def test_does_not_share_input(
         self, rules: Rules, placements: list[Placement]
     ) -> None:
-        """Test that the input board is neither modified nor shared with the state."""
+        """Test that moves on the state do not change the stacks of the input board."""
         board = _build_board(placements)
         expected = _build_board(placements)
 
@@ -745,7 +745,6 @@ class TestFromBoard:
         state.apply_move(
             Move(piece_type=PieceType.BEETLE, source_coord=(1, 0), target_coord=(1, -1))
         )
-        state.board[(0, 0)][0].owner = Player.BLACK
 
         assert board == expected
 

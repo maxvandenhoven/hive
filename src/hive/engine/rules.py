@@ -5,7 +5,7 @@ from typing import ClassVar
 
 from hive.engine.errors import IllegalMoveError, InvalidBoardError
 from hive.engine.grid import HEX_DIRECTIONS, Coordinate, add, get_neighbors
-from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
+from hive.engine.state import GameBoard, GameState, Move, PieceType, Player
 
 BASE_PIECE_COUNTS: Mapping[PieceType, int] = MappingProxyType(
     {
@@ -147,9 +147,7 @@ class Rules:
                 msg = f"The stack at coordinate `{coord}` is empty."
                 raise InvalidBoardError(msg)
 
-            state.board[coord] = [
-                Piece(type=piece.type, owner=piece.owner) for piece in stack
-            ]
+            state.board[coord] = list(stack)
             for piece in stack:
                 state.hand[piece.owner][piece.type] = (
                     state.hand[piece.owner].get(piece.type, 0) - 1

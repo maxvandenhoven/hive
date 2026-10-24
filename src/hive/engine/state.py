@@ -40,9 +40,12 @@ class PieceType(IntEnum):
     ANT = 4
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Piece:
     """A game piece with a type and an owner.
+
+    Pieces are immutable, so boards can share them and copying a board only needs to copy
+    its stacks.
 
     Attributes:
         type: The type of the piece.

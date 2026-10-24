@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -12,6 +13,13 @@ def _assert_state_equal(state: GameState, expected: GameState) -> None:
     assert state.current_ply == expected.current_ply
     assert state.hand == expected.hand
     assert state.queen_coord == expected.queen_coord
+
+
+def test_piece_frozen() -> None:
+    """Test that piece fields cannot be reassigned."""
+    piece = Piece(type=PieceType.ANT, owner=Player.WHITE)
+    with pytest.raises(FrozenInstanceError):
+        piece.owner = Player.BLACK  # ty: ignore[invalid-assignment]
 
 
 def test_player_opponent() -> None:
