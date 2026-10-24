@@ -236,7 +236,7 @@ class Rules:
 
         return current_ply
 
-    def play(self, state: GameState, move: Move | None) -> None:
+    def apply_checked_move(self, state: GameState, move: Move | None) -> None:
         """Apply a move to the state after checking that it is legal.
 
         Use this for moves from outside the engine, such as user input or game records.

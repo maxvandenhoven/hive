@@ -94,7 +94,7 @@ come from these entry points:
 |---|---|---|
 | `Rules.create_initial_state()` | – | everything |
 | `Rules.from_board(board, current_player, current_ply=None)` | piece counts per type and owner do not exceed `piece_counts` (which also limits each player to one queen), the hive is connected, no empty stacks, and the ply is consistent (see below); copies the board and derives `hand`, `queen_coord`, and `current_ply` | board editor, synthetic data, tests |
-| `Rules.play(state, move)` | the move is in `legal_moves(state)`; raises `IllegalMoveError` otherwise | API, match runner, photo matcher |
+| `Rules.apply_checked_move(state, move)` | the move is in `legal_moves(state)`; raises `IllegalMoveError` otherwise | API, match runner, photo matcher |
 
 Ply consistency in `from_board` (decided in WP 04): `current_player` must be
 `starting_player` exactly on even plies (invariant 5), and no player may have more pieces on
@@ -133,8 +133,8 @@ used by match records, gauntlet reports, the API and the database:
 - `Move` ↔ `{"piece": "ant", "from": [q, r] | null, "to": [q, r]}`; pass ↔ `null`.
 - `Rules` ↔ dict of its fields, so rules can be stored per game and per gauntlet.
 - `GameRecord` (setup + rules + moves) ↔ dict, with `GameRecord.replay()` returning the
-  final `GameState` (using `Rules.play`, so invalid records are rejected) and
-  `GameRecord.states()` iterating states per ply for replay views.
+  final `GameState` (using `Rules.apply_checked_move`, so invalid records are rejected)
+  and `GameRecord.states()` iterating states per ply for replay views.
 - Setup is either `"initial"` or a board produced by the board editor (validated through
   `from_board`).
 

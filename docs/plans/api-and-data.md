@@ -75,7 +75,7 @@ the generated frontend client.
 | GET | `/games/{id}/export` | 10 | Codec `GameRecord` as JSON download. |
 | GET | `/games/{id}/state?ply=N` | 11 | Board (stacks), hands, side to move, ply, result, last move, movable pieces, placeable coords and piece types. `ply` enables replay. |
 | GET | `/games/{id}/targets?q=&r=` | 11 | Legal targets for the tile at `(q, r)`. |
-| POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply}`. Validated with `Rules.play`; `expected_ply` gives optimistic concurrency (409 on mismatch). Updates status/result when the game ends. |
+| POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply}`. Validated with `Rules.apply_checked_move`; `expected_ply` gives optimistic concurrency (409 on mismatch). Updates status/result when the game ends. |
 | DELETE | `/games/{id}/moves/last` | 11 | Undo the last move. |
 | POST | `/games/{id}/think` | 12 | SSE stream. Body: `{agent?: AgentSpec, budget_s?, commit: bool}`. Streams `info` and `candidate` events, ends with `decision`. With `commit=true` (only allowed on an agent side, using that side's spec), the final move is stored with `source=agent` and its `DecisionRecord`. |
 | POST | `/games/{id}/photos` | 16 | Upload a photo (multipart) for the current ply; stores it. From WP 19 also runs reader + matcher and returns candidates. |

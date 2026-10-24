@@ -749,11 +749,11 @@ class TestFromBoard:
         assert board == expected
 
     def test_playable(self, rules: Rules, placements: list[Placement]) -> None:
-        """Test that the state supports legal moves and play."""
+        """Test that the state supports `legal_moves` and `apply_checked_move`."""
         state = rules.from_board(_build_board(placements), Player.WHITE)
         move = rules.legal_moves(state)[0]
 
-        rules.play(state, move)
+        rules.apply_checked_move(state, move)
 
         assert state.current_player is Player.BLACK
 
@@ -840,7 +840,7 @@ class TestFromBoard:
             rules.from_board(_build_board(placements), Player.WHITE, current_ply=2)
 
 
-class TestPlay:
+class TestApplyCheckedMove:
     """Test applying moves with legality checks."""
 
     def test_applies_legal_move(self, rules: Rules) -> None:
@@ -848,7 +848,7 @@ class TestPlay:
         state = rules.create_initial_state()
         move = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
 
-        rules.play(state, move)
+        rules.apply_checked_move(state, move)
 
         assert state.board == {(0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)]}
         assert state.current_player is Player.BLACK
@@ -868,7 +868,7 @@ class TestPlay:
             Player.WHITE,
         )
 
-        rules.play(state, None)
+        rules.apply_checked_move(state, None)
 
         assert state.current_player is Player.BLACK
 
@@ -891,7 +891,7 @@ class TestPlay:
         state = rules.create_initial_state()
 
         with pytest.raises(IllegalMoveError, match="not legal for player `WHITE`"):
-            rules.play(state, move)
+            rules.apply_checked_move(state, move)
 
         assert state.board == {}
         assert state.current_ply == 0
@@ -903,7 +903,7 @@ class TestPlay:
         move = Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
 
         with pytest.raises(IllegalMoveError):
-            rules.play(state, move)
+            rules.apply_checked_move(state, move)
 
     def test_rejects_move_of_opponent_piece(self, rules: Rules) -> None:
         """Test that moving an opponent's piece is rejected."""
@@ -919,4 +919,4 @@ class TestPlay:
         move = Move(piece_type=PieceType.QUEEN, source_coord=(1, 0), target_coord=(1, -1))
 
         with pytest.raises(IllegalMoveError):
-            rules.play(state, move)
+            rules.apply_checked_move(state, move)

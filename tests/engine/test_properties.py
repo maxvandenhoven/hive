@@ -148,7 +148,7 @@ def test_undo_restores_state(profile: _Profile) -> None:
 
 @pytest.mark.parametrize("profile", _PROFILES)
 def test_replay_reproduces_state(profile: _Profile) -> None:
-    """Test that replaying the moves with `Rules.play` gives the same state."""
+    """Test that replaying with `Rules.apply_checked_move` gives the same state."""
 
     def check(game: Game) -> None:
         rules, moves = game
@@ -158,7 +158,7 @@ def test_replay_reproduces_state(profile: _Profile) -> None:
 
         replayed_state = rules.create_initial_state()
         for move in moves:
-            rules.play(replayed_state, move)
+            rules.apply_checked_move(replayed_state, move)
 
         assert _snapshot(replayed_state) == _snapshot(fast_state)
 
