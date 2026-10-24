@@ -12,6 +12,7 @@ format:
 .PHONY: lint
 lint:
 	@uv run ruff check --fix --output-format concise
+	@uv run python scripts/tooling/check_comments.py src tests scripts
 
 
 .PHONY: type

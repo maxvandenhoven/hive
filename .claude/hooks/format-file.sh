@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # PostToolUse hook: format the Python file Claude just edited and report remaining lint
-# errors. Exit code 2 feeds stderr back to Claude; exit code 0 means nothing to report.
+# and comment style errors. Exit code 2 feeds stderr back to Claude; exit code 0 means
+# nothing to report.
 set -uo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -23,6 +24,10 @@ if ! output="$(uv run --quiet ruff format --quiet "$file_path" 2>&1)"; then
     exit 2
 fi
 if ! output="$(uv run --quiet ruff check --fix --quiet --output-format concise "$file_path" 2>&1)"; then
+    echo "$output" >&2
+    exit 2
+fi
+if ! output="$(uv run --quiet python scripts/tooling/check_comments.py "$file_path" 2>&1)"; then
     echo "$output" >&2
     exit 2
 fi
