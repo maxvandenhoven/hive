@@ -19,7 +19,7 @@ linting, typing and tests for free.
 | Behaviour is a method on the type that owns the data; functions only for math on primitives | review (see `README.md` D3) |
 | Specific, consistent names: prefix types, enums and constants with their domain (`MatchOutcome`, `TurnCloseReason`, `AgentRegistration`, `INJECTED_AGENT_PARAMS`), never a bare generic word (`Outcome`, `Info`, `Worker`); related types share a naming pattern (`ThinkMessage`, `IdleMessage`, ...) | review (documented in `CLAUDE.md`) |
 | Public by default: no leading underscore on functions, methods, attributes or constants unless hiding them clearly matters (for example state that must only change through methods, or hooks such as `SearchAgent._search` that subclasses implement but callers must not use); document public attributes in `Attributes:` | review (documented in `CLAUDE.md`) |
-| Blank lines between distinct blocks of logic: a blank line before and after every compound statement (`if`, `for`, `while`, `with`, `try`, `match`) unless it starts or ends its enclosing block, and before the closing `return` of a function with several steps (three or more statements, not counting the docstring) | `scripts/tooling/check_blank_lines.py` (`--fix` in `make format` and the hook, check in `make lint`) |
+| Blank lines between distinct blocks of logic: a blank line before and after every compound statement (`if`, `for`, `while`, `with`, `try`, `match`) unless it starts or ends its enclosing block, and before the closing `return` of a function with several steps (three or more statements, not counting the docstring) | review (documented in `CLAUDE.md`) |
 | Keyword arguments for calls to our own functions, methods and classes with two or more arguments (`worker.decide(state=state, budget_s=1.0)`); positional is fine for single-argument calls, the standard library, builtins, third-party APIs and `*args` parameters | review (documented in `CLAUDE.md`) |
 
 Ruff rule selection carries over from the current packages (`B`, `D`, `E`, `F`, `I`, `EM`,
@@ -85,8 +85,8 @@ One root `Makefile`; every command a session needs is a target.
 | Target | Does |
 |---|---|
 | `make sync` | `uv sync --all-groups --all-extras` |
-| `make format` | blank line fixer, `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` once it exists |
-| `make lint` | `ruff check --fix`, comment checker, blank line checker; `eslint` in `frontend/` |
+| `make format` | `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` once it exists |
+| `make lint` | `ruff check --fix`, comment checker; `eslint` in `frontend/` |
 | `make type` | `ty check`; `tsc --noEmit` in `frontend/` |
 | `make test` | `pytest` with coverage (excludes `slow`, `core = "sysmon"` keeps tracing cheap, `concurrency = ["multiprocessing", "thread"]` measures match worker processes); `vitest run` in `frontend/` |
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
@@ -103,8 +103,8 @@ Frontend targets are added by WP 13; dev targets by WP 10.
 `.claude/settings.json`:
 
 - **PostToolUse** on `Edit|Write|MultiEdit`: `.claude/hooks/format-file.sh` reads the hook
-  JSON from stdin, takes `tool_input.file_path`, and for `*.py` runs the blank line fixer,
-  `ruff format`, `ruff check --fix` and the comment checker on that file only; for
+  JSON from stdin, takes `tool_input.file_path`, and for `*.py` runs `ruff format`,
+  `ruff check --fix` and the comment checker on that file only; for
   `frontend/**/*.{ts,tsx,css}` runs `prettier --write` (once the frontend exists). It exits
   0 when the file is not formattable and prints remaining lint and comment errors to stderr
   with exit code 2, so Claude sees and fixes them.

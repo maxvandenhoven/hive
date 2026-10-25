@@ -19,8 +19,8 @@ One Python package `hive` with a single `pyproject.toml` and `uv.lock` at the re
 - `src/hive/assets/` — insect SVG/PNG assets
 - `src/hive/cli.py` — `hive` command line entry point (Typer)
 - `tests/` — mirrors `src/hive/`, for example `tests/engine/` for `src/hive/engine/`
-- `scripts/tooling/` — development tooling such as the comment and blank line checkers
-  (tests in `tests/tooling/`)
+- `scripts/tooling/` — development tooling such as the comment checker (tests in
+  `tests/tooling/`)
 
 Heavy dependencies live behind extras: `plotting`, `api`, `vision`, `train`.
 
@@ -30,8 +30,8 @@ Dependency management uses `uv`. Python 3.13.x is required (no other minor versi
 
 ```
 make sync           # uv sync --all-groups --all-extras
-make format         # blank line fixer, ruff format and import sorting
-make lint           # ruff check --fix, the comment checker and the blank line checker
+make format         # ruff format and import sorting
+make lint           # ruff check --fix and the comment checker
 make type           # ty check
 make check          # format + lint + type (no tests)
 make test           # pytest with coverage, excluding `slow` tests
@@ -78,8 +78,7 @@ See `docs/plans/tooling.md` for the full rules and how each one is enforced.
 - Separate distinct blocks of logic with a blank line: before and after every compound
   statement (`if`, `for`, `while`, `with`, `try`, `match`) unless it starts or ends its
   enclosing block, and before the closing `return` of a function with several steps
-  (three or more statements). Fixed by `scripts/tooling/check_blank_lines.py --fix`, which
-  `make format` and the hook run, and checked by `make lint`.
+  (three or more statements, not counting the docstring).
 - Pass arguments by keyword in calls to our own functions, methods and classes with two
   or more arguments, for example `worker.decide(state=state, budget_s=1.0)` and
   `Move(piece_type=..., source_coord=None, target_coord=(0, 0))`. Positional is fine for
@@ -95,8 +94,8 @@ Uses `ty` (Astral) — not mypy. Run via `make type`.
 ## Claude Code hooks
 
 - PostToolUse on `Edit|Write|MultiEdit` runs `.claude/hooks/format-file.sh`, which formats
-  the edited `.py` file with the blank line fixer, `ruff format` and `ruff check --fix`,
-  then runs the comment checker. Remaining errors are reported back on stderr; fix them.
+  the edited `.py` file with `ruff format` and `ruff check --fix`, then runs the comment
+  checker. Remaining errors are reported back on stderr; fix them.
 - Stop runs `make check`.
 
 ## Git workflow

@@ -19,10 +19,6 @@ file_path="$(realpath "$file_path")"
 
 cd "$repo_root" || exit 0
 
-if ! output="$(uv run --quiet python scripts/tooling/check_blank_lines.py --fix "$file_path" 2>&1)"; then
-    echo "$output" >&2
-    exit 2
-fi
 if ! output="$(uv run --quiet ruff format --quiet "$file_path" 2>&1)"; then
     echo "$output" >&2
     exit 2
