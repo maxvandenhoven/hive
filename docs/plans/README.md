@@ -15,7 +15,7 @@ the order in which work happens. Topic files go deeper on each area:
 | [`synthetic-data.md`](synthetic-data.md) | Scene generation, Blender tilesets, rendering, datasets, YOLO training |
 | [`tooling.md`](tooling.md) | Code style, ruff/ty/pytest, Makefile, Claude Code hooks, CI |
 | [`deployment.md`](deployment.md) | Docker image, Kubernetes manifests, Argo CD, Tailscale, homelab prerequisites |
-| [`performance.md`](performance.md) | Engine speed and agent strength round (profiling, autoresearch, Rust) |
+| [`performance.md`](performance.md) | Engine speed (M6: profiling, autoresearch, Rust) and agent strength (M7: repetition, alpha-beta, tuning) |
 
 Work is split into **work packages** (WPs), each tracked as a GitHub issue that contains a
 self-contained session prompt. The entry point for a session is: *"Implement issue #N"*.
@@ -123,6 +123,7 @@ Each decision has a short rationale. Topic files go into detail.
 | D21 | Google-style docstrings, types everywhere (tests included), 90 character lines, automatic formatting including docstring prose and comments, Claude Code hook formats after every edit. | See `tooling.md`. |
 | D22 | No evaluator abstraction: evaluation weights (`queen_safety`, `mobility`, ...) are flat agent params next to `depth`, and the heuristics are methods of the search agent base. | Same reasoning as D2: one weighted sum with no other implementation. Flat params keep specs one level deep for the CLI, the API forms and weight tuning. |
 | D23 | Agent classes register a kind with `@register_agent`; the param schema is derived from the constructor signature (`Annotated` constraints, docstring descriptions). Specs are `{kind, label, params}` as YAML or JSON, limited to registered kinds; tuned agents are YAML presets shipped in the package. | One source of truth for params, readable validation errors, nested config for future neural agents, and no arbitrary imports from stored or user-supplied specs. |
+| D24 | Agent strength is its own milestone (M7) after the engine speed round (M6). Every change is measured by gauntlets between agents; the bar is beating an experienced human. | Speed and strength are separate concerns with separate acceptance tests (perft nodes/s versus gauntlet results), and deeper search needs a faster engine first. |
 
 ## 5. Target repo structure
 
@@ -176,9 +177,12 @@ a test or a script first).
 | **M3 Classical vision** | Photo capture, grid fitting, move matching, classical reader, camera flow, evaluation harness | Camera button proposes the correct move on real photos; `hive vision eval` reports metrics for the classical reader |
 | **M4 Synthetic data and YOLO** | Scene generation, Blender rendering with tilesets, dataset export, YOLO training, ONNX reader, comparison report | YOLO reader is selectable in the app and compared against the classical reader on the real test set |
 | **M5 Deployment** | Docker image, CI release, Kustomize manifests, Argo CD, Tailscale ingress, migrations, metrics | Merging to `main` deploys to the homelab and the app is reachable at `https://hive.<tailnet>.ts.net` |
-| **M6 Performance** | Profiling, engine speedups, alpha-beta/TT agents, evaluator tuning, autoresearch harness | Measurable perft speedup with parity intact; stronger agent confirmed by gauntlet |
+| **M6 Performance** | Engine profiling, targeted speedups, autoresearch harness for engine speed | Measurable perft speedup with parity intact |
+| **M7 Agent strength** | Repetition handling, alpha-beta and transposition table, evaluator tuning, each validated by gauntlets between agents | The strongest agent beats an experienced human player at the app's time budget |
 
 M6 depends only on M1 (perft and gauntlet) and can be interleaved with M2–M5 at any time.
+M7 builds on M6: a faster engine searches deeper at the same budget. It does not block
+M2–M5.
 
 ## 7. Work packages and implementation order
 
@@ -215,8 +219,9 @@ issue should not be started.
 | 25 | Docker image and release workflow | M5 | 12, 13 | #36 |
 | 26 | Kubernetes manifests, Argo CD and Tailscale | M5 | 25 | #37 |
 | 27 | Engine profiling and targeted speedups | M6 | 05 | #38 |
-| 28 | Alpha-beta, transposition table and evaluator tuning | M6 | 09, 27 | #39 |
+| 28 | Alpha-beta, transposition table and evaluator tuning | M7 | 09, 27, 30 | #39 |
 | 29 | Autoresearch harness for engine speed | M6 | 27 | #40 |
+| 30 | Repetition draws, repetition-aware search and seeded tie-breaking | M7 | 09, 27 | #55 |
 
 Dependency graph (arrows mean "unblocks"):
 
@@ -246,8 +251,10 @@ flowchart LR
     WP25 --> WP26
   end
   subgraph M6
-    WP27 --> WP28
     WP27 --> WP29
+  end
+  subgraph M7
+    WP30 --> WP28
   end
   WP04 --> WP10
   WP06 --> WP10
@@ -257,12 +264,14 @@ flowchart LR
   WP04 --> WP21
   WP12 & WP13 --> WP25
   WP05 --> WP27
-  WP09 --> WP28
+  WP09 & WP27 --> WP30
+  WP09 & WP27 --> WP28
 ```
 
 Recommended order (a valid topological order following the milestones):
 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-24, 25, 26, then 27, 28, 29. M6 (27–29) can start any time after 05 and 09.
+24, 25, 26, then 27, 29, 30, 28. M6 (27, 29) can start any time after 05, and M7 (30, 28)
+after 09 and 27.
 
 ## 8. Session workflow
 
