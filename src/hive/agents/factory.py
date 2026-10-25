@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from importlib.resources import files
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, get_type_hints
+from typing import Annotated, Any, get_type_hints
 
 import yaml
 from pydantic import (
@@ -167,8 +167,6 @@ class AgentSpec(JsonCodec):
         params: The JSON parameters, validated against the kind when loading or building.
         label: The display name in reports and the UI, or `None` for none.
     """
-
-    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     kind: str
     params: Mapping[str, JsonValue] = field(default_factory=dict)

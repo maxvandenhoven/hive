@@ -15,26 +15,24 @@ is checked when a record is replayed.
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Annotated, ClassVar
+from typing import Annotated
 
-from pydantic import ConfigDict, PlainSerializer, PlainValidator, StrictInt
+from pydantic import PlainSerializer, PlainValidator, StrictInt
 
 from hive.engine.codec import JsonCodec, json_adapter
 from hive.engine.grid import Coordinate
 from hive.engine.rules import Rules
-from hive.engine.state import JSON_CONFIG, GameBoard, GameState, Move, Piece, Player
+from hive.engine.state import GameBoard, GameState, Move, Piece, Player
 
 
 @dataclass(frozen=True, slots=True)
-class BoardStack:
+class BoardStack(JsonCodec):
     """The JSON form of one occupied coordinate of a board.
 
     Attributes:
         coord: The coordinate.
         stack: The pieces on the coordinate, ordered bottom to top.
     """
-
-    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
 
     coord: Coordinate
     stack: list[Piece]
@@ -94,8 +92,6 @@ class BoardSetup(JsonCodec):
             consistent ply (see `Rules.from_board`).
     """
 
-    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
-
     board: JsonBoard
     current_player: Player
     current_ply: StrictInt | None = None
@@ -129,8 +125,6 @@ class GameRecord(JsonCodec):
             state.
         moves: The moves played from the starting position, where `None` is a pass.
     """
-
-    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
 
     rules: Rules
     setup: BoardSetup | None = None

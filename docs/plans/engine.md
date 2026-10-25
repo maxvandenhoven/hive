@@ -134,8 +134,10 @@ pydantic converts, so each value has exactly one definition (D25). `src/hive/eng
 holds the shared pieces: the `JsonCodec` mixin (`to_json()` / `from_json(data)`), a cached
 `json_adapter(type)` for type expressions such as `Move | None`, and `NamedIntEnum`, whose
 members are written as lower case names. A class declares its JSON form with annotations:
-`Field(alias="from")`, `StrictInt` / `StrictBool` where JSON must hold a real integer or
-boolean, and `extra="forbid"` for unknown keys. The same annotations produce the JSON
+`Field(alias="from")`, and `StrictInt` / `StrictBool` where JSON must hold a real integer
+or boolean. `JsonCodec` carries the shared config: unknown keys are errors and fields are
+written under their aliases; classes whose JSON holds keys they do not read (computed
+fields, the `source` of the perft suite) override it with `extra="ignore"`. The same annotations produce the JSON
 schema the API publishes, so the frontend client gets typed engine values.
 
 The first version had a hand-written `serialize_<value>` / `deserialize_<value>` pair per

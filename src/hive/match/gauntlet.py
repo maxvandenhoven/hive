@@ -14,9 +14,9 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Final, Literal
+from typing import ClassVar, Final, Literal
 
-from pydantic import computed_field
+from pydantic import ConfigDict, computed_field
 
 from hive.agents.factory import AgentSpec
 from hive.engine.codec import JsonCodec
@@ -389,6 +389,9 @@ class DecisionStats(JsonCodec):
         illegal_submissions: The number of rejected submissions.
     """
 
+    # The JSON form also holds the computed fields, which are not read back.
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
     decisions: int
     depth_reached: dict[int, int]
     nodes_per_s: float | None
@@ -502,6 +505,9 @@ class ParticipantResult(JsonCodec):
         elo: The Elo rating estimated from all results, relative to a field mean of 0.
         decision_stats: The aggregated decision records.
     """
+
+    # The JSON form also holds the computed fields, which are not read back.
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     label: str
     spec: AgentSpec

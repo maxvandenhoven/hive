@@ -2,17 +2,17 @@
 
 Values stay plain dataclasses, so the engine keeps its speed and its freedom to change
 representation; pydantic only runs when a value is written or read. A dataclass inherits
-`JsonCodec` for `to_json` and `from_json`, and declares its JSON form with annotations:
-field aliases such as `Field(alias="from")`, `StrictInt` where the JSON must hold a real
-integer, and `NamedIntEnum` members, which are written as their lower case names. The same
-annotations give the JSON schema that the API publishes.
+`JsonCodec` for `to_json`, `from_json` and the shared pydantic config, and declares its
+JSON form with annotations: field aliases such as `Field(alias="from")`, `StrictInt` where
+the JSON must hold a real integer, and `NamedIntEnum` members, which are written as their
+lower case names. The same annotations give the JSON schema that the API publishes.
 """
 
 from enum import IntEnum
 from functools import cache
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
-from pydantic import GetCoreSchemaHandler, JsonValue, TypeAdapter
+from pydantic import ConfigDict, GetCoreSchemaHandler, JsonValue, TypeAdapter
 from pydantic_core import core_schema
 
 
@@ -30,9 +30,18 @@ def json_adapter(kind: Any) -> TypeAdapter[Any]:
 
 
 class JsonCodec:
-    """A mixin that converts a dataclass to and from its JSON-compatible form."""
+    """A mixin that converts a dataclass to and from its JSON-compatible form.
+
+    Unknown keys are errors when reading, and fields are written under their aliases. A
+    class whose JSON holds keys it does not read, such as computed fields, overrides
+    `__pydantic_config__` with `extra="ignore"`.
+    """
 
     __slots__ = ()
+
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(
+        extra="forbid", serialize_by_alias=True
+    )
 
     def to_json(self) -> JsonValue:
         """Serialize the value.

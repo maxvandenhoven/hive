@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Annotated, ClassVar
 
-from pydantic import ConfigDict, Field, PlainSerializer, StrictBool, StrictInt
+from pydantic import Field, PlainSerializer, StrictBool, StrictInt
 
 from hive.engine.codec import JsonCodec
 from hive.engine.errors import IllegalMoveError, InvalidBoardError
@@ -14,7 +14,7 @@ from hive.engine.grid import (
     get_flanking_coords,
     get_neighbors,
 )
-from hive.engine.state import JSON_CONFIG, GameBoard, GameState, Move, PieceType, Player
+from hive.engine.state import GameBoard, GameState, Move, PieceType, Player
 
 BASE_PIECE_COUNTS: Mapping[PieceType, int] = MappingProxyType(
     {
@@ -49,8 +49,6 @@ class Rules(JsonCodec):
         max_turns: The maximum number of turns per player before the game is a draw, or
             `None` for no limit.
     """
-
-    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
 
     piece_counts: Annotated[
         Mapping[PieceType, Annotated[StrictInt, Field(ge=0)]],

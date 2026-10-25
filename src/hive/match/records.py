@@ -6,9 +6,9 @@ their own JSON forms, and the agents of a match are written under `white` and `b
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Annotated, ClassVar
+from typing import Annotated
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from hive.agents.base import SearchInfoValue
 from hive.agents.factory import AgentSpec
@@ -100,8 +100,6 @@ class MatchResult(JsonCodec):
         winner: The winning player, or `None` unless the outcome is a win.
         duration_s: The wall clock seconds of the whole match, including worker startup.
     """
-
-    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(serialize_by_alias=True)
 
     rules: Rules
     white_spec: Annotated[AgentSpec, Field(alias="white")]

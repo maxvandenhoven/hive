@@ -9,6 +9,9 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar
+
+from pydantic import ConfigDict
 
 from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
@@ -137,6 +140,9 @@ class PerftPosition(JsonCodec):
             counts are known.
     """
 
+    # The suite file also holds where the reference counts come from.
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
     name: str
     moves: list[Move | None]
     counts: dict[int, int]
@@ -170,6 +176,9 @@ class PerftSuite(JsonCodec):
         rules: The rules matching the reference engine.
         positions: The positions, in file order.
     """
+
+    # The suite file also holds where the reference counts come from.
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     rules: Rules
     positions: list[PerftPosition]

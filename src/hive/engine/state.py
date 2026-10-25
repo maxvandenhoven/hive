@@ -1,16 +1,12 @@
 from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Annotated, ClassVar
+from typing import Annotated
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from hive.engine.codec import JsonCodec, NamedIntEnum
 from hive.engine.grid import Coordinate, get_flanking_coords, get_neighbors
-
-JSON_CONFIG = ConfigDict(extra="forbid", serialize_by_alias=True)
-"""The pydantic config of the engine values: unknown JSON keys are errors, and fields are
-written under their aliases."""
 
 
 class Player(NamedIntEnum):
@@ -52,8 +48,6 @@ class Piece(JsonCodec):
         owner: The player that owns the piece.
     """
 
-    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
-
     type: Annotated[PieceType, Field(alias="piece")]
     owner: Player
 
@@ -73,8 +67,6 @@ class Move(JsonCodec):
             piece is being placed from the hand.
         target_coord: The axial coordinate `(q', r')` the piece moves or is placed to.
     """
-
-    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
 
     piece_type: Annotated[PieceType, Field(alias="piece")]
     source_coord: Annotated[Coordinate | None, Field(alias="from")]
