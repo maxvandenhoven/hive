@@ -39,6 +39,7 @@ def make_config(
         "seed": 0,
     }
     fields.update(overrides)
+
     return GauntletConfig(**fields)
 
 
@@ -370,6 +371,7 @@ class TestRun:
                 seed=seed, max_turns=8, jobs=2, replays=True, budget_s=2.0
             ).run(match_callback=lambda match, result: seen.append(match.index))
             assert report.replays is not None
+
             return [
                 (m.white, m.black, m.seed, m.outcome, m.winner, r.record.moves)
                 for m, r in zip(report.matches, report.replays, strict=True)

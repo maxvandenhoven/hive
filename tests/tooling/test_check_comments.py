@@ -126,6 +126,7 @@ class TestMain:
         nested.mkdir()
         (nested / "bad.py").write_text("x = 1  # bad comment\n")
         (nested / "notes.txt").write_text("# not python\n")
+
         return tmp_path
 
     def test_reports_violations_and_exits_non_zero(

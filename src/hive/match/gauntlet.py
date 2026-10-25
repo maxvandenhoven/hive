@@ -620,6 +620,7 @@ class DecisionStats:
         """
         fields = expect_mapping(data=data, kind="decision stats")
         nodes_per_s = fields["nodes_per_s"]
+
         return cls(
             decisions=int(fields["decisions"]),
             depth_reached={
@@ -808,6 +809,7 @@ class MatchSummary:
         """
         fields = expect_mapping(data=data, kind="match summary")
         winner = fields["winner"]
+
         return cls(
             index=int(fields["index"]),
             white=str(fields["white"]),

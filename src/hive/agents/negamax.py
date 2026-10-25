@@ -49,22 +49,27 @@ class NegamaxAgent(SearchAgent):
         """
         self._visit_node()
         terminal_score = self._terminal_score(state, state.current_player, ply)
+
         if terminal_score is not None:
             return terminal_score, []
+
         if depth == 0:
             self._cutoff = True
             return self.evaluate(state, state.current_player), []
 
         best_score = -math.inf
         best_pv: list[Move | None] = []
+
         for move in self.rules.legal_moves(state):
             state.apply_move(move)
+
             try:
                 child_score, pv = self._negamax(state, depth - 1, ply + 1)
             finally:
                 state.undo_move(move)
 
             score = -child_score
+
             if score > best_score:
                 best_score = score
                 best_pv = [move, *pv]

@@ -32,6 +32,7 @@ class FakeClock:
         """
         now = self.now
         self.now += self.step
+
         return now
 
     def advance(self, seconds: float) -> None:
@@ -95,6 +96,7 @@ class LocalTurnContext(TurnContext):
         if not self.submissions:
             msg = "No move was submitted."
             raise LookupError(msg)
+
         return self.submissions[-1].move
 
     @property
@@ -150,6 +152,7 @@ class LocalTurnContext(TurnContext):
         """
         stop = self._stopped or self.closed or self.remaining_seconds() <= 0
         self._stop_seen = self._stop_seen or stop
+
         return stop
 
     @override

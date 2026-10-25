@@ -83,11 +83,14 @@ def test_restores_state(kind: str, rules: Rules, position: GameState) -> None:
 def test_deterministic_for_seed(kind: str, rules: Rules, position: GameState) -> None:
     """Test that two agents with equal seeds submit the same moves over several turns."""
     runs = []
+
     for _ in range(2):
         agent = build_agent(AgentSpec(kind), rules, seed=7)
         turns = [_ticking_turn(budget_s=0.05) for _ in range(3)]
+
         for turn in turns:
             agent.think(position.copy(), turn)
+
         runs.append([turn.submissions for turn in turns])
 
     assert runs[0] == runs[1]

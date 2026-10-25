@@ -10,10 +10,13 @@ def _random_position(rules: Rules, seed: int, plies: int) -> GameState:
     """Play a seeded random game for a number of plies, or until it finishes."""
     agent = RandomAgent(rules, seed=seed)
     state = rules.create_initial_state()
+
     for _ in range(plies):
         if rules.is_finished(state):
             break
+
         state.apply_move(LocalTurnContext().run(agent, state))
+
     return state
 
 
@@ -28,4 +31,5 @@ def position(request: pytest.FixtureRequest, rules: Rules) -> GameState:
     """Build the start position and a few unfinished positions from seeded random play."""
     state = _random_position(rules, seed=request.param, plies=request.param)
     assert not rules.is_finished(state)
+
     return state

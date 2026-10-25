@@ -175,10 +175,12 @@ class Rules:
                 raise InvalidBoardError(msg)
 
             state.board[coord] = list(stack)
+
             for piece in stack:
                 state.hand[piece.owner][piece.type] = (
                     state.hand[piece.owner].get(piece.type, 0) - 1
                 )
+
                 if piece.type is PieceType.QUEEN:
                     state.queen_coord[piece.owner] = coord
 
@@ -219,6 +221,7 @@ class Rules:
                 player, or leaves a player with more pieces on the board than turns taken.
         """
         piece_count = {player: 0 for player in Player}
+
         for stack in state.board.values():
             for piece in stack:
                 piece_count[piece.owner] += 1
@@ -233,8 +236,10 @@ class Rules:
             current_ply = max(
                 2 * piece_count[starting_player] - 1, 2 * piece_count[second_player], 0
             )
+
             if (current_ply % 2 == 0) != expect_even:
                 current_ply += 1
+
             return current_ply
 
         if current_ply < 0:
@@ -252,6 +257,7 @@ class Rules:
             starting_player: (current_ply + 1) // 2,
             second_player: current_ply // 2,
         }
+
         for player in Player:
             if piece_count[player] > turns_taken[player]:
                 msg = (
@@ -328,6 +334,7 @@ class Rules:
         placeable_piece_types = self.placeable_piece_types(state)
 
         moves: list[Move] = []
+
         for coord in self.placeable_coords(state):
             for piece_type in placeable_piece_types:
                 moves.append(
@@ -335,6 +342,7 @@ class Rules:
                 )
 
         moves.sort(key=lambda move: (move.piece_type, move.target_coord))
+
         return moves
 
     def movement_moves(self, state: GameState) -> list[Move]:
@@ -348,6 +356,7 @@ class Rules:
             piece type, source and target coordinate.
         """
         moves: list[Move] = []
+
         for coord, piece_type in self.movable_pieces(state):
             for target_coord in self._TARGET_COORDS[piece_type](self, state, coord):
                 moves.append(
@@ -361,6 +370,7 @@ class Rules:
         moves.sort(
             key=lambda move: (move.piece_type, move.source_coord, move.target_coord)
         )
+
         return moves
 
     def movable_pieces(self, state: GameState) -> list[tuple[Coordinate, PieceType]]:
@@ -385,6 +395,7 @@ class Rules:
         articulation_points = state.get_articulation_points()
 
         movable_pieces: list[tuple[Coordinate, PieceType]] = []
+
         for coord in state.get_occupied_coords():
             top_piece = state.get_top_piece(coord)
 
@@ -443,8 +454,10 @@ class Rules:
             return get_neighbors((0, 0))
 
         placeable_coords = set()
+
         for coord in state.get_occupied_coords():
             top_piece = state.get_top_piece(coord)
+
             if top_piece.owner != state.current_player:
                 continue
 
@@ -474,6 +487,7 @@ class Rules:
 
         if self.queen_by_turn is not None:
             queen_placed = state.get_queen_coord(state.current_player) is not None
+
             if player_turn >= self.queen_by_turn and not queen_placed:
                 return [PieceType.QUEEN]
 
@@ -509,8 +523,10 @@ class Rules:
             return [Player.WHITE, Player.BLACK]
 
         winners: list[Player] = []
+
         for player in Player:
             queen_coord = state.get_queen_coord(player)
+
             if queen_coord is not None and state.is_surrounded(queen_coord):
                 winners.append(player.opponent)
 
@@ -544,6 +560,7 @@ class Rules:
             The neighboring coordinates that satisfy all sliding constraints.
         """
         slideable_neighbors: list[Coordinate] = []
+
         for neighbor_coord in get_neighbors(coord):
             if state.is_occupied(neighbor_coord):
                 continue
@@ -598,6 +615,7 @@ class Rules:
 
             for neighbor_coord in get_neighbors(coord):
                 height = max(source_height, state.get_stack_height(neighbor_coord))
+
                 if height == 0:
                     continue
 
@@ -630,6 +648,7 @@ class Rules:
 
         for direction in HEX_DIRECTIONS:
             current_coord = add(coord, direction)
+
             if not state.is_occupied(current_coord):
                 continue
 
@@ -710,6 +729,7 @@ class Rules:
         with state.piece_lifted(coord):
             while frontier:
                 current_coord = frontier.pop()
+
                 for neighbor_coord in self._slideable_neighbors(state, current_coord):
                     if neighbor_coord in visited_coords:
                         continue

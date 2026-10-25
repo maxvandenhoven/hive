@@ -110,18 +110,24 @@ class CommentBlock:
         blocks: list[list[Comment]] = []
         previous: Comment | None = None
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+
         for token in tokens:
             if token.type != tokenize.COMMENT:
                 continue
+
             comment = Comment.from_token(token)
+
             if comment.is_exempt or not comment.text:
                 previous = None
                 continue
+
             if previous is not None and comment.continues(previous):
                 blocks[-1].append(comment)
             else:
                 blocks.append([comment])
+
             previous = comment
+
         return [cls(tuple(block)) for block in blocks]
 
     @property
@@ -140,6 +146,7 @@ class CommentBlock:
         """
         words = self.text.split()
         violations = []
+
         if words[0][0].islower() and "://" not in words[0]:
             violations.append(
                 Violation(
@@ -148,6 +155,7 @@ class CommentBlock:
                     "comment should start with a capital letter",
                 )
             )
+
         if (
             len(words) >= MIN_WORDS_FOR_PERIOD
             and not self.text.endswith(".")
@@ -161,6 +169,7 @@ class CommentBlock:
                     "period",
                 )
             )
+
         return violations
 
 
@@ -177,6 +186,7 @@ def check_file(path: Path) -> list[Violation]:
         blocks = CommentBlock.from_source(path.read_text())
     except (tokenize.TokenError, SyntaxError) as error:
         return [Violation(path, 1, f"could not tokenize: {error}")]
+
     return [violation for block in blocks for violation in block.violations(path)]
 
 
@@ -197,8 +207,10 @@ def main(argv: list[str] | None = None) -> int:
         if file.suffix == ".py"
     )
     violations = [violation for file in files for violation in check_file(file)]
+
     for violation in violations:
         sys.stdout.write(f"{violation}\n")
+
     return 1 if violations else 0
 
 

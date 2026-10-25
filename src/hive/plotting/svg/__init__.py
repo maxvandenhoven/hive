@@ -38,6 +38,7 @@ def _hand_panel_natural_size(state: GameState) -> tuple[float, float]:
     column_gap = spacing * 1.5
     width = 2 * column_width + column_gap + 2 * spacing
     height = HEX_SIZE * 5.5
+
     return width, height
 
 
@@ -123,6 +124,7 @@ def draw_board(
     hand_pixel_height = 0.0
     hand_scale = board_scale
     hand_natural_width = 0.0
+
     if show_hands:
         hand_natural_width, hand_natural_height = _hand_panel_natural_size(state)
         hand_scale = canvas_width / hand_natural_width

@@ -250,6 +250,7 @@ def draw_hand_panel(
     all_types: list[PieceType] = sorted(
         set(state.hand[Player.WHITE].keys()) | set(state.hand[Player.BLACK].keys())
     )
+
     if not all_types:
         return 0.0
 

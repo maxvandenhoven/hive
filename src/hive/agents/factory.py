@@ -72,6 +72,7 @@ class AgentRegistration:
         """
         init = agent_class.__init__
         parameters = list(inspect.signature(init).parameters.values())[1:]
+
         if [p.name for p in parameters[:2]] != list(INJECTED_AGENT_PARAMS):
             msg = f"`{agent_class.__name__}.__init__` must start with `rules` and `seed`."
             raise TypeError(msg)
@@ -79,6 +80,7 @@ class AgentRegistration:
         hints = get_type_hints(init, include_extras=True)
         descriptions = _arg_descriptions(inspect.getdoc(init))
         fields: dict[str, Any] = {}
+
         for parameter in parameters[2:]:
             if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
                 msg = (
@@ -86,6 +88,7 @@ class AgentRegistration:
                     "keyword-only."
                 )
                 raise TypeError(msg)
+
             if parameter.name not in hints:
                 msg = (
                     f"Agent param `{parameter.name}` of `{agent_class.__name__}` has no "
@@ -106,6 +109,7 @@ class AgentRegistration:
             __config__=ConfigDict(frozen=True, extra="forbid"),
             **fields,
         )
+
         return cls(kind, agent_class, params_model)
 
     @property
@@ -180,6 +184,7 @@ class AgentSpec:
 
         spec = cls(document.kind, document.params, document.label)
         spec.validate_params(source=source)
+
         return spec
 
     @classmethod
@@ -207,6 +212,7 @@ class AgentSpec:
 
         if isinstance(data, str):
             data = {"kind": data}
+
         return cls.from_dict(data, source=source)
 
     @classmethod
@@ -290,9 +296,12 @@ class AgentSpec:
             A mapping with `kind`, `label` if set, and `params`.
         """
         data: dict[str, JsonValue] = {"kind": self.kind}
+
         if self.label is not None:
             data["label"] = self.label
+
         data["params"] = dict(self.params)
+
         return data
 
     def validate_params(self, *, source: str | None = None) -> BaseModel:
@@ -309,6 +318,7 @@ class AgentSpec:
                 invalid. All invalid params are listed in the message.
         """
         registration = AGENT_REGISTRY.get(self.kind)
+
         if registration is None:
             msg = (
                 f"Unknown agent kind `{self.kind}`{_in(source)}, expected one of: "
@@ -348,6 +358,7 @@ def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:
             raise ValueError(msg)
 
         AGENT_REGISTRY[kind] = AgentRegistration.from_class(kind, agent_class)
+
         return agent_class
 
     return register
@@ -369,6 +380,7 @@ def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent:
     """
     params = spec.validate_params()
     agent_class = AGENT_REGISTRY[spec.kind].agent_class
+
     return agent_class(rules, seed=seed, **dict(params))
 
 
@@ -406,6 +418,7 @@ def _arg_descriptions(docstring: str | None) -> dict[str, str]:
     descriptions: dict[str, str] = {}
     in_args = False
     name: str | None = None
+
     for line in (docstring or "").splitlines():
         if line == "Args:":
             in_args = True
@@ -434,8 +447,10 @@ def _format_errors(
         The error message.
     """
     lines = [f"Invalid agent spec{_in(source)}:"]
+
     for error in errors:
         location = ".".join(str(part) for part in error["loc"]) or "spec"
+
         if error["type"] == "extra_forbidden" and kind is not None:
             known = ", ".join(AGENT_REGISTRY[kind].params_model.model_fields) or "none"
             lines.append(f"  {location}: Unknown param, expected one of: {known}.")

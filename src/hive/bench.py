@@ -37,10 +37,12 @@ def perft(state: GameState, rules: Rules, depth: int) -> int:
         return 0
 
     count = 0
+
     for move in rules.legal_moves(state):
         state.apply_move(move)
         count += perft(state, rules, depth - 1)
         state.undo_move(move)
+
     return count
 
 
@@ -71,10 +73,12 @@ def divide(state: GameState, rules: Rules, depth: int) -> list[tuple[Move | None
         return []
 
     counts: list[tuple[Move | None, int]] = []
+
     for move in rules.legal_moves(state):
         state.apply_move(move)
         counts.append((move, perft(state, rules, depth - 1)))
         state.undo_move(move)
+
     return counts
 
 
@@ -117,6 +121,7 @@ def timed_perft(state: GameState, rules: Rules, depth: int) -> PerftResult:
     start = time.perf_counter()
     nodes = perft(state, rules, depth)
     seconds = time.perf_counter() - start
+
     return PerftResult(depth=depth, nodes=nodes, seconds=seconds)
 
 
@@ -150,8 +155,10 @@ class PerftPosition:
             IllegalMoveError: If a move is not legal under `rules`.
         """
         state = rules.create_initial_state()
+
         for move in self.moves:
             rules.apply_checked_move(state, move)
+
         return state
 
 
@@ -201,6 +208,7 @@ class PerftSuite:
             )
             for position in data["positions"]
         ]
+
         return cls(rules=rules, positions=positions)
 
     def position(self, name: str) -> PerftPosition:

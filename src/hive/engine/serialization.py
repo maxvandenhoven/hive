@@ -101,8 +101,10 @@ class GameRecord:
             IllegalMoveError: If a move is not legal in the state it is played in.
         """
         state = self.initial_state()
+
         for move in self.moves:
             self.rules.apply_checked_move(state, move)
+
         return state
 
     def states(self) -> Iterator[GameState]:
@@ -119,6 +121,7 @@ class GameRecord:
         """
         state = self.initial_state()
         yield state.copy()
+
         for move in self.moves:
             self.rules.apply_checked_move(state, move)
             yield state.copy()
@@ -252,6 +255,7 @@ def deserialize_move(data: object) -> Move | None:
 
     fields = _expect_object(data, "move", required={"piece", "from", "to"})
     source = fields["from"]
+
     return Move(
         piece_type=deserialize_piece_type(fields["piece"]),
         source_coord=None if source is None else deserialize_coordinate(source),
@@ -354,17 +358,21 @@ def deserialize_board(data: object) -> GameBoard:
         raise ValueError(msg)
 
     board: GameBoard = {}
+
     for entry in data:
         fields = _expect_object(entry, "stack", required={"coord", "stack"})
         coord = deserialize_coordinate(fields["coord"])
+
         if coord in board:
             msg = f"The board has more than one stack at coordinate `{coord}`."
             raise ValueError(msg)
 
         pieces = fields["stack"]
+
         if not isinstance(pieces, list):
             msg = f"Expected the stack at `{coord}` to be a list, but got `{pieces!r}`."
             raise ValueError(msg)
+
         board[coord] = [_deserialize_piece(piece) for piece in pieces]
 
     return board
@@ -407,6 +415,7 @@ def deserialize_setup(data: object) -> BoardSetup | None:
     fields = _expect_object(
         data, "setup", required={"board", "current_player"}, optional={"current_ply"}
     )
+
     return BoardSetup(
         board=deserialize_board(fields["board"]),
         current_player=deserialize_player(fields["current_player"]),
@@ -446,11 +455,13 @@ def deserialize_record(data: object) -> GameRecord:
     """
     fields = _expect_object(data, "game record", required={"rules", "setup", "moves"})
     moves = fields["moves"]
+
     if not isinstance(moves, list):
         msg = f"Expected `moves` to be a list, but got `{moves!r}`."
         raise ValueError(msg)
 
     deserialized_moves: list[Move | None] = []
+
     for index, move in enumerate(moves):
         try:
             deserialized_moves.append(deserialize_move(move))
@@ -517,6 +528,7 @@ def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
         raise ValueError(msg)
 
     piece_counts: dict[PieceType, int] = {}
+
     for name, count in data.items():
         if not _is_int(count) or count < 0:
             msg = (
@@ -524,6 +536,7 @@ def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
                 f"`{count!r}`."
             )
             raise ValueError(msg)
+
         piece_counts[deserialize_piece_type(name)] = count
 
     return piece_counts
@@ -580,11 +593,13 @@ def _expect_object(
         raise ValueError(msg)
 
     missing = required - data.keys()
+
     if missing:
         msg = f"The {kind} object is missing the keys `{sorted(missing)}`."
         raise ValueError(msg)
 
     unknown = data.keys() - required - optional
+
     if unknown:
         msg = f"The {kind} object has the unknown keys `{sorted(unknown)}`."
         raise ValueError(msg)

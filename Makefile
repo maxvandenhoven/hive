@@ -5,6 +5,7 @@ sync:
 
 .PHONY: format
 format:
+	@uv run python scripts/tooling/check_blank_lines.py --fix src tests scripts
 	@uv run ruff format
 	@uv run ruff check --fix --select I --output-format concise
 
@@ -13,6 +14,7 @@ format:
 lint:
 	@uv run ruff check --fix --output-format concise
 	@uv run python scripts/tooling/check_comments.py src tests scripts
+	@uv run python scripts/tooling/check_blank_lines.py src tests scripts
 
 
 .PHONY: type

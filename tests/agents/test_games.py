@@ -43,12 +43,15 @@ def _random_game(seed: int, extra_calls: int) -> list[Move | None]:
     state = rules.create_initial_state()
 
     moves: list[Move | None] = []
+
     while not rules.is_finished(state):
         for _ in range(extra_calls):
             rules.legal_moves(state)
+
         move = LocalTurnContext().run(agent, state)
         state.apply_move(move)
         moves.append(move)
+
     return moves
 
 

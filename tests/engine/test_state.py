@@ -18,6 +18,7 @@ def _assert_state_equal(state: GameState, expected: GameState) -> None:
 def test_piece_frozen() -> None:
     """Test that piece fields cannot be reassigned."""
     piece = Piece(type=PieceType.ANT, owner=Player.WHITE)
+
     with pytest.raises(FrozenInstanceError):
         piece.owner = Player.BLACK  # ty: ignore[invalid-assignment]
 
@@ -548,6 +549,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)):
             assert not state.is_occupied((0, 0))
 
@@ -557,6 +559,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)):
             pass
 
@@ -569,6 +572,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)) as piece:
             assert piece.type is PieceType.QUEEN
             assert piece.owner is Player.WHITE
@@ -582,6 +586,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)) as piece:
             assert piece.type is PieceType.BEETLE
             assert state.is_occupied((0, 0))
@@ -596,6 +601,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)):
             pass
 
@@ -608,6 +614,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
         )
+
         with pytest.raises(RuntimeError):
             with state.piece_lifted((0, 0)):
                 msg = "boom"
@@ -695,6 +702,7 @@ class TestIsConnected:
     def test_split_board(self, line_3_state: GameState) -> None:
         """Test that a board with two separate groups is not connected."""
         state = line_3_state
+
         with state.piece_lifted((0, 0)):
             assert not state.is_connected()
 
@@ -716,6 +724,7 @@ class TestIsConnectedAfterRemoving:
     def test_ring_stays_connected(self, ring_6_state: GameState) -> None:
         """Test that removing any piece from a ring keeps it connected."""
         state = ring_6_state
+
         for coord in state.get_occupied_coords():
             assert state.is_connected_after_removing(coord)
 
@@ -736,6 +745,7 @@ class TestIsConnectedAfterRemoving:
         """Test that articulation points match `is_connected_after_removing`."""
         state = l_shape_state
         articulation_points = state.get_articulation_points()
+
         for coord in state.get_occupied_coords():
             if coord in articulation_points:
                 assert not state.is_connected_after_removing(coord)

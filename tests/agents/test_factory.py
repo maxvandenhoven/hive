@@ -55,9 +55,11 @@ class _NeuralAgent(Agent):
                 into the description of `temperature`.
         """
         super().__init__(rules, seed=seed)
+
         if not weights:
             msg = "Missing weights."
             raise ValueError(msg)
+
         self.weights = weights
         self.network = network
         self.temperature = temperature
@@ -114,6 +116,7 @@ class TestAgentSpecFromYaml:
 
     def test_lists_every_invalid_param(self) -> None:
         text = "kind: negamax\nparams: {depth: 0, depht: 2, mobility: high}"
+
         with pytest.raises(InvalidAgentSpecError) as excinfo:
             AgentSpec.from_yaml(text)
 
@@ -323,10 +326,12 @@ class TestRegisterAgent:
             "title": "Weights",
             "type": "string",
         }
+
         with pytest.raises(InvalidAgentSpecError, match="temperature: Input should be"):
             AgentSpec.from_dict(
                 {"kind": "neural", "params": {"weights": "w", "temperature": 0}}
             )
+
         with pytest.raises(
             InvalidAgentSpecError, match=r"params\.weights: Field required"
         ):

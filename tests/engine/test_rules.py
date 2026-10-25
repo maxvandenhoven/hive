@@ -20,13 +20,16 @@ def _build_state(
     Later placements on the same coordinate stack on top of earlier ones.
     """
     state = rules.create_initial_state()
+
     for owner, piece_type, coord in placements:
         state.current_player = owner
         state.apply_placement(
             Move(piece_type=piece_type, source_coord=None, target_coord=coord)
         )
+
     state.current_player = current_player
     state.current_ply = current_ply
+
     return state
 
 
@@ -135,6 +138,7 @@ class TestConfiguration:
         counts[PieceType.ANT] = 5
 
         assert rules.piece_counts[PieceType.ANT] == 3
+
         with pytest.raises(TypeError):
             rules.piece_counts[PieceType.ANT] = 5  # ty: ignore[invalid-assignment]
 
@@ -679,6 +683,7 @@ class TestTermination:
         state.current_ply = current_ply
 
         assert rules.is_finished(state) is finished
+
         if finished:
             assert rules.winners(state) == [Player.WHITE, Player.BLACK]
 
@@ -752,6 +757,7 @@ class TestLegalMoves:
                 break
 
             legal_moves = rules.legal_moves(state)
+
             for move in legal_moves:
                 state.apply_move(move)
                 rules.legal_moves(state)
@@ -780,8 +786,10 @@ class TestLegalMoves:
 def _build_board(placements: list[Placement]) -> GameBoard:
     """Build a board by placing pieces in order, stacking on repeated coordinates."""
     board: GameBoard = {}
+
     for owner, piece_type, coord in placements:
         board.setdefault(coord, []).append(Piece(type=piece_type, owner=owner))
+
     return board
 
 

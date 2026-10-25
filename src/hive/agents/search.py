@@ -122,6 +122,7 @@ class SearchAgent(Agent):
             turn: The context to submit moves and report progress to.
         """
         legal_moves = self.rules.legal_moves(state)
+
         if len(legal_moves) == 1:
             turn.submit(legal_moves[0], final=True)
             return
@@ -132,10 +133,12 @@ class SearchAgent(Agent):
         self._nodes = 0
         start = time.perf_counter()
         depth = 1
+
         while not turn.should_stop():
             # The search sets the cutoff flag when it stops at the depth limit, so an
             # unset flag means the whole game tree below the root was searched.
             self._cutoff = False
+
             try:
                 score, pv = self._search(state, depth)
             except SearchStoppedError:
@@ -153,6 +156,7 @@ class SearchAgent(Agent):
                 depth == self.depth or not self._cutoff or abs(score) >= WIN_SCORE - depth
             )
             turn.submit(pv[0], final=final)
+
             if final:
                 return
 
@@ -169,6 +173,7 @@ class SearchAgent(Agent):
             A score where positive values favour `player`.
         """
         score = 0.0
+
         for weight, term in self._terms:
             score += weight * term(state, player)
 
@@ -197,6 +202,7 @@ class SearchAgent(Agent):
             SearchStoppedError: If the turn context asks the agent to stop.
         """
         self._nodes += 1
+
         if self._nodes % self.STOP_CHECK_INTERVAL == 0 and self._turn.should_stop():
             raise SearchStoppedError
 
@@ -212,12 +218,16 @@ class SearchAgent(Agent):
             The score of a finished game, or `None` if the game is still in progress.
         """
         winners = self.rules.winners(state)
+
         if winners is None:
             return None
+
         if len(winners) == len(Player):
             return 0.0
+
         if player in winners:
             return WIN_SCORE - ply
+
         return -(WIN_SCORE - ply)
 
     def _queen_safety(self, state: GameState, player: Player) -> float:
@@ -246,6 +256,7 @@ class SearchAgent(Agent):
             The number of occupied neighbours, or 0 if the queen has not been placed.
         """
         queen_coord = state.get_queen_coord(owner)
+
         if queen_coord is None:
             return 0.0
 
@@ -284,6 +295,7 @@ class SearchAgent(Agent):
         move_count = sum(move is not None for move in self.rules.legal_moves(state))
 
         state.current_player = original_player
+
         return move_count
 
     def _positioning(self, state: GameState, player: Player) -> float:
@@ -313,6 +325,7 @@ class SearchAgent(Agent):
             0 if the defender's queen has not been placed.
         """
         queen_coord = state.get_queen_coord(attacker.opponent)
+
         if queen_coord is None:
             return 0.0
 
@@ -334,6 +347,7 @@ class SearchAgent(Agent):
             The value of the player's pieces on the board minus the opponent's.
         """
         scores = dict.fromkeys(Player, 0.0)
+
         for stack in state.board.values():
             for piece in stack:
                 scores[piece.owner] += PIECE_VALUES.get(piece.type, 0.0)
@@ -351,6 +365,7 @@ class SearchAgent(Agent):
             The value of the player's pieces in hand minus the opponent's.
         """
         scores = dict.fromkeys(Player, 0.0)
+
         for owner, hand in state.hand.items():
             for piece_type, count in hand.items():
                 scores[owner] += count * PIECE_VALUES.get(piece_type, 0.0)

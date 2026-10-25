@@ -55,6 +55,7 @@ def _games(draw: st.DrawFn, max_plies: int) -> Game:
 
     state = rules.create_initial_state()
     moves: list[Move | None] = []
+
     while len(moves) < plies and not rules.is_finished(state):
         move = draw(st.sampled_from(rules.legal_moves(state)))
         state.apply_move(move)
@@ -86,6 +87,7 @@ def assert_invariants(state: GameState, rules: Rules) -> None:
     on_board = Counter(
         (piece.owner, piece.type) for stack in state.board.values() for piece in stack
     )
+
     for player in Player:
         for piece_type, count in rules.piece_counts.items():
             in_hand = state.hand[player].get(piece_type, 0)
@@ -126,6 +128,7 @@ def test_undo_restores_state(profile: _Profile) -> None:
         assert_invariants(state, rules)
 
         snapshots = [_snapshot(state)]
+
         for move in moves:
             before = _snapshot(state)
             state.apply_move(move)
@@ -153,10 +156,12 @@ def test_replay_reproduces_state(profile: _Profile) -> None:
     def check(game: Game) -> None:
         rules, moves = game
         fast_state = rules.create_initial_state()
+
         for move in moves:
             fast_state.apply_move(move)
 
         replayed_state = rules.create_initial_state()
+
         for move in moves:
             rules.apply_checked_move(replayed_state, move)
 
@@ -172,6 +177,7 @@ def test_from_board_reproduces_state(profile: _Profile) -> None:
     def check(game: Game) -> None:
         rules, moves = game
         state = rules.create_initial_state()
+
         for move in moves:
             state.apply_move(move)
 

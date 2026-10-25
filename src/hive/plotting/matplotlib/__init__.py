@@ -72,6 +72,7 @@ def draw_board(
 
     ax_board.set_aspect("equal")
     ax_board.axis("off")
+
     if title:
         ax_board.set_title(title, fontsize=14, fontweight="bold", pad=12)
 

@@ -49,6 +49,7 @@ def winning_position(rules: Rules) -> GameState:
         (-2, 1): [Piece(PieceType.ANT, black)],
         (2, 0): [Piece(PieceType.ANT, white)],
     }
+
     return rules.from_board(board, current_player=white)
 
 
@@ -76,6 +77,7 @@ def test_minimax_and_negamax_agree(depth: int, rules: Rules, position: GameState
     """
     weights: _Weights = {**_ALL_TERMS, "mobility": 0.0}
     infos = []
+
     for agent_class in _SEARCH_AGENTS:
         turn = LocalTurnContext()
         agent_class(rules, seed=0, depth=depth, **weights).think(position.copy(), turn)

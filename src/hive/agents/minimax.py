@@ -46,8 +46,10 @@ class MinimaxAgent(SearchAgent):
         """
         self._visit_node()
         terminal_score = self._terminal_score(state, root_player, ply)
+
         if terminal_score is not None:
             return terminal_score, []
+
         if depth == 0:
             self._cutoff = True
             return self.evaluate(state, root_player), []
@@ -57,8 +59,10 @@ class MinimaxAgent(SearchAgent):
         maximizing = state.current_player == root_player
         best_score = -math.inf if maximizing else math.inf
         best_pv: list[Move | None] = []
+
         for move in self.rules.legal_moves(state):
             state.apply_move(move)
+
             try:
                 score, pv = self._minimax(state, depth - 1, ply + 1, root_player)
             finally:

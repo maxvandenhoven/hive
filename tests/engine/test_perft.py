@@ -23,6 +23,7 @@ _MAX_DEPTH = 7
 def _count_params() -> list[Any]:
     """Build one parameter per position and depth, marking large counts as slow."""
     params = []
+
     for position in _SUITE.positions:
         for depth, count in sorted(position.counts.items()):
             if depth > _MAX_DEPTH:
@@ -31,6 +32,7 @@ def _count_params() -> list[Any]:
             marks = [pytest.mark.slow] if count > _SHALLOW_NODES else []
             param_id = f"{position.name}-{depth}"
             params.append(pytest.param(position, depth, count, id=param_id, marks=marks))
+
     return params
 
 
@@ -38,6 +40,7 @@ def _move_key(move: Move | None) -> MoveKey:
     """Get a hashable key for a move, since `Move` is not hashable."""
     if move is None:
         return None
+
     return (move.piece_type, move.source_coord, move.target_coord)
 
 

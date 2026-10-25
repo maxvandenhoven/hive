@@ -38,8 +38,10 @@ def finished_state(rules: Rules) -> GameState:
     """Build a state where the white queen is surrounded by six black pieces."""
     black_types = [PieceType.ANT] * 3 + [PieceType.SPIDER] * 2 + [PieceType.GRASSHOPPER]
     board: GameBoard = {(0, 0): [Piece(PieceType.QUEEN, Player.WHITE)]}
+
     for coord, piece_type in zip(get_neighbors((0, 0)), black_types, strict=True):
         board[coord] = [Piece(piece_type, Player.BLACK)]
+
     return rules.from_board(board, current_player=Player.WHITE)
 
 

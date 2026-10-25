@@ -59,6 +59,7 @@ def _rules(draw: st.DrawFn) -> Rules:
     )
     queen_by_turn = draw(st.none() | st.integers(1, 10))
     allow_queen_first_turn = draw(st.booleans()) or queen_by_turn == 1
+
     return Rules(
         piece_counts=piece_counts,
         starting_player=draw(st.sampled_from(Player)),
@@ -95,10 +96,12 @@ def _random_game(rules: Rules, plies: int, seed: int) -> list[Move | None]:
     rng = random.Random(seed)
     state = rules.create_initial_state()
     moves: list[Move | None] = []
+
     while len(moves) < plies and not rules.is_finished(state):
         move = rng.choice(rules.legal_moves(state))
         state.apply_move(move)
         moves.append(move)
+
     return moves
 
 
@@ -324,6 +327,7 @@ class TestGameRecord:
         rules = Rules()
         moves = _random_game(rules, plies=60, seed=seed)
         state = rules.create_initial_state()
+
         for move in moves:
             state.apply_move(move)
 
@@ -361,6 +365,7 @@ class TestGameRecord:
 
         with pytest.raises(IllegalMoveError, match="ply `1`"):
             record.replay()
+
         with pytest.raises(IllegalMoveError):
             list(record.states())
 

@@ -57,6 +57,7 @@ def collect_turn(
         messages=ScriptedMessages(clock=clock, events=events),
         clock=clock,
     )
+
     return selection, clock
 
 

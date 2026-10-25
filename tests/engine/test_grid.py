@@ -47,16 +47,20 @@ class TestDirectionRotation:
         """Test that six anti-clockwise rotations return to the original direction."""
         start_direction = (1, 0)
         current_direction = start_direction
+
         for _ in range(6):
             current_direction = get_anti_clockwise_direction(current_direction)
+
         assert current_direction == start_direction
 
     def test_clockwise_rotation_cycle(self) -> None:
         """Test that six clockwise rotations return to the original direction."""
         start_direction = (1, 0)
         current_direction = start_direction
+
         for _ in range(6):
             current_direction = get_clockwise_direction(current_direction)
+
         assert current_direction == start_direction
 
     def test_clockwise_then_anticlockwise(self) -> None:
@@ -87,6 +91,7 @@ class TestGetDirection:
     def test_inverse_of_add(self) -> None:
         """Test that `get_direction` is the inverse of `add`."""
         source_coord = (5, -2)
+
         for direction in HEX_DIRECTIONS:
             target_coord = add(source_coord, direction)
             computed_direction = get_direction(source_coord, target_coord)
@@ -107,8 +112,10 @@ class TestGetFlankingCoords:
     def test_flanks_neighbor_both(self) -> None:
         """Test that both flanks neighbor the source and the target in every direction."""
         source_coord = (2, -3)
+
         for direction in HEX_DIRECTIONS:
             target_coord = add(source_coord, direction)
+
             for flanking_coord in get_flanking_coords(source_coord, target_coord):
                 assert flanking_coord in get_neighbors(source_coord)
                 assert flanking_coord in get_neighbors(target_coord)
