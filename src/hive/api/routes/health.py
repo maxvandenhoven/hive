@@ -12,17 +12,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
 
 
-@router.get("/healthz")
+@router.get("/healthz", description="Report that the process is serving requests.")
 def read_liveness() -> dict[str, str]:
-    """Report that the process is serving requests."""
+    """Report that the process is serving requests.
+
+    Returns:
+        The status `ok`.
+    """
     return {"status": "ok"}
 
 
-@router.get("/readyz")
+@router.get(
+    "/readyz",
+    description="Report whether the database and the object store are reachable. "
+    "Responds with 503 and the failing checks if either is not.",
+)
 def read_readiness(database: DatabaseDependency, store: StoreDependency) -> JSONResponse:
     """Report whether the database and the object store are reachable.
 
-    Responds with 503 and the failing checks if either is not.
+    Args:
+        database: The database of the app.
+        store: The object store of the app.
+
+    Returns:
+        The overall status and the result of each check, with status 200 if every
+        check passed and 503 otherwise.
     """
     checks = {"database": database.check, "storage": store.check}
     results = {}

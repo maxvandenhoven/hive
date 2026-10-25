@@ -37,6 +37,15 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        """Open the database and object store for the lifetime of the app.
+
+        Args:
+            app: The app, whose state receives the `database` and `store`.
+
+        Yields:
+            Control while the app serves requests; the database is disposed afterwards
+            unless it was passed in.
+        """
         app.state.database = database or Database.from_url(resolved_settings.database_url)
         app.state.store = store or S3ObjectStore.from_settings(resolved_settings)
 

@@ -49,9 +49,21 @@ def get_game(session: Session, game_id: uuid.UUID) -> GameRow:
     return game
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    description="Create a game. At least one side must be an agent.",
+)
 def create_game(body: GameCreate, session: SessionDependency) -> GameDetail:
-    """Create a game. At least one side must be an agent."""
+    """Create a game. At least one side must be an agent.
+
+    Args:
+        body: The name, players, rules and setup of the game, already validated.
+        session: The database session of the request.
+
+    Returns:
+        The new game, active and without moves.
+    """
     game = body.to_row()
     session.add(game)
     session.commit()
@@ -60,7 +72,7 @@ def create_game(body: GameCreate, session: SessionDependency) -> GameDetail:
     return GameDetail.from_row(get_game(session=session, game_id=game.id))
 
 
-@router.get("")
+@router.get("", description="List games, newest first.")
 def list_games(
     session: SessionDependency,
     game_status: Annotated[
@@ -70,7 +82,17 @@ def list_games(
     limit: Annotated[int, Query(ge=1, le=GAME_PAGE_MAX_LIMIT)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> GamePage:
-    """List games, newest first."""
+    """List games, newest first.
+
+    Args:
+        session: The database session of the request.
+        game_status: Only list games with this status, or `None` for every game.
+        limit: The most games on the page.
+        offset: The number of games to skip before the page.
+
+    Returns:
+        The page of games and the number of matching games on all pages.
+    """
     query = select(GameRow)
 
     if game_status is not None:
@@ -92,17 +114,40 @@ def list_games(
     )
 
 
-@router.get("/{game_id}")
+@router.get("/{game_id}", description="Get a game with its rules, setup and moves.")
 def read_game(game_id: uuid.UUID, session: SessionDependency) -> GameDetail:
-    """Get a game with its rules, setup and moves."""
+    """Get a game with its rules, setup and moves.
+
+    Args:
+        game_id: The game ID.
+        session: The database session of the request.
+
+    Returns:
+        The game.
+
+    Raises:
+        HTTPException: With status 404 if there is no game with the ID.
+    """
     return GameDetail.from_row(get_game(session=session, game_id=game_id))
 
 
-@router.patch("/{game_id}")
+@router.patch("/{game_id}", description="Rename a game or change its status.")
 def update_game(
     game_id: uuid.UUID, body: GameUpdate, session: SessionDependency
 ) -> GameDetail:
-    """Rename a game or change its status."""
+    """Rename a game or change its status.
+
+    Args:
+        game_id: The game ID.
+        body: The changes; fields left out are unchanged.
+        session: The database session of the request.
+
+    Returns:
+        The changed game.
+
+    Raises:
+        HTTPException: With status 404 if there is no game with the ID.
+    """
     game = get_game(session=session, game_id=game_id)
     body.apply(game)
     session.commit()
@@ -110,11 +155,30 @@ def update_game(
     return GameDetail.from_row(game)
 
 
-@router.delete("/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{game_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    description="Delete a game with its moves, its photos and their stored images.",
+)
 def delete_game(
     game_id: uuid.UUID, session: SessionDependency, store: StoreDependency
 ) -> Response:
-    """Delete a game with its moves, its photos and their stored images."""
+    """Delete a game with its moves, its photos and their stored images.
+
+    The images are deleted after the rows are committed. If that fails, the failure is
+    logged and the game stays deleted.
+
+    Args:
+        game_id: The game ID.
+        session: The database session of the request.
+        store: The object store holding the photo images.
+
+    Returns:
+        An empty response with status 204.
+
+    Raises:
+        HTTPException: With status 404 if there is no game with the ID.
+    """
     game = get_game(session=session, game_id=game_id)
     prefix = game.photo_prefix
     session.delete(game)
@@ -141,9 +205,24 @@ def delete_game(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{game_id}/export")
+@router.get(
+    "/{game_id}/export",
+    description="Download the game as a serialized `GameRecord` with its rules, setup "
+    "and moves.",
+)
 def export_game(game_id: uuid.UUID, session: SessionDependency) -> JSONResponse:
-    """Download the game as a serialized `GameRecord` with its rules, setup and moves."""
+    """Download the game as a serialized `GameRecord` with its rules, setup and moves.
+
+    Args:
+        game_id: The game ID.
+        session: The database session of the request.
+
+    Returns:
+        The serialized game record, as an attachment named `game-<id>.json`.
+
+    Raises:
+        HTTPException: With status 404 if there is no game with the ID.
+    """
     game = get_game(session=session, game_id=game_id)
 
     return JSONResponse(

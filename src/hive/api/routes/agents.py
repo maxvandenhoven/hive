@@ -8,9 +8,15 @@ from hive.api.schemas import AgentKindRead
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
-@router.get("")
+@router.get(
+    "", description="List the agent kinds with their descriptions and param schemas."
+)
 def read_agent_kinds() -> list[AgentKindRead]:
-    """List the agent kinds with their descriptions and param schemas."""
+    """List the agent kinds with their descriptions and param schemas.
+
+    Returns:
+        One entry per registered kind, in registration order.
+    """
     return [
         AgentKindRead.from_registration(registration) for registration in list_agents()
     ]
