@@ -217,11 +217,17 @@ class GameState:
 
         Args:
             coord: The axial coordinate `(q, r)` to lift the top piece from.
+
+        Yields:
+            The lifted piece, which is put back on top of the coordinate afterwards.
+
+        Raises:
+            ValueError: If there is no piece at the coordinate.
         """
         try:
             lifted_piece = self.board[coord].pop()
         except IndexError as e:
-            msg = "Cannot lift top piece from empty coordinate `{coord}`."
+            msg = f"Cannot lift top piece from empty coordinate `{coord}`."
             raise ValueError(msg) from e
 
         lifted_final_piece = False
