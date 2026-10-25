@@ -72,19 +72,23 @@ class LocalTurnContext(TurnContext):
         clock: The clock that measures the budget, in seconds.
         submissions: Every submission in order.
         infos: Every progress report in order.
+        deadline: The clock time at which the budget is used up.
+        stopped: Whether `stop` was called.
+        stop_seen: Whether `should_stop` has returned `True`, so later submissions are
+            marked as made after the stop.
     """
 
     budget_s: float = float("inf")
     clock: Callable[[], float] = time.monotonic
     submissions: list[TurnSubmission] = field(default_factory=list)
     infos: list[dict[str, SearchInfoValue]] = field(default_factory=list)
-    _deadline: float = field(init=False)
-    _stopped: bool = field(default=False, init=False)
-    _stop_seen: bool = field(default=False, init=False)
+    deadline: float = field(init=False)
+    stopped: bool = field(default=False, init=False)
+    stop_seen: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         """Start the turn by fixing the deadline on the clock."""
-        self._deadline = self.clock() + self.budget_s
+        self.deadline = self.clock() + self.budget_s
 
     @property
     def move(self) -> Move | None:
@@ -122,7 +126,7 @@ class LocalTurnContext(TurnContext):
 
     def stop(self) -> None:
         """Ask the agent to stop, as the runner does when it cancels a turn."""
-        self._stopped = True
+        self.stopped = True
 
     @override
     def submit(self, move: Move | None, *, final: bool = False) -> None:
@@ -132,7 +136,7 @@ class LocalTurnContext(TurnContext):
             move: The proposed move, or `None` to pass.
             final: Whether the agent is done, which closes the turn.
         """
-        self.submissions.append(TurnSubmission(move, final, after_stop=self._stop_seen))
+        self.submissions.append(TurnSubmission(move, final, after_stop=self.stop_seen))
 
     @override
     def remaining_seconds(self) -> float:
@@ -141,7 +145,7 @@ class LocalTurnContext(TurnContext):
         Returns:
             The number of seconds until the deadline, which is negative once it passed.
         """
-        return self._deadline - self.clock()
+        return self.deadline - self.clock()
 
     @override
     def should_stop(self) -> bool:
@@ -150,8 +154,8 @@ class LocalTurnContext(TurnContext):
         Returns:
             `True` if the agent should stop thinking and return.
         """
-        stop = self._stopped or self.closed or self.remaining_seconds() <= 0
-        self._stop_seen = self._stop_seen or stop
+        stop = self.stopped or self.closed or self.remaining_seconds() <= 0
+        self.stop_seen = self.stop_seen or stop
 
         return stop
 

@@ -6,7 +6,7 @@ from hive.engine.rules import Rules
 from hive.engine.state import GameState
 
 
-def _random_position(rules: Rules, seed: int, plies: int) -> GameState:
+def random_position(rules: Rules, seed: int, plies: int) -> GameState:
     """Play a seeded random game for a number of plies, or until it finishes."""
     agent = RandomAgent(rules, seed=seed)
     state = rules.create_initial_state()
@@ -29,7 +29,7 @@ def rules() -> Rules:
 @pytest.fixture(scope="function", params=[0, 6, 14, 24], ids=lambda p: f"ply{p}")
 def position(request: pytest.FixtureRequest, rules: Rules) -> GameState:
     """Build the start position and a few unfinished positions from seeded random play."""
-    state = _random_position(rules, seed=request.param, plies=request.param)
+    state = random_position(rules, seed=request.param, plies=request.param)
     assert not rules.is_finished(state)
 
     return state

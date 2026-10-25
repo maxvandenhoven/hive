@@ -23,12 +23,12 @@ from hive.engine.state import GameState
 
 
 @dataclass(frozen=True, slots=True)
-class _Network:
+class Network:
     hidden: int = 8
     blocks: int = 2
 
 
-class _NeuralAgent(Agent):
+class NeuralAgent(Agent):
     """Agent with a required param and a nested config, like a future neural agent."""
 
     def __init__(
@@ -37,7 +37,7 @@ class _NeuralAgent(Agent):
         *,
         seed: int,
         weights: str,
-        network: _Network = _Network(),  # noqa: B008
+        network: Network = Network(),  # noqa: B008
         temperature: Annotated[float, Field(gt=0)] = 1.0,
     ) -> None:
         """Initialize the agent.
@@ -293,16 +293,16 @@ class TestListAgents:
 @pytest.mark.usefixtures("agent_registry")
 class TestRegisterAgent:
     def test_registers_class_with_nested_params(self) -> None:
-        assert register_agent("neural")(_NeuralAgent) is _NeuralAgent
+        assert register_agent("neural")(NeuralAgent) is NeuralAgent
 
         spec = AgentSpec.from_yaml(
             "kind: neural\nparams:\n  weights: s3://a.onnx\n  network: {hidden: 64}"
         )
         agent = build_agent(spec, Rules(), seed=0)
 
-        assert isinstance(agent, _NeuralAgent)
+        assert isinstance(agent, NeuralAgent)
         assert agent.weights == "s3://a.onnx"
-        assert agent.network == _Network(hidden=64, blocks=2)
+        assert agent.network == Network(hidden=64, blocks=2)
         assert agent.temperature == 1.0
         properties = list_agents()[-1].params_schema["properties"]
         assert isinstance(properties, dict)
@@ -315,7 +315,7 @@ class TestRegisterAgent:
         }
 
     def test_derives_required_and_constrained_params(self) -> None:
-        register_agent("neural")(_NeuralAgent)
+        register_agent("neural")(NeuralAgent)
         schema = {agent.kind: agent for agent in list_agents()}["neural"].params_schema
 
         assert schema["required"] == ["weights"]
@@ -339,32 +339,32 @@ class TestRegisterAgent:
 
     def test_rejects_duplicate_kind(self) -> None:
         with pytest.raises(ValueError, match="`random` is already registered"):
-            register_agent("random")(_NeuralAgent)
+            register_agent("random")(NeuralAgent)
 
     def test_rejects_missing_seed(self) -> None:
-        class _NoSeed(_NeuralAgent):
+        class NoSeedAgent(NeuralAgent):
             def __init__(self, rules: Rules) -> None:
                 super().__init__(rules, seed=0, weights="w")
 
         with pytest.raises(TypeError, match="must start with `rules` and `seed`"):
-            register_agent("no-seed")(_NoSeed)
+            register_agent("no-seed")(NoSeedAgent)
 
     def test_rejects_positional_param(self) -> None:
-        class _Positional(_NeuralAgent):
+        class PositionalAgent(NeuralAgent):
             def __init__(self, rules: Rules, seed: int, depth: int) -> None:
                 super().__init__(rules, seed=seed, weights="w")
 
         with pytest.raises(
-            TypeError, match="`depth` of `_Positional` must be keyword-only"
+            TypeError, match="`depth` of `PositionalAgent` must be keyword-only"
         ):
-            register_agent("positional")(_Positional)
+            register_agent("positional")(PositionalAgent)
 
     def test_rejects_missing_annotation(self) -> None:
-        class _Unannotated(_NeuralAgent):
+        class UnannotatedAgent(NeuralAgent):
             def __init__(self, rules: Rules, *, seed: int, depth=1) -> None:  # noqa: ANN001
                 super().__init__(rules, seed=seed, weights="w")
 
         with pytest.raises(
-            TypeError, match="`depth` of `_Unannotated` has no annotation"
+            TypeError, match="`depth` of `UnannotatedAgent` has no annotation"
         ):
-            register_agent("unannotated")(_Unannotated)
+            register_agent("unannotated")(UnannotatedAgent)

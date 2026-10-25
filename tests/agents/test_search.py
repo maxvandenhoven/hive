@@ -5,16 +5,16 @@ import pytest
 from hive.agents.factory import AgentSpec, build_agent
 from hive.agents.minimax import MinimaxAgent
 from hive.agents.negamax import NegamaxAgent
-from hive.agents.search import WIN_SCORE, SearchAgent
+from hive.agents.search import SEARCH_WIN_SCORE, SearchAgent
 from hive.agents.testing import LocalTurnContext
 from hive.engine.rules import Rules
 from hive.engine.serialization import serialize_move
 from hive.engine.state import GameState, Move, Piece, PieceType, Player
 
-_SEARCH_AGENTS: list[type[SearchAgent]] = [MinimaxAgent, NegamaxAgent]
+SEARCH_AGENTS: list[type[SearchAgent]] = [MinimaxAgent, NegamaxAgent]
 
 
-class _Weights(TypedDict, total=False):
+class Weights(TypedDict, total=False):
     queen_safety: float
     mobility: float
     positioning: float
@@ -22,7 +22,7 @@ class _Weights(TypedDict, total=False):
     material_in_hand: float
 
 
-_ALL_TERMS: _Weights = {
+ALL_TERMS: Weights = {
     "queen_safety": 1.0,
     "mobility": 1.0,
     "positioning": 1.0,
@@ -53,7 +53,7 @@ def winning_position(rules: Rules) -> GameState:
     return rules.from_board(board, current_player=white)
 
 
-@pytest.mark.parametrize("agent_class", _SEARCH_AGENTS)
+@pytest.mark.parametrize("agent_class", SEARCH_AGENTS)
 def test_stops_at_depth_limit(
     agent_class: type[SearchAgent], rules: Rules, position: GameState
 ) -> None:
@@ -75,10 +75,10 @@ def test_minimax_and_negamax_agree(depth: int, rules: Rules, position: GameState
     Mobility generates moves at every leaf, which is too slow at depth 2, so it is left
     out here and covered by the evaluation tests instead.
     """
-    weights: _Weights = {**_ALL_TERMS, "mobility": 0.0}
+    weights: Weights = {**ALL_TERMS, "mobility": 0.0}
     infos = []
 
-    for agent_class in _SEARCH_AGENTS:
+    for agent_class in SEARCH_AGENTS:
         turn = LocalTurnContext()
         agent_class(rules, seed=0, depth=depth, **weights).think(position.copy(), turn)
         infos.append({key: turn.infos[-1][key] for key in ("score", "pv", "nodes")})
@@ -86,7 +86,7 @@ def test_minimax_and_negamax_agree(depth: int, rules: Rules, position: GameState
     assert infos[0] == infos[1]
 
 
-@pytest.mark.parametrize("agent_class", _SEARCH_AGENTS)
+@pytest.mark.parametrize("agent_class", SEARCH_AGENTS)
 def test_forced_win_is_final(
     agent_class: type[SearchAgent], rules: Rules, winning_position: GameState
 ) -> None:
@@ -96,11 +96,11 @@ def test_forced_win_is_final(
 
     assert turn.closed
     assert turn.infos[-1]["depth"] == 1
-    assert turn.infos[-1]["score"] == WIN_SCORE - 1
+    assert turn.infos[-1]["score"] == SEARCH_WIN_SCORE - 1
     assert turn.move == Move(PieceType.ANT, (2, 0), (0, 1))
 
 
-@pytest.mark.parametrize("agent_class", _SEARCH_AGENTS)
+@pytest.mark.parametrize("agent_class", SEARCH_AGENTS)
 def test_exhausted_tree_is_final(agent_class: type[SearchAgent]) -> None:
     """Test that an unbounded search ends once every line reaches the turn limit draw."""
     rules = Rules(max_turns=1)
@@ -112,7 +112,7 @@ def test_exhausted_tree_is_final(agent_class: type[SearchAgent]) -> None:
     assert turn.infos[-1]["score"] == 0.0
 
 
-@pytest.mark.parametrize("agent_class", _SEARCH_AGENTS)
+@pytest.mark.parametrize("agent_class", SEARCH_AGENTS)
 def test_single_legal_move_is_final(agent_class: type[SearchAgent], rules: Rules) -> None:
     """Test that a forced pass is submitted as final without searching."""
     state = rules.from_board(
@@ -135,12 +135,12 @@ def test_single_legal_move_is_final(agent_class: type[SearchAgent], rules: Rules
     assert not turn.infos
 
 
-@pytest.mark.parametrize("term", list(_ALL_TERMS))
+@pytest.mark.parametrize("term", list(ALL_TERMS))
 def test_evaluation_terms_are_zero_sum(
     term: str, rules: Rules, position: GameState
 ) -> None:
     """Test that each term scores a position oppositely for the two players."""
-    weights = {name: 1.0 if name == term else 0.0 for name in _ALL_TERMS}
+    weights = {name: 1.0 if name == term else 0.0 for name in ALL_TERMS}
     agent = build_agent(AgentSpec("negamax", weights), rules, seed=0)
     assert isinstance(agent, SearchAgent)
 

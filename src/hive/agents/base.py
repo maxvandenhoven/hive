@@ -71,13 +71,15 @@ class Agent(ABC):
       the answer, since the latest candidate is already submitted.
     - `think` checks `TurnContext.should_stop` regularly (every few nodes or between
       iterative deepening iterations) and returns soon after it turns `True`.
-    - All randomness comes from `_rng`, so a fixed seed gives reproducible decisions.
+    - All randomness comes from `rng`, so a fixed seed gives reproducible decisions.
 
     An agent object lives for a whole match, so it may keep caches across turns. `reset`
     is called between matches when the agent is reused.
 
     Attributes:
         rules: The rules governing the game, used to search the game tree.
+        rng: The random number generator seeded at construction, the only source of
+            randomness of the agent.
     """
 
     def __init__(self, rules: Rules, *, seed: int) -> None:
@@ -88,7 +90,7 @@ class Agent(ABC):
             seed: The seed for the random number generator of the agent.
         """
         self.rules = rules
-        self._rng = random.Random(seed)
+        self.rng = random.Random(seed)
 
     @abstractmethod
     def think(self, state: GameState, turn: TurnContext) -> None:

@@ -27,7 +27,7 @@ INJECTED_AGENT_PARAMS = ("rules", "seed")
 AGENT_PRESET_PACKAGE = "hive.agents.presets"
 """The package holding the preset spec files, one `<name>.yaml` per preset."""
 
-_ARG_PATTERN = re.compile(r"^    (\w+)(?: \(.*\))?: (.*)$")
+DOCSTRING_ARG_PATTERN = re.compile(r"^    (\w+)(?: \(.*\))?: (.*)$")
 """A line starting an argument description in a cleaned Google-style docstring."""
 
 
@@ -78,7 +78,7 @@ class AgentRegistration:
             raise TypeError(msg)
 
         hints = get_type_hints(init, include_extras=True)
-        descriptions = _arg_descriptions(inspect.getdoc(init))
+        descriptions = parse_arg_descriptions(inspect.getdoc(init))
         fields: dict[str, Any] = {}
 
         for parameter in parameters[2:]:
@@ -180,7 +180,7 @@ class AgentSpec:
         try:
             document = AgentSpecDocument.model_validate(data)
         except ValidationError as e:
-            raise InvalidAgentSpecError(_format_errors(source, e.errors())) from e
+            raise InvalidAgentSpecError(format_spec_errors(source, e.errors())) from e
 
         spec = cls(document.kind, document.params, document.label)
         spec.validate_params(source=source)
@@ -207,7 +207,7 @@ class AgentSpec:
         try:
             data = yaml.safe_load(text)
         except yaml.YAMLError as e:
-            msg = f"Invalid YAML{_in(source)}: {e}"
+            msg = f"Invalid YAML{describe_source(source)}: {e}"
             raise InvalidAgentSpecError(msg) from e
 
         if isinstance(data, str):
@@ -321,8 +321,8 @@ class AgentSpec:
 
         if registration is None:
             msg = (
-                f"Unknown agent kind `{self.kind}`{_in(source)}, expected one of: "
-                f"{', '.join(AGENT_REGISTRY)}."
+                f"Unknown agent kind `{self.kind}`{describe_source(source)}, expected "
+                f"one of: {', '.join(AGENT_REGISTRY)}."
             )
             raise InvalidAgentSpecError(msg)
 
@@ -331,7 +331,7 @@ class AgentSpec:
         except ValidationError as e:
             errors = [{**error, "loc": ("params", *error["loc"])} for error in e.errors()]
             raise InvalidAgentSpecError(
-                _format_errors(source, errors, kind=self.kind)
+                format_spec_errors(source, errors, kind=self.kind)
             ) from e
 
 
@@ -406,7 +406,7 @@ def list_presets() -> list[str]:
     )
 
 
-def _arg_descriptions(docstring: str | None) -> dict[str, str]:
+def parse_arg_descriptions(docstring: str | None) -> dict[str, str]:
     """Read the argument descriptions from the `Args:` section of a Google docstring.
 
     Args:
@@ -424,7 +424,7 @@ def _arg_descriptions(docstring: str | None) -> dict[str, str]:
             in_args = True
         elif in_args and line and not line.startswith(" "):
             break
-        elif in_args and (match := _ARG_PATTERN.match(line)):
+        elif in_args and (match := DOCSTRING_ARG_PATTERN.match(line)):
             name = match[1]
             descriptions[name] = match[2]
         elif in_args and name is not None and line.strip():
@@ -433,7 +433,7 @@ def _arg_descriptions(docstring: str | None) -> dict[str, str]:
     return descriptions
 
 
-def _format_errors(
+def format_spec_errors(
     source: str | None, errors: Sequence[Mapping[str, Any]], *, kind: str | None = None
 ) -> str:
     """Format validation errors as one line per problem, with the path to the value.
@@ -446,7 +446,7 @@ def _format_errors(
     Returns:
         The error message.
     """
-    lines = [f"Invalid agent spec{_in(source)}:"]
+    lines = [f"Invalid agent spec{describe_source(source)}:"]
 
     for error in errors:
         location = ".".join(str(part) for part in error["loc"]) or "spec"
@@ -464,7 +464,7 @@ def _format_errors(
     return "\n".join(lines)
 
 
-def _in(source: str | None) -> str:
+def describe_source(source: str | None) -> str:
     """Describe where a spec came from, for the start of an error message.
 
     Args:
