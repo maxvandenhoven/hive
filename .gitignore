@@ -208,3 +208,6 @@ __marimo__/
 
 # Custom
 test*.ipynb
+
+# Gauntlet reports written by `hive gauntlet`
+reports/

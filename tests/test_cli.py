@@ -1,6 +1,8 @@
+import dataclasses
 import json
 import logging
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,7 @@ from hive.cli import app, describe_match_result, log_decision
 from hive.engine.rules import Rules
 from hive.engine.serialization import GameRecord
 from hive.engine.state import Player
+from hive.match.gauntlet import GauntletConfig, GauntletReport
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
 from hive.match.runner import MatchRunner
 from hive.match.worker import AgentWorkerError
@@ -24,6 +27,11 @@ def write_suite(path: Path, counts: dict[str, int]) -> Path:
     position = {"name": "start", "moves": [], "counts": counts}
     path.write_text(json.dumps({"rules": {}, "positions": [position]}))
     return path
+
+
+def error_text(stderr: str) -> str:
+    """Strip colours and the Rich error box from an error message, joining its lines."""
+    return " ".join(re.sub(r"\x1b\[[0-9;]*m|[│╭╮╰╯─]", " ", stderr).split())
 
 
 def test_version() -> None:
@@ -206,3 +214,264 @@ class TestPlay:
         )
 
         assert describe_match_result(result).startswith(start)
+
+
+@pytest.fixture(scope="module")
+def gauntlet_report() -> GauntletReport:
+    """Play a short gauntlet between two random agents, keeping the replays."""
+    config = GauntletConfig(
+        participants=(AgentSpec("random"), AgentSpec(kind="random", label="r2")),
+        games_per_pair=2,
+        budget_s=0.5,
+        max_turns=3,
+        seed=0,
+        replays=True,
+    )
+    return config.run()
+
+
+class TestGauntlet:
+    def test_writes_report(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        out = tmp_path / "report.json"
+        caplog.set_level(logging.INFO)
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "gauntlet",
+                "--agent",
+                "random",
+                "--agent",
+                "{kind: negamax, label: nm1, params: {depth: 1}}",
+                "--games-per-pair",
+                "2",
+                "--budget",
+                "0.5",
+                "--max-turns",
+                "3",
+                "--jobs",
+                "1",
+                "--seed",
+                "4",
+                "--replays",
+                "--out",
+                str(out),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        report = GauntletReport.from_dict(json.loads(out.read_text()))
+        assert report.config.labels == ["random", "nm1"]
+        assert report.config.seed == 4
+        assert report.replays is not None
+        messages = [record.getMessage() for record in caplog.records]
+        assert messages[0] == "Playing 2 matches between random, nm1, 1 at a time."
+        assert messages[1].startswith("[1/2] match 0, random vs nm1: Stopped at the turn")
+        assert "win rate" in messages[3]
+        assert messages[-1].endswith(f"Wrote the gauntlet report to `{out}`.")
+
+    def test_default_out(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        gauntlet_report: GauntletReport,
+    ) -> None:
+        monkeypatch.setattr(GauntletConfig, "run", lambda self, **kwargs: gauntlet_report)
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(
+            app, ["gauntlet", "--agent", "random", "--agent", "{kind: random, label: r2}"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert len(list((tmp_path / "reports").glob("gauntlet-*.json"))) == 1
+
+    def test_warns_about_flagged_agents(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+        gauntlet_report: GauntletReport,
+    ) -> None:
+        flagged = dataclasses.replace(
+            gauntlet_report.participants[1],
+            decision_stats=dataclasses.replace(
+                gauntlet_report.participants[1].decision_stats, failures=1
+            ),
+        )
+        report = dataclasses.replace(
+            gauntlet_report, participants=[gauntlet_report.participants[0], flagged]
+        )
+        monkeypatch.setattr(GauntletConfig, "run", lambda self, **kwargs: report)
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "gauntlet",
+                "--agent",
+                "random",
+                "--agent",
+                "{kind: random, label: r2}",
+                "--out",
+                str(tmp_path / "report.json"),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+        assert warnings == [
+            "Flagged for failures, overruns, restarts or missing moves: r2."
+        ]
+
+    @pytest.mark.parametrize(
+        ("arguments", "message"),
+        [
+            (["--agent", "random"], "at least two agents"),
+            (["--agent", "random", "--agent", "random"], "random appear more than once"),
+            (
+                ["--agent", "random", "--agent", "nm2", "--games-per-pair", "3"],
+                "positive even number",
+            ),
+            (["--agent", "random", "--agent", "{kind: nope}"], "Unknown agent kind"),
+            (["--agent", "random", "--agent", "nm2", "--jobs", "1000"], "oversubscribe"),
+        ],
+    )
+    def test_rejects_invalid(self, arguments: list[str], message: str) -> None:
+        result = CliRunner().invoke(app, ["gauntlet", *arguments])
+
+        assert result.exit_code == 2
+        assert message in error_text(result.stderr)
+
+    def test_allows_oversubscription(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        gauntlet_report: GauntletReport,
+    ) -> None:
+        configs = []
+
+        def run(self: GauntletConfig, **kwargs: object) -> GauntletReport:
+            configs.append(self)
+            return gauntlet_report
+
+        monkeypatch.setattr(GauntletConfig, "run", run)
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "gauntlet",
+                "--agent",
+                "random",
+                "--agent",
+                "nm2",
+                "--jobs",
+                "1000",
+                "--allow-oversubscribe",
+                "--out",
+                str(tmp_path / "report.json"),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert configs[0].jobs == 1000
+        assert configs[0].participants[1].label == "nm2"
+
+    def test_worker_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def fail(self: GauntletConfig, **kwargs: object) -> GauntletReport:
+            msg = "The worker of `random` failed to start: boom"
+            raise AgentWorkerError(msg)
+
+        monkeypatch.setattr(GauntletConfig, "run", fail)
+
+        result = CliRunner().invoke(
+            app, ["gauntlet", "--agent", "random", "--agent", "nm2"]
+        )
+
+        assert result.exit_code == 1
+
+
+class TestReplay:
+    def write_report(self, path: Path, report: GauntletReport) -> Path:
+        path.write_text(json.dumps(report.to_dict()))
+        return path
+
+    def test_logs_match(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+        gauntlet_report: GauntletReport,
+    ) -> None:
+        path = self.write_report(path=tmp_path / "report.json", report=gauntlet_report)
+        caplog.set_level(logging.INFO)
+
+        result = CliRunner().invoke(app, ["replay", str(path), "--match", "1"])
+
+        assert result.exit_code == 0, result.output
+        messages = [record.getMessage() for record in caplog.records]
+        assert messages[0].startswith("Match 1: r2 (white) vs random (black), seed ")
+        assert messages[1].startswith("  0 white r2: ")
+        assert len(messages) == 8
+        assert messages[-1].startswith("Stopped at the turn cap after 6 plies")
+
+    def test_draws_boards(self, tmp_path: Path, gauntlet_report: GauntletReport) -> None:
+        path = self.write_report(path=tmp_path / "report.json", report=gauntlet_report)
+        boards = tmp_path / "boards"
+
+        result = CliRunner().invoke(
+            app, ["replay", str(path), "--match", "0", "--plot-dir", str(boards)]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert sorted(p.name for p in boards.iterdir()) == [
+            f"ply-{ply:03d}.svg" for ply in range(1, 7)
+        ]
+        assert (boards / "ply-001.svg").read_text().startswith("<?xml")
+
+    def test_needs_plotting_extra(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        gauntlet_report: GauntletReport,
+    ) -> None:
+        path = self.write_report(path=tmp_path / "report.json", report=gauntlet_report)
+        monkeypatch.setitem(sys.modules, "hive.plotting.svg", None)
+
+        result = CliRunner().invoke(
+            app, ["replay", str(path), "--match", "0", "--plot-dir", str(tmp_path)]
+        )
+
+        assert result.exit_code == 2
+        assert "plotting" in error_text(result.stderr)
+
+    @pytest.mark.parametrize(
+        ("replays", "match", "message"),
+        [(False, 0, "has no replays"), (True, 5, "No match 5")],
+    )
+    def test_rejects_invalid(
+        self,
+        tmp_path: Path,
+        gauntlet_report: GauntletReport,
+        replays: bool,
+        match: int,
+        message: str,
+    ) -> None:
+        report = (
+            gauntlet_report
+            if replays
+            else dataclasses.replace(gauntlet_report, replays=None)
+        )
+        path = self.write_report(path=tmp_path / "report.json", report=report)
+
+        result = CliRunner().invoke(app, ["replay", str(path), "--match", str(match)])
+
+        assert result.exit_code == 2
+        assert message in error_text(result.stderr)
+
+    def test_missing_report(self, tmp_path: Path) -> None:
+        result = CliRunner().invoke(
+            app, ["replay", str(tmp_path / "missing.json"), "--match", "0"]
+        )
+
+        assert result.exit_code == 2
