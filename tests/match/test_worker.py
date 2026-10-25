@@ -72,7 +72,7 @@ class TestWellBehaved:
     def test_streams_messages(self, rules: Rules, state: GameState) -> None:
         streamed: list[WorkerMessage] = []
         with AgentWorker(AgentSpec("negamax", {"depth": 2}), rules, seed=0) as worker:
-            decision = worker.decide(state, 10.0, on_message=streamed.append)
+            decision = worker.decide(state, 10.0, message_callback=streamed.append)
 
         assert decision.close_reason is TurnCloseReason.FINAL
         assert any(isinstance(message, InfoMessage) for message in streamed)

@@ -192,7 +192,7 @@ class AgentWorker:
         state: GameState,
         budget_s: float,
         *,
-        on_message: Callable[[WorkerMessage], None] | None = None,
+        message_callback: Callable[[WorkerMessage], None] | None = None,
     ) -> DecisionRecord:
         """Let the agent decide a move within a time budget.
 
@@ -204,7 +204,7 @@ class AgentWorker:
         Args:
             state: The state to decide a move in, which is not modified.
             budget_s: The time budget in seconds.
-            on_message: Called with every legal submission and progress report as it
+            message_callback: Called with every legal submission and progress report as it
                 arrives, for streaming the search to a user.
 
         Returns:
@@ -226,7 +226,11 @@ class AgentWorker:
         self.conn.send(ThinkMessage(self.turn_id, state, deadline))
 
         selection = CandidateSelection.collect(
-            self.turn_id, legal_moves, deadline, self.receive, on_message=on_message
+            self.turn_id,
+            legal_moves,
+            deadline,
+            self.receive,
+            message_callback=message_callback,
         )
         closed_at = time.monotonic()
         close_reason = selection.close_reason

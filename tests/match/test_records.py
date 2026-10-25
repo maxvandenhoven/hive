@@ -76,6 +76,16 @@ class TestMatchResult:
 
         assert MatchResult.from_dict(data) == result
 
+    def test_add_decision(self, result: MatchResult) -> None:
+        move = Move(PieceType.SPIDER, None, (-1, 0))
+        decision = make_decision(Player.WHITE, 0.1, move)
+
+        result.add_decision(decision)
+
+        assert result.decisions[-1] == decision
+        assert result.record.moves[-1] == move
+        assert len(result.decisions) == len(result.record.moves) == 3
+
     def test_thinking_time_per_seat(self, result: MatchResult) -> None:
         assert result.thinking_s(Player.WHITE) == 0.5
         assert result.thinking_s(Player.BLACK) == 0.25

@@ -73,12 +73,12 @@ class MatchRunner:
         return derive_seed(self.seed, player.name.lower())
 
     def run(
-        self, *, on_decision: Callable[[DecisionRecord], None] | None = None
+        self, *, decision_callback: Callable[[DecisionRecord], None] | None = None
     ) -> MatchResult:
         """Play the match from the initial state.
 
         Args:
-            on_decision: Called with every decision after its move is applied.
+            decision_callback: Called with every decision after its move is applied.
 
         Returns:
             The result, with the game record and every decision.
@@ -99,7 +99,7 @@ class MatchRunner:
         )
 
         with ExitStack() as stack:
-            workers = {
+            workers: dict[Player, AgentWorker] = {
                 player: stack.enter_context(
                     AgentWorker(
                         result.spec(player),
@@ -117,10 +117,9 @@ class MatchRunner:
 
                 decision = workers[state.current_player].decide(state, self.budget_s)
                 self.rules.apply_checked_move(state, decision.move)
-                result.record.moves.append(decision.move)
-                result.decisions.append(decision)
-                if on_decision is not None:
-                    on_decision(decision)
+                result.add_decision(decision)
+                if decision_callback is not None:
+                    decision_callback(decision)
 
         winners = self.rules.winners(state)
         if winners is not None and len(winners) == 1:

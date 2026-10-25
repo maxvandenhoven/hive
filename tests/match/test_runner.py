@@ -49,7 +49,7 @@ def test_full_match(rules: Rules) -> None:
     )
     seen = []
 
-    result = runner.run(on_decision=seen.append)
+    result = runner.run(decision_callback=seen.append)
 
     check_consistent(result, rules)
     assert result.outcome is MatchOutcome.WIN

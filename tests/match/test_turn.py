@@ -157,7 +157,7 @@ class TestCandidateSelection:
             1.0,
             ScriptedMessages(clock, events),
             clock=clock,
-            on_message=streamed.append,
+            message_callback=streamed.append,
         )
 
         assert streamed == [events[1][1], events[2][1]]

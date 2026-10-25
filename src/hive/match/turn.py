@@ -229,7 +229,7 @@ class CandidateSelection:
         final: Whether a final submission closed the turn.
         returned: Whether the agent returned or failed, so the worker waits for a turn.
         failure: The error of a `FailedMessage`, or `None` if none arrived.
-        on_message: Called with every legal submission and progress report as it
+        message_callback: Called with every legal submission and progress report as it
             arrives, for streaming the search to a user.
     """
 
@@ -243,7 +243,7 @@ class CandidateSelection:
     final: bool = False
     returned: bool = False
     failure: str | None = None
-    on_message: Callable[[WorkerMessage], None] | None = None
+    message_callback: Callable[[WorkerMessage], None] | None = None
 
     @classmethod
     def collect(
@@ -254,7 +254,7 @@ class CandidateSelection:
         messages: WorkerMessageSource,
         *,
         clock: Callable[[], float] = time.monotonic,
-        on_message: Callable[[WorkerMessage], None] | None = None,
+        message_callback: Callable[[WorkerMessage], None] | None = None,
     ) -> "CandidateSelection":
         """Receive messages until the turn closes.
 
@@ -264,13 +264,13 @@ class CandidateSelection:
             deadline: The end of the turn on `clock`.
             messages: The source of the worker messages.
             clock: The clock the deadline is measured on, in seconds.
-            on_message: Called with every legal submission and progress report as it
+            message_callback: Called with every legal submission and progress report as it
                 arrives, for streaming the search to a user.
 
         Returns:
             The selection when the turn closed.
         """
-        selection = cls(turn_id, legal_moves, on_message=on_message)
+        selection = cls(turn_id, legal_moves, message_callback=message_callback)
 
         while not selection.closed:
             remaining = deadline - clock()
@@ -314,15 +314,15 @@ class CandidateSelection:
                 self.has_candidate = True
                 self.candidates += 1
                 self.final = final
-                if self.on_message is not None:
-                    self.on_message(message)
+                if self.message_callback is not None:
+                    self.message_callback(message)
             case SubmissionMessage(move=move):
                 self.illegal_submissions += 1
                 logger.warning("Rejected the illegal submission `%s`.", move)
             case InfoMessage(fields=fields):
                 self.last_info = fields
-                if self.on_message is not None:
-                    self.on_message(message)
+                if self.message_callback is not None:
+                    self.message_callback(message)
             case IdleMessage():
                 self.returned = True
             case FailedMessage(error=error):

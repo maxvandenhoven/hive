@@ -187,6 +187,15 @@ class MatchResult:
         """
         return self.white_spec if player is Player.WHITE else self.black_spec
 
+    def add_decision(self, decision: DecisionRecord) -> None:
+        """Record a decision and its move, keeping the decisions and the game in sync.
+
+        Args:
+            decision: The decision whose move was applied to the game.
+        """
+        self.decisions.append(decision)
+        self.record.moves.append(decision.move)
+
     def thinking_s(self, player: Player) -> float:
         """Sum the decision times of one seat.
 

@@ -95,7 +95,7 @@ def play(
         grace_s=grace,
     )
     try:
-        result = runner.run(on_decision=log_decision)
+        result = runner.run(decision_callback=log_decision)
     except AgentWorkerError as e:
         logger.error("%s", e)
         raise typer.Exit(code=1) from e

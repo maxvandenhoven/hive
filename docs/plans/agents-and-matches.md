@@ -277,8 +277,9 @@ Implementation notes (WP 08):
 - `MatchRunner(rules, white_spec, black_spec, budget_s, max_turns, seed, grace_s=1.0)`:
   `max_turns` counts turns per player like `Rules.max_turns` (`None` plays to the end).
   Seat seeds are `derive_seed(seed, "white")` and `derive_seed(seed, "black")`, a
-  blake2b hash that WP 09 reuses for per-match seeds. `run(on_decision=...)` streams
-  decisions.
+  blake2b hash that WP 09 reuses for per-match seeds. `run(decision_callback=...)`
+  streams decisions, which `MatchResult.add_decision` records together with their moves.
+  `AgentWorker.decide(message_callback=...)` streams submissions and info for the API.
 - `hive play --white SPEC --black SPEC --budget 1.0 [--max-turns 100] [--seed 0]
   [--grace 1.0] [--out result.json]` takes a YAML spec file or inline YAML per seat
   (presets come with WP 09) and logs one line per decision and the result.
