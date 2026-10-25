@@ -16,7 +16,9 @@ from hive.agents.random import RandomAgent
 from hive.engine.rules import Rules
 from hive.engine.state import GameState, Move, PieceType
 
-ILLEGAL_MOVE = Move(PieceType.QUEEN, None, (100, 100))
+ILLEGAL_MOVE = Move(
+    piece_type=PieceType.QUEEN, source_coord=None, target_coord=(100, 100)
+)
 """A placement far away from every piece, which is never legal after the first ply."""
 
 POLL_INTERVAL_S = 0.001
@@ -68,6 +70,7 @@ class IllegalAgent(Agent):
         """
         for _ in range(self.count):
             turn.submit(ILLEGAL_MOVE)
+
         if self.then_legal:
             turn.submit(self.rules.legal_moves(state)[0])
 
@@ -102,8 +105,10 @@ class LingeringAgent(Agent):
             turn: The context to submit the move to.
         """
         turn.submit(self.rules.legal_moves(state)[0])
+
         while not turn.should_stop():
             time.sleep(POLL_INTERVAL_S)
+
         time.sleep(min(self.linger_s, 3600.0))
 
 
@@ -134,8 +139,10 @@ class CrashingAgent(Agent):
             RuntimeError: Always, unless the process exits first.
         """
         turn.submit(self.rules.legal_moves(state)[0])
+
         if self.exit_process:
             os._exit(3)
+
         msg = "The agent crashed on purpose."
         raise RuntimeError(msg)
 
@@ -153,5 +160,6 @@ class CountingAgent(RandomAgent):
             path: The file to append a line to.
         """
         super().__init__(rules, seed=seed)
+
         with Path(path).open("a") as file:
             file.write(f"{os.getpid()}\n")

@@ -125,7 +125,8 @@ class DecisionRecord:
         Raises:
             ValueError: If `data` is not a valid serialized record.
         """
-        fields = expect_mapping(data, "decision record")
+        fields = expect_mapping(data=data, kind="decision record")
+
         try:
             return cls(
                 ply=int(fields["ply"]),
@@ -243,7 +244,8 @@ class MatchResult:
             ValueError: If `data` is not a valid serialized result, including specs of
                 agent kinds that are not registered.
         """
-        fields = expect_mapping(data, "match result")
+        fields = expect_mapping(data=data, kind="match result")
+
         try:
             winner = fields["winner"]
             return cls(

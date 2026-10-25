@@ -33,19 +33,19 @@ def make_decision(player: Player, elapsed_s: float, move: Move | None) -> Decisi
 def result() -> MatchResult:
     """Build a match result with two decisions."""
     moves: list[Move | None] = [
-        Move(PieceType.QUEEN, None, (0, 0)),
-        Move(PieceType.ANT, None, (1, 0)),
+        Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0)),
+        Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0)),
     ]
     return MatchResult(
         rules=Rules(max_turns=50),
-        white_spec=AgentSpec("negamax", {"depth": 2}, label="nm2"),
+        white_spec=AgentSpec(kind="negamax", params={"depth": 2}, label="nm2"),
         black_spec=AgentSpec("random"),
         seed=42,
         budget_s=1.0,
         record=GameRecord(Rules(max_turns=50), moves=moves),
         decisions=[
-            make_decision(Player.WHITE, 0.5, moves[0]),
-            make_decision(Player.BLACK, 0.25, moves[1]),
+            make_decision(player=Player.WHITE, elapsed_s=0.5, move=moves[0]),
+            make_decision(player=Player.BLACK, elapsed_s=0.25, move=moves[1]),
         ],
         outcome=MatchOutcome.WIN,
         winner=Player.BLACK,
@@ -54,9 +54,12 @@ def result() -> MatchResult:
 
 
 class TestDecisionRecord:
-    @pytest.mark.parametrize("move", [None, Move(PieceType.ANT, (0, 0), (1, 0))])
+    @pytest.mark.parametrize(
+        "move",
+        [None, Move(piece_type=PieceType.ANT, source_coord=(0, 0), target_coord=(1, 0))],
+    )
     def test_round_trip(self, move: Move | None) -> None:
-        decision = make_decision(Player.WHITE, 0.5, move)
+        decision = make_decision(player=Player.WHITE, elapsed_s=0.5, move=move)
 
         data = json.loads(json.dumps(decision.to_dict()))
 
@@ -77,8 +80,8 @@ class TestMatchResult:
         assert MatchResult.from_dict(data) == result
 
     def test_add_decision(self, result: MatchResult) -> None:
-        move = Move(PieceType.SPIDER, None, (-1, 0))
-        decision = make_decision(Player.WHITE, 0.1, move)
+        move = Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(-1, 0))
+        decision = make_decision(player=Player.WHITE, elapsed_s=0.1, move=move)
 
         result.add_decision(decision)
 

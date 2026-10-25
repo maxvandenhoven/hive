@@ -71,7 +71,7 @@ class TestBenchPerft:
     def test_checks_reference_count(
         self, tmp_path: Path, counts: dict[str, int], exit_code: int
     ) -> None:
-        suite = write_suite(tmp_path / "suite.json", counts)
+        suite = write_suite(path=tmp_path / "suite.json", counts=counts)
 
         result = CliRunner().invoke(
             app, ["bench", "perft", "--depth", "1", "--divide", "--suite", str(suite)]

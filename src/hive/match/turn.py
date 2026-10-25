@@ -165,7 +165,7 @@ class PipeTurnContext(TurnContext):
             final: Whether the agent is done, which closes the turn.
         """
         self.flush()
-        self.conn.send(SubmissionMessage(self.turn_id, move, final))
+        self.conn.send(SubmissionMessage(turn_id=self.turn_id, move=move, final=final))
         self.closed = self.closed or final
 
     @override
@@ -197,13 +197,14 @@ class PipeTurnContext(TurnContext):
             **fields: The progress values to report.
         """
         self.pending_info = fields
+
         if self.clock() - self.last_info_at >= self.info_interval_s:
             self.flush()
 
     def flush(self) -> None:
         """Send the progress report held back by the rate limit, if any."""
         if self.pending_info is not None:
-            self.conn.send(InfoMessage(self.turn_id, self.pending_info))
+            self.conn.send(InfoMessage(turn_id=self.turn_id, fields=self.pending_info))
             self.pending_info = None
             self.last_info_at = self.clock()
 
@@ -270,13 +271,18 @@ class CandidateSelection:
         Returns:
             The selection when the turn closed.
         """
-        selection = cls(turn_id, legal_moves, message_callback=message_callback)
+        selection = cls(
+            turn_id=turn_id, legal_moves=legal_moves, message_callback=message_callback
+        )
 
         while not selection.closed:
             remaining = deadline - clock()
+
             if remaining <= 0:
                 break
+
             message = messages(remaining)
+
             if message is not None:
                 selection.receive(message)
 
@@ -292,10 +298,13 @@ class CandidateSelection:
         """Why the turn closed, assuming the deadline closed it if no message did."""
         if not self.has_candidate:
             return TurnCloseReason.NO_CANDIDATE
+
         if self.failure is not None:
             return TurnCloseReason.WORKER_FAILED
+
         if self.closed:
             return TurnCloseReason.FINAL
+
         return TurnCloseReason.DEADLINE
 
     def receive(self, message: WorkerMessage) -> None:
@@ -314,6 +323,7 @@ class CandidateSelection:
                 self.has_candidate = True
                 self.candidates += 1
                 self.final = final
+
                 if self.message_callback is not None:
                     self.message_callback(message)
             case SubmissionMessage(move=move):
@@ -321,6 +331,7 @@ class CandidateSelection:
                 logger.warning("Rejected the illegal submission `%s`.", move)
             case InfoMessage(fields=fields):
                 self.last_info = fields
+
                 if self.message_callback is not None:
                     self.message_callback(message)
             case IdleMessage():

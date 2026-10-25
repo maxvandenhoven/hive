@@ -23,6 +23,7 @@ def check_consistent(result: MatchResult, rules: Rules) -> None:
         range(len(result.decisions))
     )
     winners = rules.winners(state)
+
     if result.outcome is MatchOutcome.TURN_CAP:
         assert winners is None
     elif result.outcome is MatchOutcome.WIN:
@@ -40,9 +41,9 @@ def test_derive_seed() -> None:
 
 def test_full_match(rules: Rules) -> None:
     runner = MatchRunner(
-        rules,
-        AgentSpec("negamax", {"depth": 2}, label="nm2"),
-        AgentSpec("random"),
+        rules=rules,
+        white_spec=AgentSpec(kind="negamax", params={"depth": 2}, label="nm2"),
+        black_spec=AgentSpec("random"),
         budget_s=0.2,
         max_turns=100,
         seed=0,
@@ -51,7 +52,7 @@ def test_full_match(rules: Rules) -> None:
 
     result = runner.run(decision_callback=seen.append)
 
-    check_consistent(result, rules)
+    check_consistent(result=result, rules=rules)
     assert result.outcome is MatchOutcome.WIN
     assert seen == result.decisions
     assert result.decisions
@@ -63,7 +64,12 @@ def test_full_match(rules: Rules) -> None:
 
 def test_turn_cap(rules: Rules) -> None:
     runner = MatchRunner(
-        rules, AgentSpec("random"), AgentSpec("random"), budget_s=1.0, max_turns=3, seed=5
+        rules=rules,
+        white_spec=AgentSpec("random"),
+        black_spec=AgentSpec("random"),
+        budget_s=1.0,
+        max_turns=3,
+        seed=5,
     )
 
     result = runner.run()
@@ -71,15 +77,15 @@ def test_turn_cap(rules: Rules) -> None:
     assert result.outcome is MatchOutcome.TURN_CAP
     assert result.winner is None
     assert len(result.decisions) == 6
-    check_consistent(result, rules)
+    check_consistent(result=result, rules=rules)
 
 
 def test_draw_by_turn_limit_of_rules() -> None:
     rules = Rules(max_turns=2)
     runner = MatchRunner(
-        rules,
-        AgentSpec("random"),
-        AgentSpec("random"),
+        rules=rules,
+        white_spec=AgentSpec("random"),
+        black_spec=AgentSpec("random"),
         budget_s=1.0,
         max_turns=None,
         seed=0,
@@ -90,15 +96,15 @@ def test_draw_by_turn_limit_of_rules() -> None:
     assert result.outcome is MatchOutcome.DRAW
     assert result.winner is None
     assert len(result.decisions) == 5
-    check_consistent(result, rules)
+    check_consistent(result=result, rules=rules)
 
 
 def test_reproducible(rules: Rules) -> None:
     def moves(seed: int) -> list[Move | None]:
         runner = MatchRunner(
-            rules,
-            AgentSpec("random"),
-            AgentSpec("random"),
+            rules=rules,
+            white_spec=AgentSpec("random"),
+            black_spec=AgentSpec("random"),
             budget_s=1.0,
             max_turns=10,
             seed=seed,
@@ -112,9 +118,9 @@ def test_reproducible(rules: Rules) -> None:
 def test_builds_each_seat_once(rules: Rules, tmp_path: Path) -> None:
     white, black = tmp_path / "white.txt", tmp_path / "black.txt"
     runner = MatchRunner(
-        rules,
-        AgentSpec("test-counting", {"path": str(white)}),
-        AgentSpec("test-counting", {"path": str(black)}),
+        rules=rules,
+        white_spec=AgentSpec(kind="test-counting", params={"path": str(white)}),
+        black_spec=AgentSpec(kind="test-counting", params={"path": str(black)}),
         budget_s=1.0,
         max_turns=5,
         seed=0,
@@ -130,9 +136,9 @@ def test_builds_each_seat_once(rules: Rules, tmp_path: Path) -> None:
 
 def test_misbehaving_agent_still_finishes(rules: Rules) -> None:
     runner = MatchRunner(
-        rules,
-        AgentSpec("test-never-submits"),
-        AgentSpec("random"),
+        rules=rules,
+        white_spec=AgentSpec("test-never-submits"),
+        black_spec=AgentSpec("random"),
         budget_s=0.05,
         max_turns=3,
         seed=0,
@@ -143,12 +149,17 @@ def test_misbehaving_agent_still_finishes(rules: Rules) -> None:
 
     assert len(result.decisions) == 6
     assert {d.close_reason for d in result.decisions[::2]} == {"no_candidate"}
-    check_consistent(result, rules)
+    check_consistent(result=result, rules=rules)
 
 
 def test_invalid_spec_fails(rules: Rules) -> None:
     runner = MatchRunner(
-        rules, AgentSpec("nope"), AgentSpec("random"), budget_s=1.0, max_turns=1, seed=0
+        rules=rules,
+        white_spec=AgentSpec("nope"),
+        black_spec=AgentSpec("random"),
+        budget_s=1.0,
+        max_turns=1,
+        seed=0,
     )
 
     with pytest.raises(AgentWorkerError, match="nope"):
@@ -158,9 +169,9 @@ def test_invalid_spec_fails(rules: Rules) -> None:
 @pytest.mark.slow
 def test_full_match_between_search_agents(rules: Rules) -> None:
     runner = MatchRunner(
-        rules,
-        AgentSpec("negamax", {"mobility": 0.1}),
-        AgentSpec("minimax"),
+        rules=rules,
+        white_spec=AgentSpec(kind="negamax", params={"mobility": 0.1}),
+        black_spec=AgentSpec("minimax"),
         budget_s=0.5,
         max_turns=40,
         seed=1,
@@ -168,7 +179,7 @@ def test_full_match_between_search_agents(rules: Rules) -> None:
 
     result = runner.run()
 
-    check_consistent(result, rules)
+    check_consistent(result=result, rules=rules)
     assert all(d.elapsed_s < 0.5 + 0.1 for d in result.decisions)
     assert all(d.overrun_s < 0.1 for d in result.decisions)
     assert not any(d.worker_restarted for d in result.decisions)

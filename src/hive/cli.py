@@ -87,13 +87,14 @@ def play(
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     runner = MatchRunner(
         rules=Rules(),
-        white_spec=parse_agent_spec(white, "--white"),
-        black_spec=parse_agent_spec(black, "--black"),
+        white_spec=parse_agent_spec(value=white, option="--white"),
+        black_spec=parse_agent_spec(value=black, option="--black"),
         budget_s=budget,
         max_turns=max_turns,
         seed=seed,
         grace_s=grace,
     )
+
     try:
         result = runner.run(decision_callback=log_decision)
     except AgentWorkerError as e:
@@ -101,6 +102,7 @@ def play(
         raise typer.Exit(code=1) from e
 
     logger.info("%s", describe_match_result(result))
+
     if out is not None:
         out.write_text(json.dumps(result.to_dict(), indent=2))
         logger.info("Wrote the match result to `%s`.", out)
@@ -121,8 +123,10 @@ def parse_agent_spec(value: str, option: str) -> AgentSpec:
     """
     try:
         path = Path(value)
+
         if path.is_file():
             return AgentSpec.load(path)
+
         return AgentSpec.from_yaml(value)
     except InvalidAgentSpecError as e:
         raise typer.BadParameter(str(e), param_hint=option) from e
@@ -139,12 +143,16 @@ def log_decision(decision: DecisionRecord) -> None:
     details += [
         f"{key} {info[key]}" for key in ("depth", "nodes", "score") if key in info
     ]
+
     if decision.illegal_submissions:
         details.append(f"{decision.illegal_submissions} illegal")
+
     if decision.worker_restarted:
         details.append("worker restarted")
+
     if decision.failure is not None:
         details.append(f"failure: {decision.failure}")
+
     logger.info(
         "%3d %-5s %s: %s (%s)",
         decision.ply,
@@ -165,11 +173,14 @@ def describe_match_result(result: MatchResult) -> str:
         The outcome, the number of plies and the duration of the match.
     """
     plies = f"after {len(result.decisions)} plies in {result.duration_s:.1f} s"
+
     if result.outcome is MatchOutcome.WIN and result.winner is not None:
         spec = result.spec(result.winner)
         return f"{result.winner.name.lower()} ({spec.label or spec.kind}) wins {plies}"
+
     if result.outcome is MatchOutcome.DRAW:
         return f"Draw {plies}"
+
     return f"Stopped at the turn cap {plies}"
 
 
@@ -194,6 +205,7 @@ def bench_perft(
 ) -> None:
     """Run perft on a position and print nodes, seconds and nodes per second."""
     perft_suite = PerftSuite.load(suite)
+
     try:
         perft_position = perft_suite.position(position)
     except KeyError as e:
@@ -204,21 +216,25 @@ def bench_perft(
 
     if divide and depth > 0:
         start = time.perf_counter()
-        counts = bench.divide(state, rules, depth)
+        counts = bench.divide(state=state, rules=rules, depth=depth)
         seconds = time.perf_counter() - start
+
         for move, count in counts:
             typer.echo(f"{format_move(move)}: {count}")
+
         result = bench.PerftResult(
             depth=depth, nodes=sum(count for _, count in counts), seconds=seconds
         )
     else:
-        result = bench.timed_perft(state, rules, depth)
+        result = bench.timed_perft(state=state, rules=rules, depth=depth)
+
     typer.echo(
         f"position {position} depth {result.depth}: {result.nodes} nodes in "
         f"{result.seconds:.3f} s ({result.nodes_per_second:,.0f} nodes/s)"
     )
 
     expected = perft_position.counts.get(depth)
+
     if expected is not None and expected != result.nodes:
         typer.echo(f"mismatch: the reference count is {expected}", err=True)
         raise typer.Exit(code=1)
@@ -238,6 +254,7 @@ def format_move(move: Move | None) -> str:
         return "pass"
 
     piece = move.piece_type.name.lower()
+
     if move.source_coord is None:
         return f"{piece} -> {move.target_coord}"
 

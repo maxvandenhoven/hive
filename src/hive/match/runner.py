@@ -102,8 +102,8 @@ class MatchRunner:
             workers: dict[Player, AgentWorker] = {
                 player: stack.enter_context(
                     AgentWorker(
-                        result.spec(player),
-                        self.rules,
+                        spec=result.spec(player),
+                        rules=self.rules,
                         seed=self.seat_seed(player),
                         grace_s=self.grace_s,
                         preload=self.preload,
@@ -111,21 +111,28 @@ class MatchRunner:
                 )
                 for player in Player
             }
+
             while not self.rules.is_finished(state):
                 if self.max_turns is not None and state.current_ply >= 2 * self.max_turns:
                     break
 
-                decision = workers[state.current_player].decide(state, self.budget_s)
-                self.rules.apply_checked_move(state, decision.move)
+                decision = workers[state.current_player].decide(
+                    state=state, budget_s=self.budget_s
+                )
+                self.rules.apply_checked_move(state=state, move=decision.move)
                 result.add_decision(decision)
+
                 if decision_callback is not None:
                     decision_callback(decision)
 
         winners = self.rules.winners(state)
+
         if winners is not None and len(winners) == 1:
             result.outcome = MatchOutcome.WIN
             result.winner = winners[0]
         elif winners is not None:
             result.outcome = MatchOutcome.DRAW
+
         result.duration_s = time.monotonic() - start
+
         return result

@@ -174,10 +174,12 @@ class AgentWorker:
         worker_conn.close()
 
         message = self.receive(self.startup_timeout_s)
+
         if not isinstance(message, IdleMessage):
             if isinstance(message, FailedMessage):
                 # The worker exits on its own after reporting the failure.
                 self.process.join(self.grace_s)
+
             self.kill()
             error = (
                 message.error
@@ -223,13 +225,13 @@ class AgentWorker:
         self.stop_event.clear()
         start = time.monotonic()
         deadline = start + budget_s
-        self.conn.send(ThinkMessage(self.turn_id, state, deadline))
+        self.conn.send(ThinkMessage(turn_id=self.turn_id, state=state, deadline=deadline))
 
         selection = CandidateSelection.collect(
-            self.turn_id,
-            legal_moves,
-            deadline,
-            self.receive,
+            turn_id=self.turn_id,
+            legal_moves=legal_moves,
+            deadline=deadline,
+            messages=self.receive,
             message_callback=message_callback,
         )
         closed_at = time.monotonic()
@@ -237,16 +239,20 @@ class AgentWorker:
 
         self.stop_event.set()
         failure = selection.failure
+
         if not selection.returned:
             self.wait_until_returned(selection)
+
             if not selection.returned:
                 failure = (
                     f"The agent did not return within the grace period of {self.grace_s} "
                     "s after it was stopped."
                 )
+
         returned_at = time.monotonic()
 
         restart = not selection.returned or not self.running
+
         if restart:
             logger.warning(
                 "Restarting the worker of `%s` at ply %d: %s",
@@ -257,6 +263,7 @@ class AgentWorker:
             self.restart()
 
         move = selection.move
+
         if not selection.has_candidate:
             move = legal_moves[self.fallback_rng.randrange(len(legal_moves))]
 
@@ -296,6 +303,7 @@ class AgentWorker:
             self.conn.send(None)
         except OSError:
             logger.debug("The worker of `%s` already exited.", self.label)
+
         self.process.join(self.grace_s)
         self.kill()
 
@@ -310,17 +318,23 @@ class AgentWorker:
             `None` if no message arrived in time.
         """
         assert self.conn is not None
+
         try:
             if not self.conn.poll(timeout):
                 return None
+
             return self.conn.recv()
         except (EOFError, OSError):
             # The pipe closes as the process exits, so joining it takes no time.
             exitcode = None
+
             if self.process is not None:
                 self.process.join(self.grace_s)
                 exitcode = self.process.exitcode
-            return FailedMessage(self.turn_id, f"The worker exited with code {exitcode}.")
+
+            return FailedMessage(
+                turn_id=self.turn_id, error=f"The worker exited with code {exitcode}."
+            )
 
     def wait_until_returned(self, selection: CandidateSelection) -> None:
         """Wait up to the grace period for the stopped agent to return.
@@ -332,8 +346,10 @@ class AgentWorker:
             selection: The selection of the closed turn, updated when the agent returns.
         """
         grace_deadline = time.monotonic() + self.grace_s
+
         while (remaining := grace_deadline - time.monotonic()) > 0:
             message = self.receive(remaining)
+
             if (
                 isinstance(message, IdleMessage | FailedMessage)
                 and message.turn_id == self.turn_id
@@ -346,10 +362,13 @@ class AgentWorker:
         if self.process is not None:
             if self.process.is_alive():
                 self.process.kill()
+
             self.process.join()
             self.process.close()
+
         if self.conn is not None:
             self.conn.close()
+
         self.process = None
         self.conn = None
         self.stop_event = None
@@ -370,6 +389,7 @@ def worker_process_context() -> ForkServerContext | SpawnContext:
 
     context = multiprocessing.get_context("forkserver")
     context.set_forkserver_preload([__name__])
+
     return context
 
 
@@ -397,13 +417,16 @@ def run_worker_process(
     """
     # The runner handles Ctrl+C and closes the worker, so it ignores the interrupt.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     try:
         for module in preload:
             importlib.import_module(module)
-        agent = build_agent(spec, rules, seed=seed)
+
+        agent = build_agent(spec=spec, rules=rules, seed=seed)
     except Exception as e:
-        conn.send(FailedMessage(STARTUP_TURN_ID, describe_error(e)))
+        conn.send(FailedMessage(turn_id=STARTUP_TURN_ID, error=describe_error(e)))
         return
+
     conn.send(IdleMessage(STARTUP_TURN_ID))
 
     while True:
@@ -411,15 +434,22 @@ def run_worker_process(
             message: ThinkMessage | None = conn.recv()
         except EOFError:
             return
+
         if message is None:
             return
 
-        turn = PipeTurnContext(conn, stop_event, message.turn_id, message.deadline)
+        turn = PipeTurnContext(
+            conn=conn,
+            stop_event=stop_event,
+            turn_id=message.turn_id,
+            deadline=message.deadline,
+        )
+
         try:
-            agent.think(message.state, turn)
+            agent.think(state=message.state, turn=turn)
         except Exception as e:
             turn.flush()
-            conn.send(FailedMessage(message.turn_id, describe_error(e)))
+            conn.send(FailedMessage(turn_id=message.turn_id, error=describe_error(e)))
         else:
             turn.flush()
             conn.send(IdleMessage(message.turn_id))
