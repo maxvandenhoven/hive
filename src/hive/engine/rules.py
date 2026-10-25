@@ -202,7 +202,7 @@ class Rules:
             raise InvalidBoardError(msg)
 
         state.current_player = current_player
-        state.current_ply = self.validate_ply(state, current_ply)
+        state.current_ply = self.validate_ply(state=state, current_ply=current_ply)
 
         return state
 
@@ -570,7 +570,9 @@ class Rules:
 
             if not any(
                 state.is_occupied(flanking_coord)
-                for flanking_coord in get_flanking_coords(coord, neighbor_coord)
+                for flanking_coord in get_flanking_coords(
+                    source_coord=coord, target_coord=neighbor_coord
+                )
             ):
                 continue
 
@@ -589,7 +591,7 @@ class Rules:
             The coordinates the queen can slide to.
         """
         with state.piece_lifted(coord):
-            return self.slideable_neighbors(state, coord)
+            return self.slideable_neighbors(state=state, coord=coord)
 
     def beetle_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get the targets of a beetle, which moves one space and may climb the hive.
@@ -609,7 +611,11 @@ class Rules:
         """
         with state.piece_lifted(coord):
             source_height = state.get_stack_height(coord)
-            destinations = [] if source_height else self.slideable_neighbors(state, coord)
+            destinations = (
+                []
+                if source_height
+                else self.slideable_neighbors(state=state, coord=coord)
+            )
 
             for neighbor_coord in get_neighbors(coord):
                 height = max(source_height, state.get_stack_height(neighbor_coord))
@@ -619,7 +625,9 @@ class Rules:
 
                 if all(
                     state.get_stack_height(flanking_coord) > height
-                    for flanking_coord in get_flanking_coords(coord, neighbor_coord)
+                    for flanking_coord in get_flanking_coords(
+                        source_coord=coord, target_coord=neighbor_coord
+                    )
                 ):
                     continue
 
@@ -645,13 +653,13 @@ class Rules:
         destinations = []
 
         for direction in HEX_DIRECTIONS:
-            current_coord = add(coord, direction)
+            current_coord = add(coord=coord, direction=direction)
 
             if not state.is_occupied(current_coord):
                 continue
 
             while state.is_occupied(current_coord):
-                current_coord = add(current_coord, direction)
+                current_coord = add(coord=current_coord, direction=direction)
 
             destinations.append(current_coord)
 
@@ -687,7 +695,9 @@ class Rules:
                 destinations.add(current_coord)
                 return
 
-            for neighbor_coord in self.slideable_neighbors(state, current_coord):
+            for neighbor_coord in self.slideable_neighbors(
+                state=state, coord=current_coord
+            ):
                 if neighbor_coord in visited_coords:
                     continue
 
@@ -728,7 +738,9 @@ class Rules:
             while frontier:
                 current_coord = frontier.pop()
 
-                for neighbor_coord in self.slideable_neighbors(state, current_coord):
+                for neighbor_coord in self.slideable_neighbors(
+                    state=state, coord=current_coord
+                ):
                     if neighbor_coord in visited_coords:
                         continue
 

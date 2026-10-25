@@ -48,7 +48,7 @@ def move_key(move: Move | None) -> MoveKey:
 def test_perft_matches_reference(position: PerftPosition, depth: int, count: int) -> None:
     state = position.state(SUITE.rules)
 
-    assert perft(state, SUITE.rules, depth) == count
+    assert perft(state=state, rules=SUITE.rules, depth=depth) == count
 
 
 @pytest.mark.parametrize(

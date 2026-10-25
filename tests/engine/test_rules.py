@@ -45,7 +45,7 @@ def move_keys(
 
 def targets(rules: Rules, state: GameState, coord: Coordinate) -> set[Coordinate]:
     """Get the target coordinates of the piece at `coord` as a set."""
-    return set(rules.target_coords(state, coord))
+    return set(rules.target_coords(state=state, coord=coord))
 
 
 @pytest.fixture(scope="function")
@@ -192,7 +192,10 @@ class TestPlacement:
     def test_second_ply_next_to_origin(self, rules: Rules) -> None:
         """Test that the second piece may be placed on any neighbor of the origin."""
         state = build_state(
-            rules, [(Player.WHITE, PieceType.ANT, (0, 0))], Player.BLACK, current_ply=1
+            rules=rules,
+            placements=[(Player.WHITE, PieceType.ANT, (0, 0))],
+            current_player=Player.BLACK,
+            current_ply=1,
         )
 
         assert set(rules.placeable_coords(state)) == set(get_neighbors((0, 0)))
@@ -201,12 +204,12 @@ class TestPlacement:
     def test_not_adjacent_to_opponent(self, rules: Rules) -> None:
         """Test that later placements touch own pieces and no opponent pieces."""
         state = build_state(
-            rules,
-            [
+            rules=rules,
+            placements=[
                 (Player.WHITE, PieceType.ANT, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
@@ -215,14 +218,14 @@ class TestPlacement:
     def test_covered_piece_does_not_count(self, rules: Rules) -> None:
         """Test that only the top piece of a stack determines colour adjacency."""
         state = build_state(
-            rules,
-            [
+            rules=rules,
+            placements=[
                 (Player.WHITE, PieceType.QUEEN, (0, 0)),
                 (Player.BLACK, PieceType.QUEEN, (1, 0)),
                 (Player.WHITE, PieceType.ANT, (-1, 0)),
                 (Player.BLACK, PieceType.BEETLE, (-1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=4,
         )
 
@@ -249,7 +252,10 @@ class TestPlacement:
     def test_queen_by_turn_after_queen_placed(self, rules: Rules) -> None:
         """Test that the queen deadline no longer applies once the queen is placed."""
         state = build_state(
-            rules, [(Player.WHITE, PieceType.QUEEN, (0, 0))], Player.WHITE, current_ply=6
+            rules=rules,
+            placements=[(Player.WHITE, PieceType.QUEEN, (0, 0))],
+            current_player=Player.WHITE,
+            current_ply=6,
         )
 
         assert set(rules.placeable_piece_types(state)) == set(PieceType) - {
@@ -291,28 +297,28 @@ class TestMobility:
     def test_queen_not_placed(self, rules: Rules) -> None:
         """Test that no piece may move before its owner's queen is placed."""
         state = build_state(
-            rules,
-            [
+            rules=rules,
+            placements=[
                 (Player.WHITE, PieceType.ANT, (0, 0)),
                 (Player.BLACK, PieceType.QUEEN, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
         assert rules.movable_pieces(state) == []
         assert rules.movement_moves(state) == []
-        assert rules.target_coords(state, (0, 0)) == []
+        assert rules.target_coords(state=state, coord=(0, 0)) == []
 
     def test_move_before_queen(self, free_rules: Rules) -> None:
         """Test that pieces may move before the queen when configured."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.ANT, (0, 0)),
                 (Player.BLACK, PieceType.QUEEN, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
@@ -321,18 +327,18 @@ class TestMobility:
     def test_pinned_piece(self, rules: Rules) -> None:
         """Test that a piece whose removal splits the hive cannot move."""
         state = build_state(
-            rules,
-            [
+            rules=rules,
+            placements=[
                 (Player.WHITE, PieceType.ANT, (-1, 0)),
                 (Player.WHITE, PieceType.QUEEN, (0, 0)),
                 (Player.BLACK, PieceType.QUEEN, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=4,
         )
 
         assert rules.movable_pieces(state) == [((-1, 0), PieceType.ANT)]
-        assert rules.target_coords(state, (0, 0)) == []
+        assert rules.target_coords(state=state, coord=(0, 0)) == []
 
     def test_covered_piece(self, rules: Rules) -> None:
         """Test that a covered piece cannot move and the beetle on top can."""
@@ -342,8 +348,12 @@ class TestMobility:
             (Player.WHITE, PieceType.ANT, (1, 0)),
             (Player.BLACK, PieceType.BEETLE, (1, 0)),
         ]
-        white_state = build_state(rules, placements, Player.WHITE, current_ply=4)
-        black_state = build_state(rules, placements, Player.BLACK, current_ply=5)
+        white_state = build_state(
+            rules=rules, placements=placements, current_player=Player.WHITE, current_ply=4
+        )
+        black_state = build_state(
+            rules=rules, placements=placements, current_player=Player.BLACK, current_ply=5
+        )
 
         assert rules.movable_pieces(white_state) == []
         assert set(rules.movable_pieces(black_state)) == {
@@ -354,12 +364,12 @@ class TestMobility:
     def test_opponent_pieces_not_movable(self, free_rules: Rules) -> None:
         """Test that only the current player's pieces are movable."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.ANT, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
             ],
-            Player.BLACK,
+            current_player=Player.BLACK,
             current_ply=3,
         )
 
@@ -370,7 +380,7 @@ class TestMobility:
         state = rules.create_initial_state()
 
         with pytest.raises(ValueError, match="unoccupied"):
-            rules.target_coords(state, (0, 0))
+            rules.target_coords(state=state, coord=(0, 0))
 
 
 class TestMovement:
@@ -379,81 +389,92 @@ class TestMovement:
     def test_queen_slides_one_space(self, free_rules: Rules) -> None:
         """Test that the queen slides one space along the hive."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.QUEEN, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(1, -1), (0, 1)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {(1, -1), (0, 1)}
 
     def test_queen_gate(
         self, free_rules: Rules, gate_ring_placements: list[Placement]
     ) -> None:
         """Test that the queen cannot slide through a gate or lose hive contact."""
         state = build_state(
-            free_rules,
-            [*gate_ring_placements, (Player.WHITE, PieceType.QUEEN, (0, 0))],
-            Player.WHITE,
+            rules=free_rules,
+            placements=[*gate_ring_placements, (Player.WHITE, PieceType.QUEEN, (0, 0))],
+            current_player=Player.WHITE,
             current_ply=6,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(0, -1), (-1, 1)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {(0, -1), (-1, 1)}
 
     def test_beetle_slides_and_climbs(self, free_rules: Rules) -> None:
         """Test that the beetle slides one space or climbs onto a neighbor."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.BEETLE, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(1, -1), (0, 1), (1, 0)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {
+            (1, -1),
+            (0, 1),
+            (1, 0),
+        }
 
     def test_beetle_gate(
         self, free_rules: Rules, gate_ring_placements: list[Placement]
     ) -> None:
         """Test that the beetle cannot slide through a gate but can climb its sides."""
         state = build_state(
-            free_rules,
-            [*gate_ring_placements, (Player.WHITE, PieceType.BEETLE, (0, 0))],
-            Player.WHITE,
+            rules=free_rules,
+            placements=[*gate_ring_placements, (Player.WHITE, PieceType.BEETLE, (0, 0))],
+            current_player=Player.WHITE,
             current_ply=6,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(0, -1), (-1, 1), (1, -1), (0, 1)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {
+            (0, -1),
+            (-1, 1),
+            (1, -1),
+            (0, 1),
+        }
 
     def test_beetle_on_top_of_hive(self, free_rules: Rules) -> None:
         """Test that a beetle on a stack may move to any neighbor."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.ANT, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
                 (Player.WHITE, PieceType.BEETLE, (0, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=4,
         )
 
-        assert targets(free_rules, state, (0, 0)) == set(get_neighbors((0, 0)))
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == set(
+            get_neighbors((0, 0))
+        )
 
     def test_beetle_climbing_moves(self, free_rules: Rules) -> None:
         """Test that climbing moves are generated as movement moves."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.BEETLE, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
@@ -477,25 +498,25 @@ class TestMovement:
         from `(0, 0)`, `(0, -1)` and `(-1, 1)`, are empty, so the queen loses contact.
         """
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.QUEEN, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, -1)),
                 (Player.BLACK, PieceType.ANT, (1, -2)),
                 (Player.BLACK, PieceType.ANT, (0, -2)),
                 (Player.BLACK, PieceType.ANT, (-1, -1)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=5,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(1, 0), (0, -1)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {(1, 0), (0, -1)}
 
     def test_beetle_cannot_climb_through_high_gate(self, free_rules: Rules) -> None:
         """Test that two stacks higher than the source and target block a climb."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.BEETLE, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
                 (Player.BLACK, PieceType.ANT, (1, -1)),
@@ -503,108 +524,113 @@ class TestMovement:
                 (Player.BLACK, PieceType.ANT, (0, 1)),
                 (Player.BLACK, PieceType.BEETLE, (0, 1)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=6,
         )
 
-        assert (1, 0) not in targets(free_rules, state, (0, 0))
+        assert (1, 0) not in targets(rules=free_rules, state=state, coord=(0, 0))
 
     def test_beetle_on_hive_passes_low_gate(self, free_rules: Rules) -> None:
         """Test that a beetle on the hive can move down between two single pieces."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.BLACK, PieceType.ANT, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, -1)),
                 (Player.BLACK, PieceType.ANT, (0, 1)),
                 (Player.WHITE, PieceType.BEETLE, (0, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=4,
         )
 
-        assert (1, 0) in targets(free_rules, state, (0, 0))
+        assert (1, 0) in targets(rules=free_rules, state=state, coord=(0, 0))
 
     def test_grasshopper_jumps(self, free_rules: Rules) -> None:
         """Test that the grasshopper jumps over lines of pieces to the first gap."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.GRASSHOPPER, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
                 (Player.BLACK, PieceType.ANT, (2, 0)),
                 (Player.BLACK, PieceType.ANT, (0, 1)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=4,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(3, 0), (0, 2)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {(3, 0), (0, 2)}
 
     def test_grasshopper_ignores_gates(
         self, free_rules: Rules, gate_ring_placements: list[Placement]
     ) -> None:
         """Test that the grasshopper jumps over a gate it could not slide through."""
         state = build_state(
-            free_rules,
-            [*gate_ring_placements, (Player.WHITE, PieceType.GRASSHOPPER, (0, 0))],
-            Player.WHITE,
+            rules=free_rules,
+            placements=[
+                *gate_ring_placements,
+                (Player.WHITE, PieceType.GRASSHOPPER, (0, 0)),
+            ],
+            current_player=Player.WHITE,
             current_ply=6,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(2, -2), (0, 2)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {(2, -2), (0, 2)}
 
     def test_spider_around_one_piece(self, free_rules: Rules) -> None:
         """Test that the spider moves exactly three spaces around a single piece."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.SPIDER, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(2, 0)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {(2, 0)}
 
     def test_spider_around_two_pieces(self, free_rules: Rules) -> None:
         """Test that the spider stops after three spaces in both directions."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.SPIDER, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
                 (Player.BLACK, PieceType.ANT, (2, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=3,
         )
 
-        assert targets(free_rules, state, (0, 0)) == {(3, -1), (2, 1)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == {(3, -1), (2, 1)}
 
     def test_ant_around_one_piece(self, free_rules: Rules) -> None:
         """Test that the ant reaches every space around a single piece."""
         state = build_state(
-            free_rules,
-            [
+            rules=free_rules,
+            placements=[
                 (Player.WHITE, PieceType.ANT, (0, 0)),
                 (Player.BLACK, PieceType.ANT, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
-        assert targets(free_rules, state, (0, 0)) == set(get_neighbors((1, 0))) - {(0, 0)}
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == set(
+            get_neighbors((1, 0))
+        ) - {(0, 0)}
 
     def test_ant_gate(
         self, free_rules: Rules, gate_ring_placements: list[Placement]
     ) -> None:
         """Test that the ant reaches all of the outside but not the gated hole."""
         state = build_state(
-            free_rules,
-            [*gate_ring_placements, (Player.WHITE, PieceType.ANT, (0, 0))],
-            Player.WHITE,
+            rules=free_rules,
+            placements=[*gate_ring_placements, (Player.WHITE, PieceType.ANT, (0, 0))],
+            current_player=Player.WHITE,
             current_ply=6,
         )
         outside = {
@@ -614,7 +640,7 @@ class TestMovement:
             if not state.is_occupied(neighbor)
         } - {(1, 0)}
 
-        assert targets(free_rules, state, (0, 0)) == outside
+        assert targets(rules=free_rules, state=state, coord=(0, 0)) == outside
 
 
 class TestTermination:
@@ -636,7 +662,12 @@ class TestTermination:
         self, rules: Rules, surround_placements: list[Placement]
     ) -> None:
         """Test that the game continues while no queen is surrounded."""
-        state = build_state(rules, surround_placements, Player.WHITE, current_ply=6)
+        state = build_state(
+            rules=rules,
+            placements=surround_placements,
+            current_player=Player.WHITE,
+            current_ply=6,
+        )
 
         assert rules.winners(state) is None
         assert rules.is_finished(state) is False
@@ -650,9 +681,9 @@ class TestTermination:
     ) -> None:
         """Test that surrounding a queen wins the game for the opponent."""
         state = build_state(
-            rules,
-            [*surround_placements, (Player.WHITE, PieceType.ANT, (0, 1))],
-            Player.BLACK,
+            rules=rules,
+            placements=[*surround_placements, (Player.WHITE, PieceType.ANT, (0, 1))],
+            current_player=Player.BLACK,
             current_ply=7,
         )
 
@@ -669,7 +700,12 @@ class TestTermination:
         placements += [
             (Player.WHITE, PieceType.ANT, coord) for coord in others - {(0, 0), (1, 0)}
         ]
-        state = build_state(rules, placements, Player.WHITE, current_ply=10)
+        state = build_state(
+            rules=rules,
+            placements=placements,
+            current_player=Player.WHITE,
+            current_ply=10,
+        )
 
         assert set(rules.winners(state) or []) == {Player.WHITE, Player.BLACK}
 
@@ -692,12 +728,12 @@ class TestLegalMoves:
     def test_combines_placements_and_movements(self, rules: Rules) -> None:
         """Test that legal moves are placement moves followed by movement moves."""
         state = build_state(
-            rules,
-            [
+            rules=rules,
+            placements=[
                 (Player.WHITE, PieceType.QUEEN, (0, 0)),
                 (Player.BLACK, PieceType.QUEEN, (1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=2,
         )
 
@@ -714,14 +750,14 @@ class TestLegalMoves:
     def test_sorted_by_piece_type_and_coordinates(self, rules: Rules) -> None:
         """Test that each group of moves is sorted by piece type and coordinates."""
         state = build_state(
-            rules,
-            [
+            rules=rules,
+            placements=[
                 (Player.WHITE, PieceType.QUEEN, (0, 0)),
                 (Player.BLACK, PieceType.QUEEN, (1, 0)),
                 (Player.WHITE, PieceType.ANT, (-1, 0)),
                 (Player.BLACK, PieceType.ANT, (2, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=4,
         )
 
@@ -767,14 +803,14 @@ class TestLegalMoves:
     def test_pass_when_no_moves(self, rules: Rules) -> None:
         """Test that the only legal move is a pass when nothing can be placed or moved."""
         state = build_state(
-            rules,
-            [
+            rules=rules,
+            placements=[
                 (Player.WHITE, PieceType.QUEEN, (0, 0)),
                 (Player.BLACK, PieceType.QUEEN, (1, 0)),
                 (Player.WHITE, PieceType.ANT, (-1, 0)),
                 (Player.BLACK, PieceType.BEETLE, (-1, 0)),
             ],
-            Player.WHITE,
+            current_player=Player.WHITE,
             current_ply=4,
         )
 
@@ -808,7 +844,9 @@ class TestFromBoard:
         self, rules: Rules, placements: list[Placement]
     ) -> None:
         """Test that hands and queen coordinates are derived from the board."""
-        state = rules.from_board(build_board(placements), Player.WHITE)
+        state = rules.from_board(
+            board=build_board(placements), current_player=Player.WHITE
+        )
 
         assert state.current_player is Player.WHITE
         assert state.current_ply == 4
@@ -827,7 +865,7 @@ class TestFromBoard:
 
     def test_empty_board(self, rules: Rules) -> None:
         """Test that an empty board gives the initial state."""
-        state = rules.from_board({}, Player.WHITE)
+        state = rules.from_board(board={}, current_player=Player.WHITE)
         initial_state = rules.create_initial_state()
 
         assert state.board == {}
@@ -846,7 +884,9 @@ class TestFromBoard:
         expected_ply: int,
     ) -> None:
         """Test that the derived ply is the lowest one consistent with the board."""
-        state = rules.from_board(build_board(placements), current_player)
+        state = rules.from_board(
+            board=build_board(placements), current_player=current_player
+        )
 
         assert state.current_ply == expected_ply
 
@@ -861,19 +901,21 @@ class TestFromBoard:
             ]
         )
 
-        assert rules.from_board(board, Player.BLACK).current_ply == 5
-        assert rules.from_board(board, Player.WHITE).current_ply == 6
+        assert rules.from_board(board=board, current_player=Player.BLACK).current_ply == 5
+        assert rules.from_board(board=board, current_player=Player.WHITE).current_ply == 6
 
     def test_derives_ply_for_black_starting_player(self) -> None:
         """Test that the derived ply follows a starting player other than white."""
         rules = Rules(starting_player=Player.BLACK)
         board = build_board([(Player.BLACK, PieceType.QUEEN, (0, 0))])
 
-        assert rules.from_board(board, Player.WHITE).current_ply == 1
+        assert rules.from_board(board=board, current_player=Player.WHITE).current_ply == 1
 
     def test_explicit_ply(self, rules: Rules, placements: list[Placement]) -> None:
         """Test that a valid explicit ply is kept."""
-        state = rules.from_board(build_board(placements), Player.WHITE, current_ply=10)
+        state = rules.from_board(
+            board=build_board(placements), current_player=Player.WHITE, current_ply=10
+        )
 
         assert state.current_ply == 10
 
@@ -884,7 +926,7 @@ class TestFromBoard:
         board = build_board(placements)
         expected = build_board(placements)
 
-        state = rules.from_board(board, Player.WHITE)
+        state = rules.from_board(board=board, current_player=Player.WHITE)
         state.apply_move(
             Move(piece_type=PieceType.BEETLE, source_coord=(1, 0), target_coord=(1, -1))
         )
@@ -893,10 +935,12 @@ class TestFromBoard:
 
     def test_playable(self, rules: Rules, placements: list[Placement]) -> None:
         """Test that the state supports `legal_moves` and `apply_checked_move`."""
-        state = rules.from_board(build_board(placements), Player.WHITE)
+        state = rules.from_board(
+            board=build_board(placements), current_player=Player.WHITE
+        )
         move = rules.legal_moves(state)[0]
 
-        rules.apply_checked_move(state, move)
+        rules.apply_checked_move(state=state, move=move)
 
         assert state.current_player is Player.BLACK
 
@@ -906,7 +950,7 @@ class TestFromBoard:
         board[(1, 0)] = []
 
         with pytest.raises(InvalidBoardError, match=r"stack at coordinate `\(1, 0\)`"):
-            rules.from_board(board, Player.BLACK)
+            rules.from_board(board=board, current_player=Player.BLACK)
 
     def test_too_many_pieces(self, rules: Rules) -> None:
         """Test that more pieces of a type than `piece_counts` allows are rejected."""
@@ -916,7 +960,7 @@ class TestFromBoard:
             InvalidBoardError,
             match="`BLACK` has `3` pieces of type `SPIDER`.*at most `2`",
         ):
-            rules.from_board(board, Player.WHITE, current_ply=6)
+            rules.from_board(board=board, current_player=Player.WHITE, current_ply=6)
 
     def test_two_queens(self, rules: Rules) -> None:
         """Test that a second queen for the same player is rejected."""
@@ -930,7 +974,7 @@ class TestFromBoard:
         with pytest.raises(
             InvalidBoardError, match="`WHITE` has `2` pieces of type `QUEEN`"
         ):
-            rules.from_board(board, Player.WHITE, current_ply=4)
+            rules.from_board(board=board, current_player=Player.WHITE, current_ply=4)
 
     def test_piece_type_not_in_piece_counts(self) -> None:
         """Test that a piece type with no copies in `piece_counts` is rejected."""
@@ -940,7 +984,7 @@ class TestFromBoard:
         with pytest.raises(
             InvalidBoardError, match="`1` pieces of type `BEETLE`.*at most `0`"
         ):
-            rules.from_board(board, Player.BLACK)
+            rules.from_board(board=board, current_player=Player.BLACK)
 
     def test_disconnected(self, rules: Rules) -> None:
         """Test that a board split into two groups is rejected."""
@@ -952,12 +996,12 @@ class TestFromBoard:
         )
 
         with pytest.raises(InvalidBoardError, match="connected hive"):
-            rules.from_board(board, Player.WHITE)
+            rules.from_board(board=board, current_player=Player.WHITE)
 
     def test_negative_ply(self, rules: Rules) -> None:
         """Test that a negative ply is rejected."""
         with pytest.raises(InvalidBoardError, match="must not be negative"):
-            rules.from_board({}, Player.WHITE, current_ply=-2)
+            rules.from_board(board={}, current_player=Player.WHITE, current_ply=-2)
 
     @pytest.mark.parametrize(
         ("current_player", "current_ply"), [(Player.WHITE, 5), (Player.BLACK, 4)]
@@ -971,7 +1015,11 @@ class TestFromBoard:
     ) -> None:
         """Test that a ply at which the other player would be to move is rejected."""
         with pytest.raises(InvalidBoardError, match="cannot be to move at ply"):
-            rules.from_board(build_board(placements), current_player, current_ply)
+            rules.from_board(
+                board=build_board(placements),
+                current_player=current_player,
+                current_ply=current_ply,
+            )
 
     def test_more_pieces_than_turns(
         self, rules: Rules, placements: list[Placement]
@@ -980,7 +1028,9 @@ class TestFromBoard:
         with pytest.raises(
             InvalidBoardError, match="`WHITE` has `2` pieces.*only taken `1` turns"
         ):
-            rules.from_board(build_board(placements), Player.WHITE, current_ply=2)
+            rules.from_board(
+                board=build_board(placements), current_player=Player.WHITE, current_ply=2
+            )
 
 
 class TestApplyCheckedMove:
@@ -991,7 +1041,7 @@ class TestApplyCheckedMove:
         state = rules.create_initial_state()
         move = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
 
-        rules.apply_checked_move(state, move)
+        rules.apply_checked_move(state=state, move=move)
 
         assert state.board == {(0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)]}
         assert state.current_player is Player.BLACK
@@ -1000,7 +1050,7 @@ class TestApplyCheckedMove:
     def test_applies_pass(self, rules: Rules) -> None:
         """Test that a pass is applied when it is the only legal move."""
         state = rules.from_board(
-            build_board(
+            board=build_board(
                 [
                     (Player.WHITE, PieceType.QUEEN, (0, 0)),
                     (Player.BLACK, PieceType.QUEEN, (1, 0)),
@@ -1008,10 +1058,10 @@ class TestApplyCheckedMove:
                     (Player.BLACK, PieceType.BEETLE, (-1, 0)),
                 ]
             ),
-            Player.WHITE,
+            current_player=Player.WHITE,
         )
 
-        rules.apply_checked_move(state, None)
+        rules.apply_checked_move(state=state, move=None)
 
         assert state.current_player is Player.BLACK
 
@@ -1034,7 +1084,7 @@ class TestApplyCheckedMove:
         state = rules.create_initial_state()
 
         with pytest.raises(IllegalMoveError, match="not legal for player `WHITE`"):
-            rules.apply_checked_move(state, move)
+            rules.apply_checked_move(state=state, move=move)
 
         assert state.board == {}
         assert state.current_ply == 0
@@ -1046,20 +1096,20 @@ class TestApplyCheckedMove:
         move = Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
 
         with pytest.raises(IllegalMoveError):
-            rules.apply_checked_move(state, move)
+            rules.apply_checked_move(state=state, move=move)
 
     def test_rejects_move_of_opponent_piece(self, rules: Rules) -> None:
         """Test that moving an opponent's piece is rejected."""
         state = rules.from_board(
-            build_board(
+            board=build_board(
                 [
                     (Player.WHITE, PieceType.QUEEN, (0, 0)),
                     (Player.BLACK, PieceType.QUEEN, (1, 0)),
                 ]
             ),
-            Player.WHITE,
+            current_player=Player.WHITE,
         )
         move = Move(piece_type=PieceType.QUEEN, source_coord=(1, 0), target_coord=(1, -1))
 
         with pytest.raises(IllegalMoveError):
-            rules.apply_checked_move(state, move)
+            rules.apply_checked_move(state=state, move=move)

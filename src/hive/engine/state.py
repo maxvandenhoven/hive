@@ -437,7 +437,7 @@ class GameState:
         # The two coordinates flanking the source and target coordinates should not both
         # be occupied.
         anti_clockwise_coord, clockwise_coord = get_flanking_coords(
-            source_coord, target_coord
+            source_coord=source_coord, target_coord=target_coord
         )
 
         return not (

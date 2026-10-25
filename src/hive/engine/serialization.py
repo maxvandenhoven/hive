@@ -58,7 +58,11 @@ class BoardSetup:
         Raises:
             InvalidBoardError: If the board is not valid under `rules`.
         """
-        return rules.from_board(self.board, self.current_player, self.current_ply)
+        return rules.from_board(
+            board=self.board,
+            current_player=self.current_player,
+            current_ply=self.current_ply,
+        )
 
 
 @dataclass(slots=True)
@@ -103,7 +107,7 @@ class GameRecord:
         state = self.initial_state()
 
         for move in self.moves:
-            self.rules.apply_checked_move(state, move)
+            self.rules.apply_checked_move(state=state, move=move)
 
         return state
 
@@ -123,7 +127,7 @@ class GameRecord:
         yield state.copy()
 
         for move in self.moves:
-            self.rules.apply_checked_move(state, move)
+            self.rules.apply_checked_move(state=state, move=move)
             yield state.copy()
 
 
@@ -151,7 +155,7 @@ def deserialize_player(data: object) -> Player:
     Raises:
         ValueError: If `data` is not the name of a player.
     """
-    return deserialize_enum(data, Player, "player")
+    return deserialize_enum(data=data, enum=Player, kind="player")
 
 
 def serialize_piece_type(piece_type: PieceType) -> str:
@@ -178,7 +182,7 @@ def deserialize_piece_type(data: object) -> PieceType:
     Raises:
         ValueError: If `data` is not the name of a piece type.
     """
-    return deserialize_enum(data, PieceType, "piece type")
+    return deserialize_enum(data=data, enum=PieceType, kind="piece type")
 
 
 def serialize_coordinate(coord: Coordinate) -> list[JsonValue]:
@@ -253,7 +257,7 @@ def deserialize_move(data: object) -> Move | None:
     if data is None:
         return None
 
-    fields = expect_object(data, "move", required={"piece", "from", "to"})
+    fields = expect_object(data=data, kind="move", required={"piece", "from", "to"})
     source = fields["from"]
 
     return Move(
@@ -299,20 +303,22 @@ def deserialize_rules(data: object) -> Rules:
             type, or describes an invalid configuration.
     """
     defaults = serialize_rules(Rules())
-    fields = defaults | expect_object(data, "rules", optional=defaults.keys())
+    fields = defaults | expect_object(data=data, kind="rules", optional=defaults.keys())
 
     try:
         return Rules(
             piece_counts=deserialize_piece_counts(fields["piece_counts"]),
             starting_player=deserialize_player(fields["starting_player"]),
-            queen_by_turn=expect_optional_int(fields["queen_by_turn"], "queen_by_turn"),
+            queen_by_turn=expect_optional_int(
+                value=fields["queen_by_turn"], name="queen_by_turn"
+            ),
             allow_queen_first_turn=expect_bool(
-                fields["allow_queen_first_turn"], "allow_queen_first_turn"
+                value=fields["allow_queen_first_turn"], name="allow_queen_first_turn"
             ),
             move_before_queen=expect_bool(
-                fields["move_before_queen"], "move_before_queen"
+                value=fields["move_before_queen"], name="move_before_queen"
             ),
-            max_turns=expect_optional_int(fields["max_turns"], "max_turns"),
+            max_turns=expect_optional_int(value=fields["max_turns"], name="max_turns"),
         )
     except ValueError as e:
         msg = f"Invalid rules: {e}"
@@ -360,7 +366,7 @@ def deserialize_board(data: object) -> GameBoard:
     board: GameBoard = {}
 
     for entry in data:
-        fields = expect_object(entry, "stack", required={"coord", "stack"})
+        fields = expect_object(data=entry, kind="stack", required={"coord", "stack"})
         coord = deserialize_coordinate(fields["coord"])
 
         if coord in board:
@@ -413,13 +419,18 @@ def deserialize_setup(data: object) -> BoardSetup | None:
         return None
 
     fields = expect_object(
-        data, "setup", required={"board", "current_player"}, optional={"current_ply"}
+        data=data,
+        kind="setup",
+        required={"board", "current_player"},
+        optional={"current_ply"},
     )
 
     return BoardSetup(
         board=deserialize_board(fields["board"]),
         current_player=deserialize_player(fields["current_player"]),
-        current_ply=expect_optional_int(fields.get("current_ply"), "current_ply"),
+        current_ply=expect_optional_int(
+            value=fields.get("current_ply"), name="current_ply"
+        ),
     )
 
 
@@ -453,7 +464,9 @@ def deserialize_record(data: object) -> GameRecord:
     Raises:
         ValueError: If `data` is not a valid game record object.
     """
-    fields = expect_object(data, "game record", required={"rules", "setup", "moves"})
+    fields = expect_object(
+        data=data, kind="game record", required={"rules", "setup", "moves"}
+    )
     moves = fields["moves"]
 
     if not isinstance(moves, list):
@@ -503,7 +516,7 @@ def deserialize_piece(data: object) -> Piece:
     Raises:
         ValueError: If `data` is not a valid piece object.
     """
-    fields = expect_object(data, "piece", required={"piece", "owner"})
+    fields = expect_object(data=data, kind="piece", required={"piece", "owner"})
     return Piece(
         type=deserialize_piece_type(fields["piece"]),
         owner=deserialize_player(fields["owner"]),

@@ -178,10 +178,10 @@ class TestFormat:
 
     def test_board_is_ordered_by_coordinate(self) -> None:
         board: GameBoard = {
-            (1, 0): [Piece(PieceType.ANT, Player.BLACK)],
+            (1, 0): [Piece(type=PieceType.ANT, owner=Player.BLACK)],
             (0, 0): [
-                Piece(PieceType.QUEEN, Player.WHITE),
-                Piece(PieceType.BEETLE, Player.BLACK),
+                Piece(type=PieceType.QUEEN, owner=Player.WHITE),
+                Piece(type=PieceType.BEETLE, owner=Player.BLACK),
             ],
         }
 
@@ -332,7 +332,7 @@ class TestGameRecord:
     @pytest.mark.parametrize("seed", range(5))
     def test_replay_matches_fast_path(self, seed: int) -> None:
         rules = Rules()
-        moves = random_game(rules, plies=60, seed=seed)
+        moves = random_game(rules=rules, plies=60, seed=seed)
         state = rules.create_initial_state()
 
         for move in moves:
@@ -346,7 +346,7 @@ class TestGameRecord:
 
     def test_states(self) -> None:
         rules = Rules()
-        moves = random_game(rules, plies=20, seed=0)
+        moves = random_game(rules=rules, plies=20, seed=0)
         record = GameRecord(rules=rules, moves=moves)
 
         states = list(record.states())
@@ -357,7 +357,7 @@ class TestGameRecord:
 
     def test_states_are_independent(self) -> None:
         rules = Rules()
-        record = GameRecord(rules=rules, moves=random_game(rules, plies=4, seed=0))
+        record = GameRecord(rules=rules, moves=random_game(rules=rules, plies=4, seed=0))
 
         states = list(record.states())
         states[0].apply_move(rules.legal_moves(states[0])[0])
@@ -383,8 +383,8 @@ class TestGameRecord:
     def test_replay_from_setup(self) -> None:
         rules = Rules()
         board: GameBoard = {
-            (0, 0): [Piece(PieceType.QUEEN, Player.WHITE)],
-            (1, 0): [Piece(PieceType.QUEEN, Player.BLACK)],
+            (0, 0): [Piece(type=PieceType.QUEEN, owner=Player.WHITE)],
+            (1, 0): [Piece(type=PieceType.QUEEN, owner=Player.BLACK)],
         }
         setup = BoardSetup(board=board, current_player=Player.WHITE)
         move = Move(piece_type=PieceType.QUEEN, source_coord=(0, 0), target_coord=(1, -1))
@@ -396,8 +396,8 @@ class TestGameRecord:
 
     def test_rejects_invalid_setup(self) -> None:
         board: GameBoard = {
-            (0, 0): [Piece(PieceType.ANT, Player.WHITE)],
-            (2, 0): [Piece(PieceType.ANT, Player.BLACK)],
+            (0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)],
+            (2, 0): [Piece(type=PieceType.ANT, owner=Player.BLACK)],
         }
         setup = BoardSetup(board=board, current_player=Player.WHITE)
 
@@ -405,11 +405,13 @@ class TestGameRecord:
             GameRecord(rules=Rules(), setup=setup).replay()
 
     def test_setup_board_is_copied(self) -> None:
-        board: GameBoard = {(0, 0): [Piece(PieceType.ANT, Player.WHITE)]}
+        board: GameBoard = {(0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)]}
         record = GameRecord(
             rules=Rules(), setup=BoardSetup(board=board, current_player=Player.BLACK)
         )
 
-        record.replay().board[(0, 0)].append(Piece(PieceType.BEETLE, Player.BLACK))
+        record.replay().board[(0, 0)].append(
+            Piece(type=PieceType.BEETLE, owner=Player.BLACK)
+        )
 
-        assert board == {(0, 0): [Piece(PieceType.ANT, Player.WHITE)]}
+        assert board == {(0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)]}

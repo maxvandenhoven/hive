@@ -39,8 +39,8 @@ class Profile:
     max_plies: int
 
 
-FAST = Profile(settings(max_examples=100, deadline=None), max_plies=100)
-SLOW = Profile(settings(max_examples=500, deadline=None), max_plies=300)
+FAST = Profile(settings=settings(max_examples=100, deadline=None), max_plies=100)
+SLOW = Profile(settings=settings(max_examples=500, deadline=None), max_plies=300)
 PROFILES = [
     pytest.param(FAST, id="fast"),
     pytest.param(SLOW, id="slow", marks=pytest.mark.slow),
@@ -125,14 +125,14 @@ def test_undo_restores_state(profile: Profile) -> None:
     def check(game: Game) -> None:
         rules, moves = game
         state = rules.create_initial_state()
-        assert_invariants(state, rules)
+        assert_invariants(state=state, rules=rules)
 
         snapshots = [snapshot(state)]
 
         for move in moves:
             before = snapshot(state)
             state.apply_move(move)
-            assert_invariants(state, rules)
+            assert_invariants(state=state, rules=rules)
 
             state.undo_move(move)
             assert snapshot(state) == before
@@ -146,7 +146,7 @@ def test_undo_restores_state(profile: Profile) -> None:
             state.undo_move(move)
             assert snapshot(state) == snapshots[-1]
 
-    run_profile(profile, check)
+    run_profile(profile=profile, check=check)
 
 
 @pytest.mark.parametrize("profile", PROFILES)
@@ -163,11 +163,11 @@ def test_replay_reproduces_state(profile: Profile) -> None:
         replayed_state = rules.create_initial_state()
 
         for move in moves:
-            rules.apply_checked_move(replayed_state, move)
+            rules.apply_checked_move(state=replayed_state, move=move)
 
         assert snapshot(replayed_state) == snapshot(fast_state)
 
-    run_profile(profile, check)
+    run_profile(profile=profile, check=check)
 
 
 @pytest.mark.parametrize("profile", PROFILES)
@@ -182,13 +182,17 @@ def test_from_board_reproduces_state(profile: Profile) -> None:
             state.apply_move(move)
 
             rebuilt = rules.from_board(
-                state.board, state.current_player, state.current_ply
+                board=state.board,
+                current_player=state.current_player,
+                current_ply=state.current_ply,
             )
             assert snapshot(rebuilt) == snapshot(state)
 
             # The derived ply is the lowest valid one, so it never exceeds the real ply.
-            derived = rules.from_board(state.board, state.current_player)
+            derived = rules.from_board(
+                board=state.board, current_player=state.current_player
+            )
             assert derived.current_ply <= state.current_ply
-            assert_invariants(derived, rules)
+            assert_invariants(state=derived, rules=rules)
 
-    run_profile(profile, check)
+    run_profile(profile=profile, check=check)

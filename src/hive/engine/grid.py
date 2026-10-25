@@ -77,7 +77,7 @@ def get_neighbors(coord: Coordinate) -> list[Coordinate]:
     Returns:
         The six axial coordinates `(q', r')` that directly neighbor `(q, r)`.
     """
-    return [add(coord, direction) for direction in HEX_DIRECTIONS]
+    return [add(coord=coord, direction=direction) for direction in HEX_DIRECTIONS]
 
 
 def get_anti_clockwise_direction(direction: Direction) -> Direction:
@@ -133,8 +133,8 @@ def get_flanking_coords(
     Returns:
         The anti-clockwise and the clockwise flanking coordinate, seen from the source.
     """
-    direction = get_direction(source_coord, target_coord)
+    direction = get_direction(source_coord=source_coord, target_coord=target_coord)
     return (
-        add(source_coord, get_anti_clockwise_direction(direction)),
-        add(source_coord, get_clockwise_direction(direction)),
+        add(coord=source_coord, direction=get_anti_clockwise_direction(direction)),
+        add(coord=source_coord, direction=get_clockwise_direction(direction)),
     )
