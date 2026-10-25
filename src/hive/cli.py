@@ -1,5 +1,7 @@
 """Command line interface for the `hive` package."""
 
+import json
+import logging
 import time
 from pathlib import Path
 from typing import Annotated
@@ -7,8 +9,15 @@ from typing import Annotated
 import typer
 
 from hive import __version__, bench
+from hive.agents.factory import AgentSpec, InvalidAgentSpecError
 from hive.bench import PerftSuite
+from hive.engine.rules import Rules
 from hive.engine.state import Move
+from hive.match.records import DecisionRecord, MatchResult, Outcome
+from hive.match.runner import MatchRunner
+from hive.match.worker import DEFAULT_GRACE_S, WorkerError
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(name="hive", no_args_is_help=True)
 
@@ -40,6 +49,128 @@ def main(
     ] = False,
 ) -> None:
     """Hive engine, agents and tools."""
+
+
+@app.command("play")
+def play(
+    white: Annotated[
+        str,
+        typer.Option(
+            help="The white agent: a YAML spec file, or inline YAML such as `random` or "
+            "`{kind: negamax, params: {depth: 2}}`."
+        ),
+    ],
+    black: Annotated[
+        str, typer.Option(help="The black agent, in the same form as `--white`.")
+    ],
+    budget: Annotated[
+        float, typer.Option(min=0.0, help="The time budget of every decision in seconds.")
+    ] = 1.0,
+    max_turns: Annotated[
+        int | None,
+        typer.Option(
+            min=1, help="The number of turns per player before the match stops."
+        ),
+    ] = 100,
+    seed: Annotated[int, typer.Option(help="The match seed.")] = 0,
+    grace: Annotated[
+        float,
+        typer.Option(
+            min=0.0, help="The seconds an agent may take to return after it is stopped."
+        ),
+    ] = DEFAULT_GRACE_S,
+    out: Annotated[
+        Path | None, typer.Option(help="Write the match result as JSON to this file.")
+    ] = None,
+) -> None:
+    """Play one timed match between two agents and log every decision and the result."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    runner = MatchRunner(
+        rules=Rules(),
+        white_spec=_parse_spec(white, "--white"),
+        black_spec=_parse_spec(black, "--black"),
+        budget_s=budget,
+        max_turns=max_turns,
+        seed=seed,
+        grace_s=grace,
+    )
+    try:
+        result = runner.run(on_decision=_log_decision)
+    except WorkerError as e:
+        logger.error("%s", e)
+        raise typer.Exit(code=1) from e
+
+    logger.info("%s", _describe_result(result))
+    if out is not None:
+        out.write_text(json.dumps(result.to_dict(), indent=2))
+        logger.info("Wrote the match result to `%s`.", out)
+
+
+def _parse_spec(value: str, option: str) -> AgentSpec:
+    """Read an agent spec from a YAML file, or from inline YAML if no such file exists.
+
+    Args:
+        value: The path of a YAML spec file, or inline YAML.
+        option: The name of the command line option, for error messages.
+
+    Returns:
+        The validated spec.
+
+    Raises:
+        typer.BadParameter: If the spec is invalid.
+    """
+    try:
+        path = Path(value)
+        if path.is_file():
+            return AgentSpec.load(path)
+        return AgentSpec.from_yaml(value)
+    except InvalidAgentSpecError as e:
+        raise typer.BadParameter(str(e), param_hint=option) from e
+
+
+def _log_decision(decision: DecisionRecord) -> None:
+    """Log a one line summary of a decision.
+
+    Args:
+        decision: The decision to summarise.
+    """
+    details = [decision.close_reason.value, f"{decision.elapsed_s:.2f} s"]
+    info = decision.last_info or {}
+    details += [
+        f"{key} {info[key]}" for key in ("depth", "nodes", "score") if key in info
+    ]
+    if decision.illegal_submissions:
+        details.append(f"{decision.illegal_submissions} illegal")
+    if decision.worker_restarted:
+        details.append("worker restarted")
+    if decision.failure is not None:
+        details.append(f"failure: {decision.failure}")
+    logger.info(
+        "%3d %-5s %s: %s (%s)",
+        decision.ply,
+        decision.player.name.lower(),
+        decision.agent_label,
+        _format_move(decision.move),
+        ", ".join(details),
+    )
+
+
+def _describe_result(result: MatchResult) -> str:
+    """Describe how a match ended, for example `white (negamax) wins after 27 plies`.
+
+    Args:
+        result: The played match.
+
+    Returns:
+        The outcome, the number of plies and the duration of the match.
+    """
+    plies = f"after {len(result.decisions)} plies in {result.duration_s:.1f} s"
+    if result.outcome is Outcome.WIN and result.winner is not None:
+        spec = result.spec(result.winner)
+        return f"{result.winner.name.lower()} ({spec.label or spec.kind}) wins {plies}"
+    if result.outcome is Outcome.DRAW:
+        return f"Draw {plies}"
+    return f"Stopped at the turn cap {plies}"
 
 
 bench_app = typer.Typer(no_args_is_help=True, help="Benchmarks and correctness checks.")
