@@ -1,7 +1,12 @@
-"""Object storage for photos, datasets and models, with an S3 and an in-memory store."""
+"""Object storage for photos, datasets and models in an S3 bucket.
 
-from typing import Any, Protocol
+boto3 blocks, so every request runs in a worker thread and never stalls the event loop.
+"""
 
+from functools import partial
+from typing import Any
+
+import anyio.to_thread
 import boto3
 from botocore.config import Config
 
@@ -24,116 +29,11 @@ class ObjectNotFoundError(KeyError):
     """Raised when an object key does not exist in the store."""
 
 
-class ObjectStore(Protocol):
-    """A flat key-value store of binary objects, such as an S3 bucket."""
-
-    def put(self, key: str, data: bytes, content_type: str) -> None:
-        """Store an object, replacing any object with the same key.
-
-        Args:
-            key: The object key, for example `photos/<game_id>/<photo_id>.jpg`.
-            data: The object contents.
-            content_type: The media type of the contents, for example `image/jpeg`.
-        """
-        ...
-
-    def get(self, key: str) -> bytes:
-        """Read an object.
-
-        Args:
-            key: The object key.
-
-        Returns:
-            The object contents.
-
-        Raises:
-            ObjectNotFoundError: If there is no object with the key.
-        """
-        ...
-
-    def delete_prefix(self, prefix: str) -> int:
-        """Delete every object whose key starts with a prefix.
-
-        Args:
-            prefix: The key prefix, for example `photos/<game_id>/`.
-
-        Returns:
-            The number of deleted objects.
-        """
-        ...
-
-    def check(self) -> None:
-        """Check that the store is reachable, for readiness probes.
-
-        Raises:
-            Exception: If the store cannot be reached.
-        """
-        ...
-
-
-class InMemoryObjectStore:
-    """An object store in a dictionary, for tests.
+class ObjectStore:
+    """A flat key-value store of binary objects in an S3 bucket, for example on Garage.
 
     Attributes:
-        objects: The stored contents and media type by key.
-    """
-
-    def __init__(self) -> None:
-        """Create an empty store."""
-        self.objects: dict[str, tuple[bytes, str]] = {}
-
-    def put(self, key: str, data: bytes, content_type: str) -> None:
-        """Store an object, replacing any object with the same key.
-
-        Args:
-            key: The object key.
-            data: The object contents.
-            content_type: The media type of the contents.
-        """
-        self.objects[key] = (data, content_type)
-
-    def get(self, key: str) -> bytes:
-        """Read an object.
-
-        Args:
-            key: The object key.
-
-        Returns:
-            The object contents.
-
-        Raises:
-            ObjectNotFoundError: If there is no object with the key.
-        """
-        if key not in self.objects:
-            raise ObjectNotFoundError(key)
-
-        return self.objects[key][0]
-
-    def delete_prefix(self, prefix: str) -> int:
-        """Delete every object whose key starts with a prefix.
-
-        Args:
-            prefix: The key prefix.
-
-        Returns:
-            The number of deleted objects.
-        """
-        keys = [key for key in self.objects if key.startswith(prefix)]
-
-        for key in keys:
-            del self.objects[key]
-
-        return len(keys)
-
-    def check(self) -> None:
-        """Do nothing, since an in-memory store is always reachable."""
-
-
-class S3ObjectStore:
-    """An object store in one bucket of an S3 compatible service such as Garage.
-
-    Attributes:
-        client: The boto3 S3 client.
+        client: The boto3 S3 client, which is thread-safe.
         bucket: The bucket name.
     """
 
@@ -148,7 +48,7 @@ class S3ObjectStore:
         self.bucket = bucket
 
     @classmethod
-    def from_settings(cls, settings: ApiSettings) -> "S3ObjectStore":
+    def from_settings(cls, settings: ApiSettings) -> "ObjectStore":
         """Create a store from the S3 settings of the service.
 
         Args:
@@ -168,20 +68,40 @@ class S3ObjectStore:
 
         return cls(client=client, bucket=settings.s3_bucket)
 
-    def put(self, key: str, data: bytes, content_type: str) -> None:
+    async def put(self, key: str, data: bytes, content_type: str) -> None:
         """Store an object, replacing any object with the same key.
 
         Args:
-            key: The object key.
+            key: The object key, for example `photos/<game_id>/<photo_id>.jpg`.
             data: The object contents.
-            content_type: The media type of the contents.
+            content_type: The media type of the contents, for example `image/jpeg`.
         """
-        self.client.put_object(
-            Bucket=self.bucket, Key=key, Body=data, ContentType=content_type
+        await anyio.to_thread.run_sync(
+            partial(
+                self.client.put_object,
+                Bucket=self.bucket,
+                Key=key,
+                Body=data,
+                ContentType=content_type,
+            )
         )
 
-    def get(self, key: str) -> bytes:
+    async def get(self, key: str) -> bytes:
         """Read an object.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The object contents.
+
+        Raises:
+            ObjectNotFoundError: If there is no object with the key.
+        """
+        return await anyio.to_thread.run_sync(self.get_blocking, key)
+
+    def get_blocking(self, key: str) -> bytes:
+        """Read an object in the calling thread.
 
         Args:
             key: The object key.
@@ -199,8 +119,19 @@ class S3ObjectStore:
 
         return response["Body"].read()
 
-    def delete_prefix(self, prefix: str) -> int:
+    async def delete_prefix(self, prefix: str) -> int:
         """Delete every object whose key starts with a prefix.
+
+        Args:
+            prefix: The key prefix, for example `photos/<game_id>/`.
+
+        Returns:
+            The number of deleted objects.
+        """
+        return await anyio.to_thread.run_sync(self.delete_prefix_blocking, prefix)
+
+    def delete_prefix_blocking(self, prefix: str) -> int:
+        """Delete every object whose key starts with a prefix, in the calling thread.
 
         Args:
             prefix: The key prefix.
@@ -208,12 +139,7 @@ class S3ObjectStore:
         Returns:
             The number of deleted objects.
         """
-        paginator = self.client.get_paginator("list_objects_v2")
-        keys = [
-            item["Key"]
-            for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix)
-            for item in page.get("Contents", [])
-        ]
+        keys = self.list_keys_blocking(prefix)
 
         for start in range(0, len(keys), S3_DELETE_BATCH_SIZE):
             batch = keys[start : start + S3_DELETE_BATCH_SIZE]
@@ -224,11 +150,41 @@ class S3ObjectStore:
 
         return len(keys)
 
-    def check(self) -> None:
-        """Check that the bucket exists and the keys may access it.
+    async def list_keys(self, prefix: str = "") -> list[str]:
+        """List the keys of the objects whose key starts with a prefix.
+
+        Args:
+            prefix: The key prefix, or `""` for every object.
+
+        Returns:
+            The keys in lexicographic order.
+        """
+        return await anyio.to_thread.run_sync(self.list_keys_blocking, prefix)
+
+    def list_keys_blocking(self, prefix: str = "") -> list[str]:
+        """List the keys of the objects under a prefix, in the calling thread.
+
+        Args:
+            prefix: The key prefix, or `""` for every object.
+
+        Returns:
+            The keys in lexicographic order.
+        """
+        paginator = self.client.get_paginator("list_objects_v2")
+
+        return [
+            item["Key"]
+            for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix)
+            for item in page.get("Contents", [])
+        ]
+
+    async def check(self) -> None:
+        """Check that the bucket exists and the keys may access it, for readiness probes.
 
         Raises:
             botocore.exceptions.ClientError: If the bucket is missing or not accessible.
             botocore.exceptions.EndpointConnectionError: If the endpoint is unreachable.
         """
-        self.client.head_bucket(Bucket=self.bucket)
+        await anyio.to_thread.run_sync(
+            partial(self.client.head_bucket, Bucket=self.bucket)
+        )

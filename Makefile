@@ -36,8 +36,12 @@ perft:
 	@uv run hive bench perft --depth 6
 
 
+.env:
+	@cp .env.example .env
+
+
 .PHONY: dev-services
-dev-services:
+dev-services: .env
 	@docker compose -f deploy/compose.yaml up -d --wait
 	@uv run hive db upgrade
 

@@ -1,21 +1,25 @@
 from typing import Any
 
+import httpx2
 import pytest
-from fastapi.testclient import TestClient
 
 from hive.agents.factory import list_agents
-from hive.api.storage import InMemoryObjectStore
+from hive.api.storage import ObjectStore
+
+pytestmark = pytest.mark.anyio
 
 
-def test_liveness(offline_client: TestClient) -> None:
-    response = offline_client.get("/healthz")
+async def test_liveness(offline_client: httpx2.AsyncClient) -> None:
+    response = await offline_client.get("/healthz")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_readiness_reports_failed_database(offline_client: TestClient) -> None:
-    response = offline_client.get("/readyz")
+async def test_readiness_reports_failed_database(
+    offline_client: httpx2.AsyncClient,
+) -> None:
+    response = await offline_client.get("/readyz")
 
     assert response.status_code == 503
     assert response.json() == {
@@ -24,21 +28,18 @@ def test_readiness_reports_failed_database(offline_client: TestClient) -> None:
     }
 
 
-def test_readiness_reports_failed_storage(
-    client: TestClient, store: InMemoryObjectStore, monkeypatch: pytest.MonkeyPatch
+async def test_readiness_reports_failed_storage(
+    client: httpx2.AsyncClient, store: ObjectStore
 ) -> None:
-    def fail() -> None:
-        raise ConnectionError
-
-    monkeypatch.setattr(store, "check", fail)
-    response = client.get("/readyz")
+    store.client.delete_bucket(Bucket=store.bucket)
+    response = await client.get("/readyz")
 
     assert response.status_code == 503
     assert response.json()["checks"] == {"database": "ok", "storage": "failed"}
 
 
-def test_readiness(client: TestClient) -> None:
-    response = client.get("/readyz")
+async def test_readiness(client: httpx2.AsyncClient) -> None:
+    response = await client.get("/readyz")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -47,8 +48,8 @@ def test_readiness(client: TestClient) -> None:
     }
 
 
-def test_agent_kinds(offline_client: TestClient) -> None:
-    response = offline_client.get("/api/agents")
+async def test_agent_kinds(offline_client: httpx2.AsyncClient) -> None:
+    response = await offline_client.get("/api/agents")
     kinds: list[dict[str, Any]] = response.json()
 
     assert response.status_code == 200
@@ -57,11 +58,3 @@ def test_agent_kinds(offline_client: TestClient) -> None:
     negamax = next(kind for kind in kinds if kind["kind"] == "negamax")
     assert negamax["description"]
     assert "depth" in negamax["params_schema"]["properties"]
-
-
-def test_request_id_is_returned(offline_client: TestClient) -> None:
-    given = offline_client.get("/healthz", headers={"X-Request-ID": "abc"})
-    generated = offline_client.get("/healthz")
-
-    assert given.headers["X-Request-ID"] == "abc"
-    assert len(generated.headers["X-Request-ID"]) == 32

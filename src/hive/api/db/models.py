@@ -1,6 +1,8 @@
 """ORM models of the database tables: games, their moves and their photos.
 
 Engine values are stored in their serialized JSON form (see `hive.engine.serialization`).
+Relationships are never loaded lazily, since that would do I/O on attribute access, which
+the asyncio extension does not allow; queries load them explicitly with `selectinload`.
 """
 
 import uuid
@@ -143,12 +145,14 @@ class GameRow(Base):
         order_by="MoveRow.ply",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        lazy="raise",
     )
     photos: Mapped[list["PhotoRow"]] = relationship(
         back_populates="game",
         order_by="PhotoRow.created_at",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        lazy="raise",
     )
 
     @property
@@ -210,7 +214,7 @@ class PhotoRow(Base):
         DateTime(timezone=True), default=utc_now, server_default=func.now()
     )
 
-    game: Mapped[GameRow] = relationship(back_populates="photos")
+    game: Mapped[GameRow] = relationship(back_populates="photos", lazy="raise")
 
 
 class MoveRow(Base):
@@ -243,4 +247,4 @@ class MoveRow(Base):
         DateTime(timezone=True), default=utc_now, server_default=func.now()
     )
 
-    game: Mapped[GameRow] = relationship(back_populates="moves")
+    game: Mapped[GameRow] = relationship(back_populates="moves", lazy="raise")

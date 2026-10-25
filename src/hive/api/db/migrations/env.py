@@ -12,6 +12,15 @@ from hive.api.db.models import Base
 from hive.api.settings import ApiSettings
 
 
+def command_line_database_url() -> str:
+    """Read the database URL for a migration run from the command line.
+
+    Returns:
+        The database URL from `HIVE_` environment variables or `.env`.
+    """
+    return ApiSettings().database_url
+
+
 def run_migrations(connection: Connection) -> None:
     """Run the migrations over a connection.
 
@@ -34,7 +43,7 @@ def run_migrations_online() -> None:
         run_migrations(connection)
         return
 
-    engine = create_engine(ApiSettings().database_url)
+    engine = create_engine(command_line_database_url())
 
     with engine.connect() as new_connection:
         run_migrations(new_connection)
@@ -43,7 +52,7 @@ def run_migrations_online() -> None:
 
 
 if context.is_offline_mode():
-    context.configure(url=ApiSettings().database_url, target_metadata=Base.metadata)
+    context.configure(url=command_line_database_url(), target_metadata=Base.metadata)
 
     with context.begin_transaction():
         context.run_migrations()

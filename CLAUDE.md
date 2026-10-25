@@ -37,7 +37,7 @@ make check          # format + lint + type (no tests)
 make test           # pytest with coverage, excluding `slow` tests
 make test-slow      # pytest -m slow
 make perft          # perft speed benchmark (start position, depth 6)
-make dev            # local Postgres + Garage (compose), migrate, `hive serve --reload`
+make dev            # .env from .env.example, Postgres + Garage, migrate, `hive serve --reload`
 make dev-services   # only the compose services and the migration
 make install-hooks  # install pre-commit hooks (including commit-msg)
 ```

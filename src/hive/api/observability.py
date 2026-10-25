@@ -1,78 +1,35 @@
-"""JSON logging and request IDs for the API service."""
+"""JSON logging, request IDs and access logs for the API service.
 
-import json
+Request IDs come from `asgi-correlation-id` and JSON lines from `python-json-logger`. Both
+middlewares here are plain ASGI rather than Starlette's `BaseHTTPMiddleware`, so streamed
+responses such as the agent thinking stream pass through unbuffered.
+"""
+
 import logging
 import time
-import uuid
-from collections.abc import Awaitable, Callable
-from contextvars import ContextVar
-from datetime import UTC, datetime
-from typing import Any, override
+from typing import Any
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
+from pythonjsonlogger.core import RESERVED_ATTRS
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "X-Request-ID"
 """The header that carries the request ID in requests and responses."""
 
-REQUEST_ID: ContextVar[str | None] = ContextVar("request_id", default=None)
-"""The ID of the request being handled, included in every log line written for it."""
-
-IGNORED_LOG_RECORD_ATTRIBUTES = frozenset(
-    vars(logging.LogRecord("", 0, "", 0, "", None, None)).keys()
-    | {"message", "asctime", "color_message"}
-)
-"""The attributes of every log record and the coloured message copy uvicorn adds, which
-are left out of log lines; the remaining attributes are the `extra` fields of a call."""
-
-
-class JsonLogFormatter(logging.Formatter):
-    """Format log records as one JSON object per line.
-
-    Every line has the `time`, `level`, `logger` and `message`, the request ID when the
-    record was written while handling a request, the fields passed in `extra`, and the
-    traceback in `exception` if there is one.
-    """
-
-    @override
-    def format(self, record: logging.LogRecord) -> str:
-        """Format a record as a JSON object.
-
-        Args:
-            record: The log record.
-
-        Returns:
-            The JSON object on one line.
-        """
-        entry: dict[str, Any] = {
-            "time": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-        }
-        request_id = REQUEST_ID.get()
-
-        if request_id is not None:
-            entry["request_id"] = request_id
-
-        for key, value in vars(record).items():
-            if key not in IGNORED_LOG_RECORD_ATTRIBUTES and not key.startswith("_"):
-                entry[key] = value
-
-        if record.exc_info:
-            entry["exception"] = self.formatException(record.exc_info)
-
-        return json.dumps(entry, default=str)
+LOG_RECORD_IGNORED_ATTRIBUTES = [*RESERVED_ATTRS, "color_message"]
+"""The record attributes left out of log lines: the standard ones, which the format
+names explicitly, and the coloured message copy uvicorn adds. The remaining attributes are
+the `extra` fields of a call."""
 
 
 def logging_config(level: str) -> dict[str, Any]:
     """Build the `logging.config.dictConfig` configuration of the service.
 
     Passed to uvicorn, which applies it in every server process, including the one it
-    starts for `--reload`.
+    starts for `--reload`. Every line is a JSON object with the `time`, `level`, `logger`,
+    `message` and `request_id` (`null` outside a request), the `extra` fields of the call,
+    and the traceback in `exception` if there is one.
 
     Args:
         level: The level of the root logger, for example `INFO`.
@@ -84,8 +41,28 @@ def logging_config(level: str) -> dict[str, Any]:
     return {
         "version": 1,
         "disable_existing_loggers": False,
-        "formatters": {"json": {"()": JsonLogFormatter}},
-        "handlers": {"stderr": {"class": "logging.StreamHandler", "formatter": "json"}},
+        "filters": {"request_id": {"()": "asgi_correlation_id.CorrelationIdFilter"}},
+        "formatters": {
+            "json": {
+                "()": "pythonjsonlogger.json.JsonFormatter",
+                "fmt": "%(levelname)s %(name)s %(message)s %(correlation_id)s",
+                "rename_fields": {
+                    "levelname": "level",
+                    "name": "logger",
+                    "correlation_id": "request_id",
+                    "exc_info": "exception",
+                },
+                "reserved_attrs": LOG_RECORD_IGNORED_ATTRIBUTES,
+                "timestamp": "time",
+            }
+        },
+        "handlers": {
+            "stderr": {
+                "class": "logging.StreamHandler",
+                "formatter": "json",
+                "filters": ["request_id"],
+            }
+        },
         "root": {"level": level, "handlers": ["stderr"]},
         "loggers": {
             **{
@@ -97,48 +74,66 @@ def logging_config(level: str) -> dict[str, Any]:
     }
 
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Give every request an ID and log one line per request with its latency.
+class AccessLogMiddleware:
+    """Log one line per request with its route, status and latency.
 
-    The ID is taken from the `X-Request-ID` header, or generated, and returned in the
-    same header of the response.
+    The line is written when the response is complete, so for a stream the latency is
+    the time until the stream ended.
+
+    Attributes:
+        app: The wrapped ASGI app.
     """
 
-    @override
-    async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        """Handle a request with its ID set, then log it.
+    def __init__(self, app: ASGIApp) -> None:
+        """Wrap an app.
 
         Args:
-            request: The incoming request.
-            call_next: Handles the request in the rest of the app.
-
-        Returns:
-            The response, with the `X-Request-ID` header set.
+            app: The ASGI app.
         """
-        request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex
-        token = REQUEST_ID.set(request_id)
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Handle a request, then log it.
+
+        Args:
+            scope: The connection scope.
+            receive: Receives messages from the client.
+            send: Sends messages to the client.
+        """
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         start = time.perf_counter()
+        status_code = 500
+
+        async def send_and_record_status(message: Message) -> None:
+            """Send a message, noting the status code of the response.
+
+            Args:
+                message: The ASGI message.
+            """
+            nonlocal status_code
+
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+
+            await send(message)
 
         try:
-            response = await call_next(request)
-            route = request.scope.get("route")
+            await self.app(scope, receive, send_and_record_status)
+        finally:
+            route = scope.get("route")
             logger.info(
                 "%s %s %d",
-                request.method,
-                request.url.path,
-                response.status_code,
+                scope["method"],
+                scope["path"],
+                status_code,
                 extra={
-                    "method": request.method,
-                    "path": request.url.path,
+                    "method": scope["method"],
+                    "path": scope["path"],
                     "route": getattr(route, "path", None),
-                    "status": response.status_code,
+                    "status": status_code,
                     "duration_ms": round((time.perf_counter() - start) * 1000, 2),
                 },
             )
-            response.headers[REQUEST_ID_HEADER] = request_id
-        finally:
-            REQUEST_ID.reset(token)
-
-        return response

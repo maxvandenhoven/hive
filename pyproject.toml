@@ -18,13 +18,15 @@ plotting = [
 ]
 api = [
     "alembic>=1.20.1",
+    "asgi-correlation-id>=5.0.1",
     "boto3>=1.43.118",
     "fastapi>=0.162.0",
     "prometheus-client>=0.26.0",
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.16.1",
+    "python-json-logger>=4.2.0",
     "python-multipart>=0.0.32",
-    "sqlalchemy>=2.1.6",
+    "sqlalchemy[asyncio]>=2.1.6",
     "uvicorn>=0.54.0",
 ]
 vision = []
@@ -41,6 +43,7 @@ build-backend = "uv_build"
 dev = [
     "httpx2>=2.16.0",
     "hypothesis>=6.170.9",
+    "moto[s3]>=5.2.4",
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",

@@ -1,4 +1,4 @@
-"""Settings of the API service, read from `HIVE_` environment variables."""
+"""Settings of the API service, read from `HIVE_` environment variables or `.env`."""
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -8,8 +8,10 @@ class ApiSettings(BaseSettings):
     """The configuration of the API service.
 
     Every field is read from an environment variable with the `HIVE_` prefix, for example
-    `HIVE_DATABASE_URL`. The defaults match the local stack in `deploy/compose.yaml`, so
-    `make dev` needs no configuration.
+    `HIVE_DATABASE_URL`, or from a `.env` file in the working directory. The connection
+    settings have no defaults, so a deployment cannot silently fall back to development
+    credentials; `make dev` creates `.env` from `.env.example`, which matches the local
+    stack in `deploy/compose.yaml`.
 
     Attributes:
         database_url: The SQLAlchemy URL of the Postgres database, using psycopg 3.
@@ -21,14 +23,14 @@ class ApiSettings(BaseSettings):
         log_level: The level of the root logger, for example `INFO`.
     """
 
-    model_config = SettingsConfigDict(env_prefix="HIVE_")
+    model_config = SettingsConfigDict(
+        env_prefix="HIVE_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
-    database_url: str = "postgresql+psycopg://hive:hive@localhost:5432/hive"
-    s3_endpoint_url: str = "http://localhost:3900"
+    database_url: str
+    s3_endpoint_url: str
     s3_region: str = "garage"
     s3_bucket: str = "hive"
-    s3_access_key_id: str = "GK0123456789abcdef01234567"
-    s3_secret_access_key: SecretStr = SecretStr(
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-    )
+    s3_access_key_id: str
+    s3_secret_access_key: SecretStr
     log_level: str = "INFO"

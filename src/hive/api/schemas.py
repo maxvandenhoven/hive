@@ -14,6 +14,7 @@ from hive.engine.serialization import (
     JsonValue,
     deserialize_rules,
     deserialize_setup,
+    serialize_record,
     serialize_rules,
     serialize_setup,
 )
@@ -131,6 +132,8 @@ class GameCreate(BaseModel):
             setup=self.setup,
             white_player=self.white.model_dump(),
             black_player=self.black.model_dump(),
+            moves=[],
+            photos=[],
         )
 
 
@@ -285,6 +288,35 @@ class GameDetail(GameSummary):
         }
 
 
+class GameExport(BaseModel):
+    """A game as a serialized `GameRecord`, for download.
+
+    Attributes:
+        rules: The serialized rules, with every field.
+        setup: `"initial"`, or the serialized board from the board editor.
+        moves: The serialized moves, with `None` for a pass.
+    """
+
+    rules: dict[str, Any]
+    setup: JsonValue
+    moves: list[JsonValue]
+
+    @classmethod
+    def from_row(cls, row: GameRow) -> "GameExport":
+        """Build the export of a game.
+
+        Args:
+            row: The game, with its moves.
+
+        Returns:
+            The serialized game record. The moves are not replayed.
+
+        Raises:
+            ValueError: If a stored value is not a valid serialized engine value.
+        """
+        return cls.model_validate(serialize_record(row.to_record()))
+
+
 class GamePage(BaseModel):
     """One page of the game list, newest first.
 
@@ -329,3 +361,43 @@ class AgentKindRead(BaseModel):
             description=registration.description,
             params_schema=registration.params_schema,
         )
+
+
+type HealthCheckResult = Literal["ok", "failed"]
+"""The result of one readiness check."""
+
+
+class LivenessReport(BaseModel):
+    """The answer of the liveness probe.
+
+    Attributes:
+        status: Always `ok`; any answer at all means the process is serving.
+    """
+
+    status: Literal["ok"] = "ok"
+
+
+class ReadinessReport(BaseModel):
+    """The answer of the readiness probe.
+
+    Attributes:
+        status: `ready` if every check passed.
+        checks: The result of each check by name: `database` and `storage`.
+    """
+
+    status: Literal["ready", "not ready"]
+    checks: dict[str, HealthCheckResult]
+
+    @classmethod
+    def from_checks(cls, checks: dict[str, HealthCheckResult]) -> "ReadinessReport":
+        """Summarize the results of the readiness checks.
+
+        Args:
+            checks: The result of each check by name.
+
+        Returns:
+            The report, `ready` if every check passed.
+        """
+        ready = all(result == "ok" for result in checks.values())
+
+        return cls(status="ready" if ready else "not ready", checks=checks)

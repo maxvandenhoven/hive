@@ -478,7 +478,26 @@ class TestReplay:
         assert result.exit_code == 2
 
 
+API_ENV = {
+    "HIVE_DATABASE_URL": "postgresql+psycopg://u@db.invalid/x",
+    "HIVE_S3_ENDPOINT_URL": "http://s3.invalid:3900",
+    "HIVE_S3_ACCESS_KEY_ID": "key",
+    "HIVE_S3_SECRET_ACCESS_KEY": "secret",
+}
+"""Complete API settings as environment variables."""
+
+
+@pytest.fixture(scope="function")
+def api_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the API settings in the environment, away from any `.env` file."""
+    monkeypatch.chdir(tmp_path)
+
+    for name, value in API_ENV.items():
+        monkeypatch.setenv(name, value)
+
+
 class TestServe:
+    @pytest.mark.usefixtures("api_env")
     def test_runs_app_factory_with_json_logs(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -500,6 +519,7 @@ class TestServe:
         )
         assert kwargs["log_config"]["root"]["level"] == "DEBUG"
         assert kwargs["access_log"] is False
+        assert kwargs["timeout_graceful_shutdown"] > 0
 
     def test_needs_api_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setitem(sys.modules, "fastapi", None)
@@ -507,18 +527,34 @@ class TestServe:
 
         assert result.exit_code == 1
 
+    def test_needs_settings(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        for name in API_ENV:
+            monkeypatch.delenv(name, raising=False)
+
+        result = CliRunner().invoke(app, ["serve"])
+
+        assert result.exit_code == 1
+        assert "database_url" in caplog.text
+
 
 class TestDbUpgrade:
+    @pytest.mark.usefixtures("api_env")
     def test_upgrades_database_from_settings(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         upgrades: list[tuple[str, str]] = []
-        monkeypatch.setattr(
-            Database,
-            "upgrade",
-            lambda self, revision: upgrades.append((str(self.engine.url), revision)),
-        )
-        monkeypatch.setenv("HIVE_DATABASE_URL", "postgresql+psycopg://u@db.invalid/x")
+
+        async def upgrade(database: Database, revision: str) -> None:
+            upgrades.append((str(database.engine.url), revision))
+
+        monkeypatch.setattr(Database, "upgrade", upgrade)
         result = CliRunner().invoke(app, ["db", "upgrade", "--revision", "0001"])
 
         assert result.exit_code == 0
