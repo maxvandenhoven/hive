@@ -389,7 +389,7 @@ class GauntletConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class DistributionSummary:
+class DecisionTimeSummary:
     """Summary statistics of a sample of non-negative values, such as overruns.
 
     Attributes:
@@ -407,7 +407,7 @@ class DistributionSummary:
     max: float
 
     @classmethod
-    def from_values(cls, values: Sequence[float]) -> "DistributionSummary":
+    def from_values(cls, values: Sequence[float]) -> "DecisionTimeSummary":
         """Summarise a sample.
 
         Args:
@@ -444,7 +444,7 @@ class DistributionSummary:
         }
 
     @classmethod
-    def from_dict(cls, data: object) -> "DistributionSummary":
+    def from_dict(cls, data: object) -> "DecisionTimeSummary":
         """Deserialize a summary.
 
         Args:
@@ -490,8 +490,8 @@ class DecisionStats:
     depth_reached: dict[int, int]
     nodes_per_s: float | None
     close_reasons: dict[TurnCloseReason, int]
-    elapsed_s: DistributionSummary
-    overrun_s: DistributionSummary
+    elapsed_s: DecisionTimeSummary
+    overrun_s: DecisionTimeSummary
     overruns: int
     failures: int
     worker_restarts: int
@@ -528,8 +528,8 @@ class DecisionStats:
             depth_reached=dict(sorted(depths.items())),
             nodes_per_s=sum(speeds) / len(speeds) if speeds else None,
             close_reasons=close_reasons,
-            elapsed_s=DistributionSummary.from_values([d.elapsed_s for d in decisions]),
-            overrun_s=DistributionSummary.from_values([d.overrun_s for d in decisions]),
+            elapsed_s=DecisionTimeSummary.from_values([d.elapsed_s for d in decisions]),
+            overrun_s=DecisionTimeSummary.from_values([d.overrun_s for d in decisions]),
             overruns=sum(d.overrun_s > GAUNTLET_OVERRUN_TOLERANCE_S for d in decisions),
             failures=sum(d.failure is not None for d in decisions),
             worker_restarts=sum(d.worker_restarted for d in decisions),
@@ -631,8 +631,8 @@ class DecisionStats:
                 TurnCloseReason(reason): int(count)
                 for reason, count in fields["close_reasons"].items()
             },
-            elapsed_s=DistributionSummary.from_dict(fields["elapsed_s"]),
-            overrun_s=DistributionSummary.from_dict(fields["overrun_s"]),
+            elapsed_s=DecisionTimeSummary.from_dict(fields["elapsed_s"]),
+            overrun_s=DecisionTimeSummary.from_dict(fields["overrun_s"]),
             overruns=int(fields["overruns"]),
             failures=int(fields["failures"]),
             worker_restarts=int(fields["worker_restarts"]),
