@@ -44,7 +44,7 @@ tests/data/perft/
   "source": "see README.md",
   "rules": {"allow_queen_first_turn": false, "queen_by_turn": 4, "...": "..."},
   "positions": [
-    {"name": "start", "setup": "initial", "moves": [], "counts": {"1": 0, "2": 0}}
+    {"name": "start", "moves": [], "counts": {"1": 0, "2": 0}}
   ]
 }
 ```

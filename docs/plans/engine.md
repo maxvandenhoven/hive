@@ -127,24 +127,34 @@ checking invariants 1 to 5. Games are drawn with `hypothesis` (moves sampled fro
 (100 games of up to 100 plies) runs in `make test`; the slow profile (500 games of up to 300
 plies) is marked `slow`.
 
-## Serialization (WP 06)
+## Serialization (WP 06, reworked before WP 10)
 
-`src/hive/engine/serialization.py` converts engine values to and from JSON-compatible
-values. It is used by match records, gauntlet reports, the API, the database and the perft
-suite. Each value has a pair of plain functions, `serialize_<value>` and
-`deserialize_<value>`, rather than methods: a pass is `None`, and `Coordinate` and
-`GameBoard` are type aliases, so not every value has a type to hang a method on. A single
-generic `serialize` / `deserialize(data, type)` pair was rejected because dispatching on
-`None`, tuples and dicts is fragile and its overloads do not type-check cleanly.
+Every value that is written to a file, the database or the API is a dataclass that
+pydantic converts, so each value has exactly one definition (D25). `src/hive/engine/codec.py`
+holds the shared pieces: the `JsonCodec` mixin (`to_json()` / `from_json(data)`), a cached
+`json_adapter(type)` for type expressions such as `Move | None`, and `NamedIntEnum`, whose
+members are written as lower case names. A class declares its JSON form with annotations:
+`Field(alias="from")`, `StrictInt` / `StrictBool` where JSON must hold a real integer or
+boolean, and `extra="forbid"` for unknown keys. The same annotations produce the JSON
+schema the API publishes, so the frontend client gets typed engine values.
+
+The first version had a hand-written `serialize_<value>` / `deserialize_<value>` pair per
+value. It was replaced because the API needed a second, pydantic definition of every
+value, and the two had to be kept in sync by hand. The values stay plain dataclasses
+rather than pydantic models: pydantic only runs when a value is converted, so `Move`
+construction (about 0.2 µs, millions per perft run) and memory are unchanged, `Rules`
+stays hashable, and the engine can change its internal representation in the speed
+rounds as long as the JSON mapping keeps working.
 
 | Value | JSON |
 |---|---|
 | `Player`, `PieceType` | lower case name, for example `"white"`, `"ant"` |
 | `Coordinate` | `[q, r]` |
+| `Piece` | `{"piece": "ant", "owner": "white"}` |
 | `Move \| None` | `{"piece": "ant", "from": [q, r] \| null, "to": [q, r]}`; pass is `null` |
-| `Rules` | object with every field, `piece_counts` keyed by piece type name; missing fields take their default when deserializing |
-| `GameBoard` | list of `{"coord": [q, r], "stack": [{"piece": ..., "owner": ...}]}`, ordered by coordinate (object keys cannot be coordinates) |
-| `BoardSetup \| None` | `"initial"`, or `{"board": ..., "current_player": ..., "current_ply": int \| null}` |
+| `Rules` | object with every field, `piece_counts` keyed by piece type name; missing fields take their default when reading |
+| `GameBoard` (`JsonBoard`) | list of `{"coord": [q, r], "stack": [piece, ...]}`, ordered by coordinate (object keys cannot be coordinates) |
+| `BoardSetup \| None` | `null` for the initial state, or `{"board": ..., "current_player": ..., "current_ply": int \| null}` |
 | `GameRecord` | `{"rules": ..., "setup": ..., "moves": [...]}` |
 
 - `BoardSetup(board, current_player, current_ply=None)` is a board editor position. The
@@ -155,10 +165,11 @@ generic `serialize` / `deserialize(data, type)` pair was rejected because dispat
   start from `Rules.from_board` for editor setups and use `Rules.apply_checked_move` for
   every move, so invalid records raise `InvalidBoardError` or `IllegalMoveError`.
   `GameState.copy()` was added for `states()`.
-- Deserializers check only the shape of their input and raise `ValueError` with a clear
-  message (unknown or missing keys, wrong types, unknown names, booleans where integers
-  are expected). Legality is checked by `replay()`. Serializers are total.
-- Round-trip property tests (through `json.dumps` / `json.loads`) cover every value.
+- `GameRecord` and `BoardSetup` live in `src/hive/engine/record.py`.
+- Reading checks only the shape and raises `pydantic.ValidationError` (a `ValueError`)
+  with the location of every problem, for example `moves.1.from`. Legality is checked by
+  `replay()`. Writing is total.
+- Round-trip property tests (through JSON text) and golden format tests cover every value.
 
 ## Invariants
 

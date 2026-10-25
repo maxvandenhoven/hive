@@ -124,6 +124,7 @@ Each decision has a short rationale. Topic files go into detail.
 | D22 | No evaluator abstraction: evaluation weights (`queen_safety`, `mobility`, ...) are flat agent params next to `depth`, and the heuristics are methods of the search agent base. | Same reasoning as D2: one weighted sum with no other implementation. Flat params keep specs one level deep for the CLI, the API forms and weight tuning. |
 | D23 | Agent classes register a kind with `@register_agent`; the param schema is derived from the constructor signature (`Annotated` constraints, docstring descriptions). Specs are `{kind, label, params}` as YAML or JSON, limited to registered kinds; tuned agents are YAML presets shipped in the package. | One source of truth for params, readable validation errors, nested config for future neural agents, and no arbitrary imports from stored or user-supplied specs. |
 | D24 | Agent strength is its own milestone (M7) after the engine speed round (M6). Every change is measured by gauntlets between agents; the bar is beating an experienced human. | Speed and strength are separate concerns with separate acceptance tests (perft nodes/s versus gauntlet results), and deeper search needs a faster engine first. |
+| D25 | One definition per serialized value: values are plain dataclasses, converted to and from JSON by pydantic (`JsonCodec`, annotations for aliases and strict types). No hand-written converters and no parallel API models of engine, agent or match values. | One source of truth for the engine, agents, match records, the database and the OpenAPI client; dataclasses keep the engine fast and free to change representation. |
 
 ## 5. Target repo structure
 
@@ -139,7 +140,7 @@ hive/
 ├─ .github/workflows/          # ci.yaml (checks), release.yaml (image + tag bump)
 ├─ docs/plans/                 # this folder
 ├─ src/hive/
-│  ├─ engine/                  # grid.py, state.py, rules.py, serialization.py, errors.py
+│  ├─ engine/                  # grid.py, state.py, rules.py, codec.py, record.py, errors.py
 │  ├─ agents/                  # base.py, factory.py, random.py, search.py, minimax.py, negamax.py, testing.py
 │  ├─ match/                   # turn.py, worker.py, runner.py, records.py, gauntlet.py
 │  ├─ vision/                  # [vision] reader.py, classical/, yolo/, grid_fit.py, matcher.py, eval/

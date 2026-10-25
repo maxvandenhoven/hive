@@ -138,25 +138,28 @@ class SearchAgent(Agent):
 
 ```python
 @dataclass(frozen=True, slots=True)
-class AgentSpec:
+class AgentSpec(JsonCodec):  # to_json() / from_json(data), shape only
     kind: str
     params: Mapping[str, JsonValue] = field(default_factory=dict)
     label: str | None = None   # display name in reports and UI
 
     @classmethod
-    def from_dict(cls, data: object, *, source: str | None = None) -> AgentSpec: ...
+    def parse(cls, data: object, *, source: str | None = None) -> AgentSpec: ...
     @classmethod
     def from_yaml(cls, text: str, *, source: str | None = None) -> AgentSpec: ...
     @classmethod
     def load(cls, path: Path) -> AgentSpec: ...
-    def to_dict(self) -> dict[str, JsonValue]: ...
     def validate_params(self, *, source: str | None = None) -> BaseModel: ...
 
 def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent: ...
 def list_agents() -> list[AgentRegistration]: ...   # kind, description, params schema
 ```
 
-- The serialized form is a mapping with `kind`, an optional `label` and optional
+- `parse` reads user input (CLI, files, API) and also checks the params against the
+  registered kind; `from_json` only checks the shape, so stored records with kinds that
+  are only registered in workers still load. `AgentRegistration` is itself the JSON the
+  API lists (`kind`, `description`, `params_schema`), leaving out the class and model.
+- The JSON form is a mapping with `kind`, an optional `label` and optional
   `params`, stored as JSON in records and reports and written as YAML by hand:
 
   ```yaml
@@ -303,9 +306,10 @@ Every decision produces a `DecisionRecord`:
 
 A `MatchResult` holds the rules, both specs, the seed, the budget, the game record,
 decision records, the `MatchOutcome` (`win` with a `winner`, `draw`, `turn_cap`) and the
-match duration; `thinking_s(player)` sums a seat's decision times. Both records serialize
-with `to_dict` / `from_dict` using the engine codec for moves, players, rules and the
-record.
+match duration; `thinking_s(player)` sums a seat's decision times. Both records, and every
+gauntlet type, convert with `JsonCodec` like the engine values; derived values such as
+rates are written as computed fields and ignored when reading. Reports carry a `version`
+(2 since the initial setup is written as `null`).
 
 ## Gauntlets (WP 09)
 
