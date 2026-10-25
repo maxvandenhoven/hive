@@ -35,6 +35,22 @@ perft:
 	@uv run hive bench perft --depth 6
 
 
+.PHONY: dev-services
+dev-services:
+	@docker compose -f deploy/compose.yaml up -d --wait
+	@uv run hive db upgrade
+
+
+.PHONY: dev
+dev: dev-services
+	@uv run hive serve --reload
+
+
+.PHONY: dev-down
+dev-down:
+	@docker compose -f deploy/compose.yaml down
+
+
 .PHONY: check
 check: format lint type
 

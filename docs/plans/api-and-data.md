@@ -15,8 +15,8 @@ stateless per request: load the game's moves from Postgres, replay them with
 | Object storage | Garage via `boto3` (S3 API) | Wrapped in a `PhotoStore` / `ObjectStore` protocol with an in-memory fake for tests. |
 | Logging | stdlib `logging` with a JSON formatter | Request ID middleware; no `print` (`T20`). |
 | Metrics | `prometheus-client` | `/metrics` endpoint. |
-| Local dev | `deploy/compose.yaml` with Postgres and single-node Garage | `make dev` starts compose, `uvicorn --reload` and `vite`. |
-| Tests | pytest; fakes for unit tests; testcontainers Postgres for API tests | No SQLite, so JSONB and Postgres behaviour are tested for real. |
+| Local dev | `deploy/compose.yaml` with Postgres and single-node Garage | `make dev` starts compose, migrates, and runs `hive serve --reload` (plus `vite` from WP 13). Garage bootstraps itself with `server --single-node --default-bucket` (v2.3+), creating the layout, the `hive` bucket and a fixed dev key; the `ApiSettings` defaults match the stack. |
+| Tests | pytest; fakes for unit tests; testcontainers Postgres for API tests | No SQLite, so JSONB and Postgres behaviour are tested for real. A session-scoped container is migrated from scratch; each test runs in a rolled-back transaction. Without Docker the database tests skip locally (never in CI), or run against `HIVE_TEST_DATABASE_URL`, whose schema they drop and recreate. |
 
 ## Schema (WP 10)
 

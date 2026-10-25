@@ -92,7 +92,9 @@ One root `Makefile`; every command a session needs is a target.
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
 | `make check` | `format lint type` (no tests) |
 | `make perft` | `hive bench perft --depth 6` on the start position: a speed baseline that also fails on a count mismatch |
-| `make dev` | compose up (Postgres, Garage), uvicorn `--reload`, vite dev server |
+| `make dev-services` | compose up (Postgres, Garage) and wait until healthy, then `hive db upgrade` |
+| `make dev` | `make dev-services`, then `hive serve --reload`; vite dev server from WP 13 |
+| `make dev-down` | compose down (volumes are kept) |
 | `make api-client` | regenerate the OpenAPI TypeScript client |
 | `make install-hooks` | install pre-commit hooks (including commit-msg) |
 
