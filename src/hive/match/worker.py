@@ -27,10 +27,10 @@ from hive.match.records import DecisionRecord
 from hive.match.turn import (
     STARTUP_TURN_ID,
     CandidateSelection,
-    Failed,
-    Idle,
+    FailedMessage,
+    IdleMessage,
     PipeTurnContext,
-    Think,
+    ThinkMessage,
     WorkerMessage,
 )
 
@@ -46,17 +46,17 @@ MAX_FAILURE_LENGTH = 500
 """The maximum number of characters of a recorded failure description."""
 
 
-class WorkerError(RuntimeError):
+class AgentWorkerError(RuntimeError):
     """Raised when a worker cannot start, for example because its agent fails to build."""
 
 
-class Worker:
+class AgentWorker:
     """A handle to a persistent worker process that decides moves for one agent.
 
     Use it as a context manager, or call `start` and `close`:
 
     ```python
-    with Worker(AgentSpec("negamax"), rules, seed=0) as worker:
+    with AgentWorker(AgentSpec("negamax"), rules, seed=0) as worker:
         decision = worker.decide(state, budget_s=1.0)
     ```
 
@@ -70,6 +70,12 @@ class Worker:
         preload: Modules imported in the worker before the agent is built, which register
             agent kinds that are not built in.
         restarts: The number of times the worker was killed and restarted.
+        fallback_rng: The random number generator that picks a move when the agent
+            submitted no legal one.
+        turn_id: The id of the latest turn, or `STARTUP_TURN_ID` before the first one.
+        process: The worker process, or `None` when the worker is not started.
+        conn: The runner end of the pipe to the worker, or `None` when not started.
+        stop_event: The event that stops the agent, or `None` when not started.
     """
 
     def __init__(
@@ -102,11 +108,11 @@ class Worker:
         self.startup_timeout_s = startup_timeout_s
         self.preload = tuple(preload)
         self.restarts = 0
-        self._fallback_rng = random.Random(seed)
-        self._turn_id = STARTUP_TURN_ID
-        self._process: BaseProcess | None = None
-        self._conn: Connection | None = None
-        self._stop_event: Event | None = None
+        self.fallback_rng = random.Random(seed)
+        self.turn_id = STARTUP_TURN_ID
+        self.process: BaseProcess | None = None
+        self.conn: Connection | None = None
+        self.stop_event: Event | None = None
 
     @property
     def label(self) -> str:
@@ -116,7 +122,7 @@ class Worker:
     @property
     def running(self) -> bool:
         """Whether the worker process is alive."""
-        return self._process is not None and self._process.is_alive()
+        return self.process is not None and self.process.is_alive()
 
     def __enter__(self) -> Self:
         """Start the worker.
@@ -147,39 +153,39 @@ class Worker:
 
         Raises:
             RuntimeError: If the worker is already started.
-            WorkerError: If building the agent raised, or took longer than
+            AgentWorkerError: If building the agent raised, or took longer than
                 `startup_timeout_s`.
         """
-        if self._process is not None:
+        if self.process is not None:
             msg = f"The worker of `{self.label}` is already started."
             raise RuntimeError(msg)
 
-        context = _multiprocessing_context()
-        self._conn, worker_conn = context.Pipe()
-        self._stop_event = context.Event()
-        self._process = context.Process(
-            target=_run_worker,
-            args=(worker_conn, self._stop_event, self.spec, self.rules, self.seed),
+        context = worker_process_context()
+        self.conn, worker_conn = context.Pipe()
+        self.stop_event = context.Event()
+        self.process = context.Process(
+            target=run_worker_process,
+            args=(worker_conn, self.stop_event, self.spec, self.rules, self.seed),
             kwargs={"preload": self.preload},
             name=f"hive-worker-{self.label}",
             daemon=True,
         )
-        self._process.start()
+        self.process.start()
         worker_conn.close()
 
-        message = self._receive(self.startup_timeout_s)
-        if not isinstance(message, Idle):
-            if isinstance(message, Failed):
+        message = self.receive(self.startup_timeout_s)
+        if not isinstance(message, IdleMessage):
+            if isinstance(message, FailedMessage):
                 # The worker exits on its own after reporting the failure.
-                self._process.join(self.grace_s)
-            self._kill()
+                self.process.join(self.grace_s)
+            self.kill()
             error = (
                 message.error
-                if isinstance(message, Failed)
+                if isinstance(message, FailedMessage)
                 else f"timed out after {self.startup_timeout_s} s"
             )
             msg = f"The worker of `{self.label}` failed to start: {error}"
-            raise WorkerError(msg)
+            raise AgentWorkerError(msg)
 
     def decide(
         self,
@@ -206,29 +212,29 @@ class Worker:
 
         Raises:
             RuntimeError: If the worker is not started.
-            WorkerError: If the worker has to be restarted and fails to start.
+            AgentWorkerError: If the worker has to be restarted and fails to start.
         """
-        if self._conn is None or self._stop_event is None:
+        if self.conn is None or self.stop_event is None:
             msg = f"The worker of `{self.label}` is not started."
             raise RuntimeError(msg)
 
-        self._turn_id += 1
+        self.turn_id += 1
         legal_moves = self.rules.legal_moves(state)
-        self._stop_event.clear()
+        self.stop_event.clear()
         start = time.monotonic()
         deadline = start + budget_s
-        self._conn.send(Think(self._turn_id, state, deadline))
+        self.conn.send(ThinkMessage(self.turn_id, state, deadline))
 
         selection = CandidateSelection.collect(
-            self._turn_id, legal_moves, deadline, self._receive, on_message=on_message
+            self.turn_id, legal_moves, deadline, self.receive, on_message=on_message
         )
         closed_at = time.monotonic()
         close_reason = selection.close_reason
 
-        self._stop_event.set()
+        self.stop_event.set()
         failure = selection.failure
         if not selection.returned:
-            self._wait_returned(selection)
+            self.wait_until_returned(selection)
             if not selection.returned:
                 failure = (
                     f"The agent did not return within the grace period of {self.grace_s} "
@@ -248,7 +254,7 @@ class Worker:
 
         move = selection.move
         if not selection.has_candidate:
-            move = legal_moves[self._fallback_rng.randrange(len(legal_moves))]
+            move = legal_moves[self.fallback_rng.randrange(len(legal_moves))]
 
         return DecisionRecord(
             ply=state.current_ply,
@@ -271,78 +277,81 @@ class Worker:
         """Kill the worker process and start a new one, which builds the agent again.
 
         Raises:
-            WorkerError: If the new worker fails to start.
+            AgentWorkerError: If the new worker fails to start.
         """
-        self._kill()
+        self.kill()
         self.restarts += 1
         self.start()
 
     def close(self) -> None:
         """Ask the worker to exit, and kill it if it does not within the grace period."""
-        if self._process is None or self._conn is None:
+        if self.process is None or self.conn is None:
             return
 
         try:
-            self._conn.send(None)
+            self.conn.send(None)
         except OSError:
             logger.debug("The worker of `%s` already exited.", self.label)
-        self._process.join(self.grace_s)
-        self._kill()
+        self.process.join(self.grace_s)
+        self.kill()
 
-    def _receive(self, timeout: float) -> WorkerMessage | None:
+    def receive(self, timeout: float) -> WorkerMessage | None:
         """Receive the next message from the worker.
 
         Args:
             timeout: The maximum number of seconds to wait.
 
         Returns:
-            The message, a `Failed` message of the current turn if the worker died, or
+            The message, a `FailedMessage` of the current turn if the worker died, or
             `None` if no message arrived in time.
         """
-        assert self._conn is not None
+        assert self.conn is not None
         try:
-            if not self._conn.poll(timeout):
+            if not self.conn.poll(timeout):
                 return None
-            return self._conn.recv()
+            return self.conn.recv()
         except (EOFError, OSError):
             # The pipe closes as the process exits, so joining it takes no time.
             exitcode = None
-            if self._process is not None:
-                self._process.join(self.grace_s)
-                exitcode = self._process.exitcode
-            return Failed(self._turn_id, f"The worker exited with code {exitcode}.")
+            if self.process is not None:
+                self.process.join(self.grace_s)
+                exitcode = self.process.exitcode
+            return FailedMessage(self.turn_id, f"The worker exited with code {exitcode}.")
 
-    def _wait_returned(self, selection: CandidateSelection) -> None:
+    def wait_until_returned(self, selection: CandidateSelection) -> None:
         """Wait up to the grace period for the stopped agent to return.
 
-        Messages that arrive in the meantime are ignored, except for `Idle` and `Failed`,
-        which mark the selection as returned.
+        Messages that arrive in the meantime are ignored, except for `IdleMessage` and
+        `FailedMessage`, which mark the selection as returned.
 
         Args:
             selection: The selection of the closed turn, updated when the agent returns.
         """
         grace_deadline = time.monotonic() + self.grace_s
         while (remaining := grace_deadline - time.monotonic()) > 0:
-            message = self._receive(remaining)
-            if isinstance(message, Idle | Failed) and message.turn_id == self._turn_id:
+            message = self.receive(remaining)
+            if (
+                isinstance(message, IdleMessage | FailedMessage)
+                and message.turn_id == self.turn_id
+            ):
                 selection.receive(message)
                 return
 
-    def _kill(self) -> None:
+    def kill(self) -> None:
         """Kill the worker process if it runs, and release the pipe and the event."""
-        if self._process is not None:
-            if self._process.is_alive():
-                self._process.kill()
-            self._process.join()
-            self._process.close()
-        if self._conn is not None:
-            self._conn.close()
-        self._process = None
-        self._conn = None
-        self._stop_event = None
+        if self.process is not None:
+            if self.process.is_alive():
+                self.process.kill()
+            self.process.join()
+            self.process.close()
+        if self.conn is not None:
+            self.conn.close()
+        self.process = None
+        self.conn = None
+        self.stop_event = None
 
 
-def _multiprocessing_context() -> ForkServerContext | SpawnContext:
+def worker_process_context() -> ForkServerContext | SpawnContext:
     """Get the context that starts worker processes.
 
     Plain `fork` is never used, so workers do not inherit parent memory such as open
@@ -360,7 +369,7 @@ def _multiprocessing_context() -> ForkServerContext | SpawnContext:
     return context
 
 
-def _run_worker(
+def run_worker_process(
     conn: Connection,
     stop_event: Event,
     spec: AgentSpec,
@@ -371,7 +380,7 @@ def _run_worker(
 ) -> None:
     """Build the agent and decide moves until the runner closes the pipe.
 
-    Runs in the worker process. Errors of the agent are reported as `Failed` messages, so
+    Runs in the worker process. Errors of the agent are reported as `FailedMessage`, so
     the worker survives an agent that raises during a turn.
 
     Args:
@@ -389,13 +398,13 @@ def _run_worker(
             importlib.import_module(module)
         agent = build_agent(spec, rules, seed=seed)
     except Exception as e:
-        conn.send(Failed(STARTUP_TURN_ID, _describe(e)))
+        conn.send(FailedMessage(STARTUP_TURN_ID, describe_error(e)))
         return
-    conn.send(Idle(STARTUP_TURN_ID))
+    conn.send(IdleMessage(STARTUP_TURN_ID))
 
     while True:
         try:
-            message: Think | None = conn.recv()
+            message: ThinkMessage | None = conn.recv()
         except EOFError:
             return
         if message is None:
@@ -406,14 +415,14 @@ def _run_worker(
             agent.think(message.state, turn)
         except Exception as e:
             turn.flush()
-            conn.send(Failed(message.turn_id, _describe(e)))
+            conn.send(FailedMessage(message.turn_id, describe_error(e)))
         else:
             turn.flush()
-            conn.send(Idle(message.turn_id))
+            conn.send(IdleMessage(message.turn_id))
 
 
-def _describe(error: Exception) -> str:
-    """Describe an error for a `Failed` message.
+def describe_error(error: Exception) -> str:
+    """Describe an error for a `FailedMessage`.
 
     Args:
         error: The error to describe.

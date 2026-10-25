@@ -1,8 +1,8 @@
 """Misbehaving agents for tests of workers and the match runner.
 
 Importing this module registers agent kinds starting with `test-`. Import it only in
-worker processes, with `Worker(..., preload=["hive.match.testing"])`, so the kinds stay
-out of the registry of the test process and out of `list_agents`.
+worker processes, with `AgentWorker(..., preload=["hive.match.testing"])`, so the kinds
+stay out of the registry of the test process and out of `list_agents`.
 """
 
 import os
@@ -19,7 +19,7 @@ from hive.engine.state import GameState, Move, PieceType
 ILLEGAL_MOVE = Move(PieceType.QUEEN, None, (100, 100))
 """A placement far away from every piece, which is never legal after the first ply."""
 
-_POLL_S = 0.001
+POLL_INTERVAL_S = 0.001
 """The number of seconds the agents sleep between two checks of `should_stop`."""
 
 
@@ -36,7 +36,7 @@ class NeverSubmitsAgent(Agent):
             turn: The context of the turn.
         """
         while not turn.should_stop():
-            time.sleep(_POLL_S)
+            time.sleep(POLL_INTERVAL_S)
 
 
 @register_agent("test-illegal")
@@ -103,7 +103,7 @@ class LingeringAgent(Agent):
         """
         turn.submit(self.rules.legal_moves(state)[0])
         while not turn.should_stop():
-            time.sleep(_POLL_S)
+            time.sleep(POLL_INTERVAL_S)
         time.sleep(min(self.linger_s, 3600.0))
 
 

@@ -6,10 +6,10 @@ from hive.agents.factory import AgentSpec
 from hive.engine.rules import Rules
 from hive.engine.serialization import GameRecord
 from hive.engine.state import Move, PieceType, Player
-from hive.match.records import CloseReason, DecisionRecord, MatchResult, Outcome
+from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
 
 
-def _decision(player: Player, elapsed_s: float, move: Move | None) -> DecisionRecord:
+def make_decision(player: Player, elapsed_s: float, move: Move | None) -> DecisionRecord:
     """Build a decision record with the given player, time and move."""
     return DecisionRecord(
         ply=0 if player is Player.WHITE else 1,
@@ -19,7 +19,7 @@ def _decision(player: Player, elapsed_s: float, move: Move | None) -> DecisionRe
         budget_s=1.0,
         elapsed_s=elapsed_s,
         overrun_s=0.01,
-        close_reason=CloseReason.DEADLINE,
+        close_reason=TurnCloseReason.DEADLINE,
         candidates=3,
         illegal_submissions=1,
         move=move,
@@ -44,10 +44,10 @@ def result() -> MatchResult:
         budget_s=1.0,
         record=GameRecord(Rules(max_turns=50), moves=moves),
         decisions=[
-            _decision(Player.WHITE, 0.5, moves[0]),
-            _decision(Player.BLACK, 0.25, moves[1]),
+            make_decision(Player.WHITE, 0.5, moves[0]),
+            make_decision(Player.BLACK, 0.25, moves[1]),
         ],
-        outcome=Outcome.WIN,
+        outcome=MatchOutcome.WIN,
         winner=Player.BLACK,
         duration_s=1.5,
     )
@@ -56,7 +56,7 @@ def result() -> MatchResult:
 class TestDecisionRecord:
     @pytest.mark.parametrize("move", [None, Move(PieceType.ANT, (0, 0), (1, 0))])
     def test_round_trip(self, move: Move | None) -> None:
-        decision = _decision(Player.WHITE, 0.5, move)
+        decision = make_decision(Player.WHITE, 0.5, move)
 
         data = json.loads(json.dumps(decision.to_dict()))
 

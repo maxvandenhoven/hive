@@ -1,10 +1,10 @@
 """Worker messages, the turn context of a worker and the policy that selects a move.
 
-A turn is a `Think` message from the runner, answered by any number of `Submission` and
-`Info` messages and closed by `Idle` when the agent returns or `Failed` when it raises.
-Every message carries the id of its turn, so messages from an earlier turn are ignored.
-Turn id 0 is the startup of the worker: `Idle` means the agent was built, `Failed` that
-building it raised.
+A turn is a `ThinkMessage` from the runner, answered by any number of `SubmissionMessage`
+and `InfoMessage` and closed by `IdleMessage` when the agent returns or `FailedMessage`
+when it raises. Every message carries the id of its turn, so messages from an earlier turn
+are ignored. Turn id 0 is the startup of the worker: `IdleMessage` means the agent was
+built, `FailedMessage` that building it raised.
 """
 
 import logging
@@ -17,7 +17,7 @@ from typing import override
 
 from hive.agents.base import SearchInfoValue, TurnContext
 from hive.engine.state import GameState, Move
-from hive.match.records import CloseReason
+from hive.match.records import TurnCloseReason
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ INFO_INTERVAL_S = 0.1
 
 
 @dataclass(frozen=True, slots=True)
-class Think:
+class ThinkMessage:
     """Ask the worker to decide a move.
 
     Attributes:
@@ -45,7 +45,7 @@ class Think:
 
 
 @dataclass(frozen=True, slots=True)
-class Submission:
+class SubmissionMessage:
     """A move the agent proposed as its current answer.
 
     Attributes:
@@ -60,7 +60,7 @@ class Submission:
 
 
 @dataclass(frozen=True, slots=True)
-class Info:
+class InfoMessage:
     """A progress report of the agent.
 
     Attributes:
@@ -73,7 +73,7 @@ class Info:
 
 
 @dataclass(frozen=True, slots=True)
-class Idle:
+class IdleMessage:
     """The agent returned, or was built at startup, and the worker waits for a turn.
 
     Attributes:
@@ -84,7 +84,7 @@ class Idle:
 
 
 @dataclass(frozen=True, slots=True)
-class Failed:
+class FailedMessage:
     """The agent raised, or building it raised at startup, or the worker died.
 
     The worker keeps running after an agent raised during a turn.
@@ -98,10 +98,10 @@ class Failed:
     error: str
 
 
-type WorkerMessage = Submission | Info | Idle | Failed
+type WorkerMessage = SubmissionMessage | InfoMessage | IdleMessage | FailedMessage
 """A message from a worker to the runner."""
 
-type MessageSource = Callable[[float], WorkerMessage | None]
+type WorkerMessageSource = Callable[[float], WorkerMessage | None]
 """Receive the next message within a timeout in seconds, or `None` if none arrived."""
 
 
@@ -110,6 +110,18 @@ class PipeTurnContext(TurnContext):
 
     Submissions and progress reports are sent to the runner over a pipe. `should_stop`
     reads a stop event shared with the runner, which sets it when it closes the turn.
+
+    Attributes:
+        conn: The worker end of the pipe to the runner.
+        stop_event: The event the runner sets to stop the agent.
+        turn_id: The id of the turn, sent with every message.
+        deadline: The end of the turn on `clock`.
+        info_interval_s: The minimum number of seconds between two progress reports sent
+            over the pipe.
+        clock: The clock the deadline is measured on, in seconds.
+        closed: Whether a final move was submitted.
+        last_info_at: The time on `clock` the latest progress report was sent.
+        pending_info: The progress report held back by the rate limit, if any.
     """
 
     def __init__(
@@ -134,15 +146,15 @@ class PipeTurnContext(TurnContext):
                 one is sent when the interval passed or the turn ends.
             clock: The clock the deadline is measured on, in seconds.
         """
-        self._conn = conn
-        self._stop_event = stop_event
-        self._turn_id = turn_id
-        self._deadline = deadline
-        self._info_interval_s = info_interval_s
-        self._clock = clock
-        self._closed = False
-        self._last_info_at = float("-inf")
-        self._pending_info: dict[str, SearchInfoValue] | None = None
+        self.conn = conn
+        self.stop_event = stop_event
+        self.turn_id = turn_id
+        self.deadline = deadline
+        self.info_interval_s = info_interval_s
+        self.clock = clock
+        self.closed = False
+        self.last_info_at = float("-inf")
+        self.pending_info: dict[str, SearchInfoValue] | None = None
 
     @override
     def submit(self, move: Move | None, *, final: bool = False) -> None:
@@ -153,8 +165,8 @@ class PipeTurnContext(TurnContext):
             final: Whether the agent is done, which closes the turn.
         """
         self.flush()
-        self._conn.send(Submission(self._turn_id, move, final))
-        self._closed = self._closed or final
+        self.conn.send(SubmissionMessage(self.turn_id, move, final))
+        self.closed = self.closed or final
 
     @override
     def remaining_seconds(self) -> float:
@@ -163,7 +175,7 @@ class PipeTurnContext(TurnContext):
         Returns:
             The number of seconds until the deadline, which is negative once it passed.
         """
-        return self._deadline - self._clock()
+        return self.deadline - self.clock()
 
     @override
     def should_stop(self) -> bool:
@@ -175,7 +187,7 @@ class PipeTurnContext(TurnContext):
         Returns:
             `True` if the agent should stop thinking and return.
         """
-        return self._closed or self._stop_event.is_set()
+        return self.closed or self.stop_event.is_set()
 
     @override
     def info(self, **fields: SearchInfoValue) -> None:
@@ -184,16 +196,16 @@ class PipeTurnContext(TurnContext):
         Args:
             **fields: The progress values to report.
         """
-        self._pending_info = fields
-        if self._clock() - self._last_info_at >= self._info_interval_s:
+        self.pending_info = fields
+        if self.clock() - self.last_info_at >= self.info_interval_s:
             self.flush()
 
     def flush(self) -> None:
         """Send the progress report held back by the rate limit, if any."""
-        if self._pending_info is not None:
-            self._conn.send(Info(self._turn_id, self._pending_info))
-            self._pending_info = None
-            self._last_info_at = self._clock()
+        if self.pending_info is not None:
+            self.conn.send(InfoMessage(self.turn_id, self.pending_info))
+            self.pending_info = None
+            self.last_info_at = self.clock()
 
 
 @dataclass(slots=True)
@@ -201,8 +213,9 @@ class CandidateSelection:
     """The selection policy of one turn, and what it saw.
 
     The latest legal submission is the candidate. A final submission closes the turn, as
-    does the agent returning (`Idle`), the agent failing (`Failed`) or the deadline.
-    Illegal submissions are counted and ignored, and messages of other turns are dropped.
+    does the agent returning (`IdleMessage`), the agent failing (`FailedMessage`) or the
+    deadline. Illegal submissions are counted and ignored, and messages of other turns are
+    dropped.
 
     Attributes:
         turn_id: The id of the turn.
@@ -215,7 +228,7 @@ class CandidateSelection:
         last_info: The latest progress report, or `None` if there was none.
         final: Whether a final submission closed the turn.
         returned: Whether the agent returned or failed, so the worker waits for a turn.
-        failure: The error of a `Failed` message, or `None` if none arrived.
+        failure: The error of a `FailedMessage`, or `None` if none arrived.
         on_message: Called with every legal submission and progress report as it
             arrives, for streaming the search to a user.
     """
@@ -238,7 +251,7 @@ class CandidateSelection:
         turn_id: int,
         legal_moves: Sequence[Move | None],
         deadline: float,
-        messages: MessageSource,
+        messages: WorkerMessageSource,
         *,
         clock: Callable[[], float] = time.monotonic,
         on_message: Callable[[WorkerMessage], None] | None = None,
@@ -275,15 +288,15 @@ class CandidateSelection:
         return self.final or self.returned
 
     @property
-    def close_reason(self) -> CloseReason:
+    def close_reason(self) -> TurnCloseReason:
         """Why the turn closed, assuming the deadline closed it if no message did."""
         if not self.has_candidate:
-            return CloseReason.NO_CANDIDATE
+            return TurnCloseReason.NO_CANDIDATE
         if self.failure is not None:
-            return CloseReason.WORKER_FAILED
+            return TurnCloseReason.WORKER_FAILED
         if self.closed:
-            return CloseReason.FINAL
-        return CloseReason.DEADLINE
+            return TurnCloseReason.FINAL
+        return TurnCloseReason.DEADLINE
 
     def receive(self, message: WorkerMessage) -> None:
         """Update the selection with a message from the worker.
@@ -296,22 +309,22 @@ class CandidateSelection:
             return
 
         match message:
-            case Submission(move=move, final=final) if move in self.legal_moves:
+            case SubmissionMessage(move=move, final=final) if move in self.legal_moves:
                 self.move = move
                 self.has_candidate = True
                 self.candidates += 1
                 self.final = final
                 if self.on_message is not None:
                     self.on_message(message)
-            case Submission(move=move):
+            case SubmissionMessage(move=move):
                 self.illegal_submissions += 1
                 logger.warning("Rejected the illegal submission `%s`.", move)
-            case Info(fields=fields):
+            case InfoMessage(fields=fields):
                 self.last_info = fields
                 if self.on_message is not None:
                     self.on_message(message)
-            case Idle():
+            case IdleMessage():
                 self.returned = True
-            case Failed(error=error):
+            case FailedMessage(error=error):
                 self.returned = True
                 self.failure = error

@@ -8,18 +8,18 @@ from typer.testing import CliRunner
 
 from hive import __version__
 from hive.agents.factory import AgentSpec
-from hive.cli import _describe_result, _log_decision, app
+from hive.cli import app, describe_match_result, log_decision
 from hive.engine.rules import Rules
 from hive.engine.serialization import GameRecord
 from hive.engine.state import Player
-from hive.match.records import CloseReason, DecisionRecord, MatchResult, Outcome
+from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
 from hive.match.runner import MatchRunner
-from hive.match.worker import WorkerError
+from hive.match.worker import AgentWorkerError
 
-_SUITE = Path(__file__).parent / "data" / "perft" / "base.json"
+SUITE = Path(__file__).parent / "data" / "perft" / "base.json"
 
 
-def _write_suite(path: Path, counts: dict[str, int]) -> Path:
+def write_suite(path: Path, counts: dict[str, int]) -> Path:
     """Write a perft suite with default rules, the start position and the given counts."""
     position = {"name": "start", "moves": [], "counts": counts}
     path.write_text(json.dumps({"rules": {}, "positions": [position]}))
@@ -36,7 +36,7 @@ def test_version() -> None:
 class TestBenchPerft:
     def test_prints_nodes_and_speed(self) -> None:
         result = CliRunner().invoke(
-            app, ["bench", "perft", "--depth", "2", "--suite", str(_SUITE)]
+            app, ["bench", "perft", "--depth", "2", "--suite", str(SUITE)]
         )
 
         assert result.exit_code == 0
@@ -55,7 +55,7 @@ class TestBenchPerft:
                 "beetle_gate",
                 "--divide",
                 "--suite",
-                str(_SUITE),
+                str(SUITE),
             ],
         )
 
@@ -71,7 +71,7 @@ class TestBenchPerft:
     def test_checks_reference_count(
         self, tmp_path: Path, counts: dict[str, int], exit_code: int
     ) -> None:
-        suite = _write_suite(tmp_path / "suite.json", counts)
+        suite = write_suite(tmp_path / "suite.json", counts)
 
         result = CliRunner().invoke(
             app, ["bench", "perft", "--depth", "1", "--divide", "--suite", str(suite)]
@@ -91,7 +91,7 @@ class TestBenchPerft:
                 "--position",
                 "nope",
                 "--suite",
-                str(_SUITE),
+                str(SUITE),
             ],
         )
 
@@ -148,7 +148,7 @@ class TestPlay:
     def test_worker_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def fail(self: MatchRunner, **kwargs: object) -> MatchResult:
             msg = "The worker of `random` failed to start: boom"
-            raise WorkerError(msg)
+            raise AgentWorkerError(msg)
 
         monkeypatch.setattr(MatchRunner, "run", fail)
 
@@ -167,7 +167,7 @@ class TestPlay:
             budget_s=1.0,
             elapsed_s=1.0,
             overrun_s=1.0,
-            close_reason=CloseReason.DEADLINE,
+            close_reason=TurnCloseReason.DEADLINE,
             candidates=1,
             illegal_submissions=2,
             move=None,
@@ -176,7 +176,7 @@ class TestPlay:
         )
         caplog.set_level(logging.INFO)
 
-        _log_decision(decision)
+        log_decision(decision)
 
         assert caplog.records[0].getMessage() == (
             "  4 black nm: pass (deadline, 1.00 s, 2 illegal, worker restarted, failure: "
@@ -186,13 +186,13 @@ class TestPlay:
     @pytest.mark.parametrize(
         ("outcome", "winner", "start"),
         [
-            (Outcome.WIN, Player.BLACK, "black (random) wins after 0 plies"),
-            (Outcome.DRAW, None, "Draw after 0 plies"),
-            (Outcome.TURN_CAP, None, "Stopped at the turn cap after 0 plies"),
+            (MatchOutcome.WIN, Player.BLACK, "black (random) wins after 0 plies"),
+            (MatchOutcome.DRAW, None, "Draw after 0 plies"),
+            (MatchOutcome.TURN_CAP, None, "Stopped at the turn cap after 0 plies"),
         ],
     )
     def test_describes_result(
-        self, outcome: Outcome, winner: Player | None, start: str
+        self, outcome: MatchOutcome, winner: Player | None, start: str
     ) -> None:
         result = MatchResult(
             rules=Rules(),
@@ -205,4 +205,4 @@ class TestPlay:
             winner=winner,
         )
 
-        assert _describe_result(result).startswith(start)
+        assert describe_match_result(result).startswith(start)

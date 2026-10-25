@@ -10,8 +10,8 @@ from hive.agents.factory import AgentSpec
 from hive.engine.rules import Rules
 from hive.engine.serialization import GameRecord
 from hive.engine.state import Player
-from hive.match.records import DecisionRecord, MatchResult, Outcome
-from hive.match.worker import DEFAULT_GRACE_S, Worker
+from hive.match.records import DecisionRecord, MatchOutcome, MatchResult
+from hive.match.worker import DEFAULT_GRACE_S, AgentWorker
 
 
 def derive_seed(seed: int, *parts: str | int) -> int:
@@ -84,8 +84,8 @@ class MatchRunner:
             The result, with the game record and every decision.
 
         Raises:
-            WorkerError: If a worker fails to start, for example because its agent spec
-                is invalid.
+            AgentWorkerError: If a worker fails to start, for example because its agent
+                spec is invalid.
         """
         start = time.monotonic()
         state = self.rules.create_initial_state()
@@ -101,7 +101,7 @@ class MatchRunner:
         with ExitStack() as stack:
             workers = {
                 player: stack.enter_context(
-                    Worker(
+                    AgentWorker(
                         result.spec(player),
                         self.rules,
                         seed=self.seat_seed(player),
@@ -124,9 +124,9 @@ class MatchRunner:
 
         winners = self.rules.winners(state)
         if winners is not None and len(winners) == 1:
-            result.outcome = Outcome.WIN
+            result.outcome = MatchOutcome.WIN
             result.winner = winners[0]
         elif winners is not None:
-            result.outcome = Outcome.DRAW
+            result.outcome = MatchOutcome.DRAW
         result.duration_s = time.monotonic() - start
         return result

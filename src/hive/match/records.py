@@ -23,7 +23,7 @@ from hive.engine.serialization import (
 from hive.engine.state import Move, Player
 
 
-class CloseReason(StrEnum):
+class TurnCloseReason(StrEnum):
     """Why a turn closed, which also tells where the applied move came from."""
 
     FINAL = "final"
@@ -39,7 +39,7 @@ class CloseReason(StrEnum):
     """The turn closed without a legal candidate, so a seeded random move was taken."""
 
 
-class Outcome(StrEnum):
+class MatchOutcome(StrEnum):
     """How a match ended."""
 
     WIN = "win"
@@ -80,7 +80,7 @@ class DecisionRecord:
     budget_s: float
     elapsed_s: float
     overrun_s: float
-    close_reason: CloseReason
+    close_reason: TurnCloseReason
     candidates: int
     illegal_submissions: int
     move: Move | None
@@ -125,7 +125,7 @@ class DecisionRecord:
         Raises:
             ValueError: If `data` is not a valid serialized record.
         """
-        fields = _expect_mapping(data, "decision record")
+        fields = expect_mapping(data, "decision record")
         try:
             return cls(
                 ply=int(fields["ply"]),
@@ -135,7 +135,7 @@ class DecisionRecord:
                 budget_s=float(fields["budget_s"]),
                 elapsed_s=float(fields["elapsed_s"]),
                 overrun_s=float(fields["overrun_s"]),
-                close_reason=CloseReason(fields["close_reason"]),
+                close_reason=TurnCloseReason(fields["close_reason"]),
                 candidates=int(fields["candidates"]),
                 illegal_submissions=int(fields["illegal_submissions"]),
                 move=deserialize_move(fields["move"]),
@@ -172,7 +172,7 @@ class MatchResult:
     budget_s: float
     record: GameRecord
     decisions: list[DecisionRecord] = field(default_factory=list)
-    outcome: Outcome = Outcome.TURN_CAP
+    outcome: MatchOutcome = MatchOutcome.TURN_CAP
     winner: Player | None = None
     duration_s: float = 0.0
 
@@ -234,7 +234,7 @@ class MatchResult:
             ValueError: If `data` is not a valid serialized result, including specs of
                 agent kinds that are not registered.
         """
-        fields = _expect_mapping(data, "match result")
+        fields = expect_mapping(data, "match result")
         try:
             winner = fields["winner"]
             return cls(
@@ -247,7 +247,7 @@ class MatchResult:
                 decisions=[
                     DecisionRecord.from_dict(decision) for decision in fields["decisions"]
                 ],
-                outcome=Outcome(fields["outcome"]),
+                outcome=MatchOutcome(fields["outcome"]),
                 winner=None if winner is None else deserialize_player(winner),
                 duration_s=float(fields["duration_s"]),
             )
@@ -256,7 +256,7 @@ class MatchResult:
             raise ValueError(msg) from e
 
 
-def _expect_mapping(data: object, kind: str) -> Mapping[str, Any]:
+def expect_mapping(data: object, kind: str) -> Mapping[str, Any]:
     """Check that a serialized value is an object.
 
     Args:

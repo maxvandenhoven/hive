@@ -13,16 +13,16 @@ from hive.agents.factory import AgentSpec, InvalidAgentSpecError
 from hive.bench import PerftSuite
 from hive.engine.rules import Rules
 from hive.engine.state import Move
-from hive.match.records import DecisionRecord, MatchResult, Outcome
+from hive.match.records import DecisionRecord, MatchOutcome, MatchResult
 from hive.match.runner import MatchRunner
-from hive.match.worker import DEFAULT_GRACE_S, WorkerError
+from hive.match.worker import DEFAULT_GRACE_S, AgentWorkerError
 
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(name="hive", no_args_is_help=True)
 
 
-def _print_version(value: bool) -> None:
+def print_version(value: bool) -> None:
     """Print the package version and exit when `--version` is passed.
 
     Args:
@@ -42,7 +42,7 @@ def main(
         bool,
         typer.Option(
             "--version",
-            callback=_print_version,
+            callback=print_version,
             is_eager=True,
             help="Show the version and exit.",
         ),
@@ -87,26 +87,26 @@ def play(
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     runner = MatchRunner(
         rules=Rules(),
-        white_spec=_parse_spec(white, "--white"),
-        black_spec=_parse_spec(black, "--black"),
+        white_spec=parse_agent_spec(white, "--white"),
+        black_spec=parse_agent_spec(black, "--black"),
         budget_s=budget,
         max_turns=max_turns,
         seed=seed,
         grace_s=grace,
     )
     try:
-        result = runner.run(on_decision=_log_decision)
-    except WorkerError as e:
+        result = runner.run(on_decision=log_decision)
+    except AgentWorkerError as e:
         logger.error("%s", e)
         raise typer.Exit(code=1) from e
 
-    logger.info("%s", _describe_result(result))
+    logger.info("%s", describe_match_result(result))
     if out is not None:
         out.write_text(json.dumps(result.to_dict(), indent=2))
         logger.info("Wrote the match result to `%s`.", out)
 
 
-def _parse_spec(value: str, option: str) -> AgentSpec:
+def parse_agent_spec(value: str, option: str) -> AgentSpec:
     """Read an agent spec from a YAML file, or from inline YAML if no such file exists.
 
     Args:
@@ -128,7 +128,7 @@ def _parse_spec(value: str, option: str) -> AgentSpec:
         raise typer.BadParameter(str(e), param_hint=option) from e
 
 
-def _log_decision(decision: DecisionRecord) -> None:
+def log_decision(decision: DecisionRecord) -> None:
     """Log a one line summary of a decision.
 
     Args:
@@ -150,12 +150,12 @@ def _log_decision(decision: DecisionRecord) -> None:
         decision.ply,
         decision.player.name.lower(),
         decision.agent_label,
-        _format_move(decision.move),
+        format_move(decision.move),
         ", ".join(details),
     )
 
 
-def _describe_result(result: MatchResult) -> str:
+def describe_match_result(result: MatchResult) -> str:
     """Describe how a match ended, for example `white (negamax) wins after 27 plies`.
 
     Args:
@@ -165,10 +165,10 @@ def _describe_result(result: MatchResult) -> str:
         The outcome, the number of plies and the duration of the match.
     """
     plies = f"after {len(result.decisions)} plies in {result.duration_s:.1f} s"
-    if result.outcome is Outcome.WIN and result.winner is not None:
+    if result.outcome is MatchOutcome.WIN and result.winner is not None:
         spec = result.spec(result.winner)
         return f"{result.winner.name.lower()} ({spec.label or spec.kind}) wins {plies}"
-    if result.outcome is Outcome.DRAW:
+    if result.outcome is MatchOutcome.DRAW:
         return f"Draw {plies}"
     return f"Stopped at the turn cap {plies}"
 
@@ -207,7 +207,7 @@ def bench_perft(
         counts = bench.divide(state, rules, depth)
         seconds = time.perf_counter() - start
         for move, count in counts:
-            typer.echo(f"{_format_move(move)}: {count}")
+            typer.echo(f"{format_move(move)}: {count}")
         result = bench.PerftResult(
             depth=depth, nodes=sum(count for _, count in counts), seconds=seconds
         )
@@ -224,7 +224,7 @@ def bench_perft(
         raise typer.Exit(code=1)
 
 
-def _format_move(move: Move | None) -> str:
+def format_move(move: Move | None) -> str:
     """Format a move for the divide output, for example `ant (0, 0) -> (1, 0)`.
 
     Args:
