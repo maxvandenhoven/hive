@@ -21,7 +21,7 @@ PRAGMA_PATTERN = re.compile(r"^(noqa\b|type:|pragma:|fmt:|ruff:|ty:|isort:)")
 
 
 @dataclass(frozen=True, slots=True)
-class Violation:
+class CommentViolation:
     """A comment style violation at a line in a file.
 
     Attributes:
@@ -40,7 +40,7 @@ class Violation:
 
 
 @dataclass(frozen=True, slots=True)
-class Comment:
+class CommentToken:
     """A single comment token.
 
     Attributes:
@@ -56,7 +56,7 @@ class Comment:
     inline: bool
 
     @classmethod
-    def from_token(cls, token: tokenize.TokenInfo) -> "Comment":
+    def from_token(cls, token: tokenize.TokenInfo) -> "CommentToken":
         """Create a comment from a `COMMENT` token."""
         line, column = token.start
         return cls(
@@ -73,7 +73,7 @@ class Comment:
             self.line == 1 and self.text.startswith("!")
         )
 
-    def continues(self, previous: "Comment") -> bool:
+    def continues(self, previous: "CommentToken") -> bool:
         """Whether the comment continues the block that ends with `previous`."""
         return (
             not self.inline
@@ -91,7 +91,7 @@ class CommentBlock:
         comments: The comments in the block, in source order.
     """
 
-    comments: tuple[Comment, ...]
+    comments: tuple[CommentToken, ...]
 
     @classmethod
     def from_source(cls, source: str) -> list["CommentBlock"]:
@@ -107,21 +107,27 @@ class CommentBlock:
             tokenize.TokenError: If the source cannot be tokenized.
             SyntaxError: If the source contains invalid indentation.
         """
-        blocks: list[list[Comment]] = []
-        previous: Comment | None = None
+        blocks: list[list[CommentToken]] = []
+        previous: CommentToken | None = None
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+
         for token in tokens:
             if token.type != tokenize.COMMENT:
                 continue
-            comment = Comment.from_token(token)
+
+            comment = CommentToken.from_token(token)
+
             if comment.is_exempt or not comment.text:
                 previous = None
                 continue
+
             if previous is not None and comment.continues(previous):
                 blocks[-1].append(comment)
             else:
                 blocks.append([comment])
+
             previous = comment
+
         return [cls(tuple(block)) for block in blocks]
 
     @property
@@ -129,7 +135,7 @@ class CommentBlock:
         """The text of all comments in the block, joined by spaces."""
         return " ".join(comment.text for comment in self.comments)
 
-    def violations(self, path: Path) -> list[Violation]:
+    def violations(self, path: Path) -> list[CommentViolation]:
         """Check the block against the comment style rules.
 
         Args:
@@ -140,31 +146,34 @@ class CommentBlock:
         """
         words = self.text.split()
         violations = []
+
         if words[0][0].islower() and "://" not in words[0]:
             violations.append(
-                Violation(
-                    path,
-                    self.comments[0].line,
-                    "comment should start with a capital letter",
+                CommentViolation(
+                    path=path,
+                    line=self.comments[0].line,
+                    message="comment should start with a capital letter",
                 )
             )
+
         if (
             len(words) >= MIN_WORDS_FOR_PERIOD
             and not self.text.endswith(".")
             and "://" not in words[-1]
         ):
             violations.append(
-                Violation(
-                    path,
-                    self.comments[-1].line,
-                    f"comment of {MIN_WORDS_FOR_PERIOD} or more words should end with a "
-                    "period",
+                CommentViolation(
+                    path=path,
+                    line=self.comments[-1].line,
+                    message=f"comment of {MIN_WORDS_FOR_PERIOD} or more words should end "
+                    "with a period",
                 )
             )
+
         return violations
 
 
-def check_file(path: Path) -> list[Violation]:
+def check_file(path: Path) -> list[CommentViolation]:
     """Check all comments in a Python file.
 
     Args:
@@ -176,7 +185,10 @@ def check_file(path: Path) -> list[Violation]:
     try:
         blocks = CommentBlock.from_source(path.read_text())
     except (tokenize.TokenError, SyntaxError) as error:
-        return [Violation(path, 1, f"could not tokenize: {error}")]
+        return [
+            CommentViolation(path=path, line=1, message=f"could not tokenize: {error}")
+        ]
+
     return [violation for block in blocks for violation in block.violations(path)]
 
 
@@ -197,8 +209,10 @@ def main(argv: list[str] | None = None) -> int:
         if file.suffix == ".py"
     )
     violations = [violation for file in files for violation in check_file(file)]
+
     for violation in violations:
         sys.stdout.write(f"{violation}\n")
+
     return 1 if violations else 0
 
 

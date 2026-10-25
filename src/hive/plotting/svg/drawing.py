@@ -11,7 +11,7 @@ from hive.plotting.svg.constants import (
 from hive.plotting.svg.geometry import HexOrientation, axial_to_pixel, get_hex_points
 
 
-def _draw_piece_hex(
+def draw_piece_hex(
     group: dw.Group,
     cx: float,
     cy: float,
@@ -43,7 +43,7 @@ def _draw_piece_hex(
     # Slightly smaller hex so the grid lines remain visible.
     inner_size = size * 0.88
     resolved_stroke_width = stroke_width if stroke_width is not None else size * 0.03
-    points = get_hex_points(cx, cy, orientation=orientation, size=inner_size)
+    points = get_hex_points(cx=cx, cy=cy, orientation=orientation, size=inner_size)
     group.append(
         dw.Lines(
             *points,
@@ -74,7 +74,7 @@ def _draw_piece_hex(
         )
 
 
-def _draw_stack_badge(
+def draw_stack_badge(
     group: dw.Group, cx: float, cy: float, stack_height: int, size: float
 ) -> None:
     """Draw a small badge indicating how many pieces are stacked at a position.
@@ -131,8 +131,10 @@ def draw_grid(
         size: The radius of each hexagon.
     """
     for coord in grid_coords:
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
-        points = get_hex_points(cx, cy, orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
+        points = get_hex_points(cx=cx, cy=cy, orientation=orientation, size=size)
         group.append(
             dw.Lines(
                 *points,
@@ -164,10 +166,12 @@ def draw_pieces(
         use_sprites: If `True`, render pieces as SVG sprite images.
     """
     for coord in state.get_occupied_coords():
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
         top_piece = state.get_top_piece(coord)
 
-        _draw_piece_hex(
+        draw_piece_hex(
             group=group,
             cx=cx,
             cy=cy,
@@ -178,7 +182,7 @@ def draw_pieces(
             use_sprites=use_sprites,
         )
 
-        _draw_stack_badge(
+        draw_stack_badge(
             group=group,
             cx=cx,
             cy=cy,
@@ -205,9 +209,11 @@ def draw_highlights(
     for color, coords in highlights.items():
         for coord in coords:
             cx, cy = axial_to_pixel(
-                coord[0], coord[1], orientation=orientation, size=size
+                q=coord[0], r=coord[1], orientation=orientation, size=size
             )
-            ring_points = get_hex_points(cx, cy, orientation=orientation, size=size * 0.9)
+            ring_points = get_hex_points(
+                cx=cx, cy=cy, orientation=orientation, size=size * 0.9
+            )
             group.append(
                 dw.Lines(
                     *ring_points,
@@ -250,6 +256,7 @@ def draw_hand_panel(
     all_types: list[PieceType] = sorted(
         set(state.hand[Player.WHITE].keys()) | set(state.hand[Player.BLACK].keys())
     )
+
     if not all_types:
         return 0.0
 
@@ -315,7 +322,7 @@ def draw_hand_panel(
             icon_x = icon_x_start + type_idx * icon_spacing
             count = state.hand[player].get(piece_type, 0)
 
-            _draw_piece_hex(
+            draw_piece_hex(
                 group=group,
                 cx=icon_x,
                 cy=icon_y,
@@ -330,7 +337,7 @@ def draw_hand_panel(
             # Semi-transparent overlay to dim exhausted pieces.
             if count == 0:
                 dim_points = get_hex_points(
-                    icon_x, icon_y, orientation=orientation, size=icon_size * 0.88
+                    cx=icon_x, cy=icon_y, orientation=orientation, size=icon_size * 0.88
                 )
                 group.append(
                     dw.Lines(

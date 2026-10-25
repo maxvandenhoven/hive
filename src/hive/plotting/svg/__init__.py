@@ -19,7 +19,7 @@ from hive.plotting.svg.geometry import (
 HEX_SIZE = 50.0
 
 
-def _hand_panel_natural_size(state: GameState) -> tuple[float, float]:
+def hand_panel_natural_size(state: GameState) -> tuple[float, float]:
     """Compute the natural width and height of the hand panel.
 
     Args:
@@ -38,6 +38,7 @@ def _hand_panel_natural_size(state: GameState) -> tuple[float, float]:
     column_gap = spacing * 1.5
     width = 2 * column_width + column_gap + 2 * spacing
     height = HEX_SIZE * 5.5
+
     return width, height
 
 
@@ -75,13 +76,15 @@ def draw_board(
 
     # Determine the grid extent based on the furthest occupied coordinate. Always show at
     # least min_radius to give some breathing room around the starting pieces.
-    max_distance = max(get_distance((0, 0), coord) for coord in state.board)
+    max_distance = max(
+        get_distance(source_coord=(0, 0), target_coord=coord) for coord in state.board
+    )
     grid_radius = max(min_radius, max_distance + 1)
     grid_coords = get_grid_coords(grid_radius)
 
     # Pixel positions of every grid hex center.
     all_xy = [
-        axial_to_pixel(coord[0], coord[1], orientation=orientation, size=HEX_SIZE)
+        axial_to_pixel(q=coord[0], r=coord[1], orientation=orientation, size=HEX_SIZE)
         for coord in grid_coords
     ]
     all_x = [pixel[0] for pixel in all_xy]
@@ -123,8 +126,9 @@ def draw_board(
     hand_pixel_height = 0.0
     hand_scale = board_scale
     hand_natural_width = 0.0
+
     if show_hands:
-        hand_natural_width, hand_natural_height = _hand_panel_natural_size(state)
+        hand_natural_width, hand_natural_height = hand_panel_natural_size(state)
         hand_scale = canvas_width / hand_natural_width
         hand_pixel_height = hand_natural_height * hand_scale
 

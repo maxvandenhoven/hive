@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 STARTUP_TURN_ID = 0
 """The turn id of the messages that report the startup of a worker."""
 
-INFO_INTERVAL_S = 0.1
+INFO_MESSAGE_INTERVAL_S = 0.1
 """The minimum number of seconds between two progress reports sent over the pipe."""
 
 
@@ -131,7 +131,7 @@ class PipeTurnContext(TurnContext):
         turn_id: int,
         deadline: float,
         *,
-        info_interval_s: float = INFO_INTERVAL_S,
+        info_interval_s: float = INFO_MESSAGE_INTERVAL_S,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         """Initialize the context of one turn.

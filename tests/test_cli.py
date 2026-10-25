@@ -26,6 +26,7 @@ def write_suite(path: Path, counts: dict[str, int]) -> Path:
     """Write a perft suite with default rules, the start position and the given counts."""
     position = {"name": "start", "moves": [], "counts": counts}
     path.write_text(json.dumps({"rules": {}, "positions": [position]}))
+
     return path
 
 

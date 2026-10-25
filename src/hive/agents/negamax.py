@@ -28,9 +28,9 @@ class NegamaxAgent(SearchAgent):
             The score of the root from the perspective of the player to move, and the
             principal variation starting with the best move.
         """
-        return self._negamax(state, depth, 0)
+        return self.negamax(state=state, depth=depth, ply=0)
 
-    def _negamax(
+    def negamax(
         self, state: GameState, depth: int, ply: int
     ) -> tuple[float, list[Move | None]]:
         """Recursively search the game tree using negamax.
@@ -47,24 +47,31 @@ class NegamaxAgent(SearchAgent):
             The score of the node from the perspective of the player to move, and the
             principal variation from this node, which is empty at leaves.
         """
-        self._visit_node()
-        terminal_score = self._terminal_score(state, state.current_player, ply)
+        self.visit_node()
+        terminal_score = self.terminal_score(
+            state=state, player=state.current_player, ply=ply
+        )
+
         if terminal_score is not None:
             return terminal_score, []
+
         if depth == 0:
-            self._cutoff = True
-            return self.evaluate(state, state.current_player), []
+            self.cutoff = True
+            return self.evaluate(state=state, player=state.current_player), []
 
         best_score = -math.inf
         best_pv: list[Move | None] = []
+
         for move in self.rules.legal_moves(state):
             state.apply_move(move)
+
             try:
-                child_score, pv = self._negamax(state, depth - 1, ply + 1)
+                child_score, pv = self.negamax(state=state, depth=depth - 1, ply=ply + 1)
             finally:
                 state.undo_move(move)
 
             score = -child_score
+
             if score > best_score:
                 best_score = score
                 best_pv = [move, *pv]

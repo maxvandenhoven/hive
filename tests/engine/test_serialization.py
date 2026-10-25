@@ -31,25 +31,29 @@ from hive.engine.serialization import (
 )
 from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
 
-_coords = st.tuples(st.integers(-50, 50), st.integers(-50, 50))
-_moves = st.none() | st.builds(
+coord_strategy = st.tuples(st.integers(-50, 50), st.integers(-50, 50))
+move_strategy = st.none() | st.builds(
     Move,
     piece_type=st.sampled_from(PieceType),
-    source_coord=st.none() | _coords,
-    target_coord=_coords,
+    source_coord=st.none() | coord_strategy,
+    target_coord=coord_strategy,
 )
-_pieces = st.builds(Piece, type=st.sampled_from(PieceType), owner=st.sampled_from(Player))
-_boards = st.dictionaries(_coords, st.lists(_pieces, min_size=1, max_size=4), max_size=8)
-_setups = st.none() | st.builds(
+piece_strategy = st.builds(
+    Piece, type=st.sampled_from(PieceType), owner=st.sampled_from(Player)
+)
+board_strategy = st.dictionaries(
+    coord_strategy, st.lists(piece_strategy, min_size=1, max_size=4), max_size=8
+)
+setup_strategy = st.none() | st.builds(
     BoardSetup,
-    board=_boards,
+    board=board_strategy,
     current_player=st.sampled_from(Player),
     current_ply=st.none() | st.integers(0, 200),
 )
 
 
 @st.composite
-def _rules(draw: st.DrawFn) -> Rules:
+def rules_strategy(draw: st.DrawFn) -> Rules:
     """Draw a valid rules configuration."""
     other_types = [
         piece_type for piece_type in PieceType if piece_type is not PieceType.QUEEN
@@ -59,6 +63,7 @@ def _rules(draw: st.DrawFn) -> Rules:
     )
     queen_by_turn = draw(st.none() | st.integers(1, 10))
     allow_queen_first_turn = draw(st.booleans()) or queen_by_turn == 1
+
     return Rules(
         piece_counts=piece_counts,
         starting_player=draw(st.sampled_from(Player)),
@@ -69,17 +74,20 @@ def _rules(draw: st.DrawFn) -> Rules:
     )
 
 
-_records = st.builds(
-    GameRecord, rules=_rules(), setup=_setups, moves=st.lists(_moves, max_size=10)
+record_strategy = st.builds(
+    GameRecord,
+    rules=rules_strategy(),
+    setup=setup_strategy,
+    moves=st.lists(move_strategy, max_size=10),
 )
 
 
-def _through_json(data: JsonValue) -> object:
+def through_json(data: JsonValue) -> object:
     """Write and read a serialized value as JSON, which turns tuples into lists."""
     return json.loads(json.dumps(data))
 
 
-def _snapshot(state: GameState) -> tuple[object, ...]:
+def snapshot(state: GameState) -> tuple[object, ...]:
     """Capture every field of a state for comparison."""
     return (
         {coord: list(stack) for coord, stack in state.board.items()},
@@ -90,52 +98,54 @@ def _snapshot(state: GameState) -> tuple[object, ...]:
     )
 
 
-def _random_game(rules: Rules, plies: int, seed: int) -> list[Move | None]:
+def random_game(rules: Rules, plies: int, seed: int) -> list[Move | None]:
     """Play a seeded random game and return its moves."""
     rng = random.Random(seed)
     state = rules.create_initial_state()
     moves: list[Move | None] = []
+
     while len(moves) < plies and not rules.is_finished(state):
         move = rng.choice(rules.legal_moves(state))
         state.apply_move(move)
         moves.append(move)
+
     return moves
 
 
 class TestRoundTrip:
     @given(st.sampled_from(Player))
     def test_player(self, player: Player) -> None:
-        assert deserialize_player(_through_json(serialize_player(player))) is player
+        assert deserialize_player(through_json(serialize_player(player))) is player
 
     @given(st.sampled_from(PieceType))
     def test_piece_type(self, piece_type: PieceType) -> None:
-        data = _through_json(serialize_piece_type(piece_type))
+        data = through_json(serialize_piece_type(piece_type))
 
         assert deserialize_piece_type(data) is piece_type
 
-    @given(_coords)
+    @given(coord_strategy)
     def test_coordinate(self, coord: Coordinate) -> None:
-        assert deserialize_coordinate(_through_json(serialize_coordinate(coord))) == coord
+        assert deserialize_coordinate(through_json(serialize_coordinate(coord))) == coord
 
-    @given(_moves)
+    @given(move_strategy)
     def test_move(self, move: Move | None) -> None:
-        assert deserialize_move(_through_json(serialize_move(move))) == move
+        assert deserialize_move(through_json(serialize_move(move))) == move
 
-    @given(_rules())
+    @given(rules_strategy())
     def test_rules(self, rules: Rules) -> None:
-        assert deserialize_rules(_through_json(serialize_rules(rules))) == rules
+        assert deserialize_rules(through_json(serialize_rules(rules))) == rules
 
-    @given(_boards)
+    @given(board_strategy)
     def test_board(self, board: GameBoard) -> None:
-        assert deserialize_board(_through_json(serialize_board(board))) == board
+        assert deserialize_board(through_json(serialize_board(board))) == board
 
-    @given(_setups)
+    @given(setup_strategy)
     def test_setup(self, setup: BoardSetup | None) -> None:
-        assert deserialize_setup(_through_json(serialize_setup(setup))) == setup
+        assert deserialize_setup(through_json(serialize_setup(setup))) == setup
 
-    @given(_records)
+    @given(record_strategy)
     def test_record(self, record: GameRecord) -> None:
-        assert deserialize_record(_through_json(serialize_record(record))) == record
+        assert deserialize_record(through_json(serialize_record(record))) == record
 
 
 class TestFormat:
@@ -168,10 +178,10 @@ class TestFormat:
 
     def test_board_is_ordered_by_coordinate(self) -> None:
         board: GameBoard = {
-            (1, 0): [Piece(PieceType.ANT, Player.BLACK)],
+            (1, 0): [Piece(type=PieceType.ANT, owner=Player.BLACK)],
             (0, 0): [
-                Piece(PieceType.QUEEN, Player.WHITE),
-                Piece(PieceType.BEETLE, Player.BLACK),
+                Piece(type=PieceType.QUEEN, owner=Player.WHITE),
+                Piece(type=PieceType.BEETLE, owner=Player.BLACK),
             ],
         }
 
@@ -322,31 +332,32 @@ class TestGameRecord:
     @pytest.mark.parametrize("seed", range(5))
     def test_replay_matches_fast_path(self, seed: int) -> None:
         rules = Rules()
-        moves = _random_game(rules, plies=60, seed=seed)
+        moves = random_game(rules=rules, plies=60, seed=seed)
         state = rules.create_initial_state()
+
         for move in moves:
             state.apply_move(move)
 
         record = deserialize_record(
-            _through_json(serialize_record(GameRecord(rules=rules, moves=moves)))
+            through_json(serialize_record(GameRecord(rules=rules, moves=moves)))
         )
 
-        assert _snapshot(record.replay()) == _snapshot(state)
+        assert snapshot(record.replay()) == snapshot(state)
 
     def test_states(self) -> None:
         rules = Rules()
-        moves = _random_game(rules, plies=20, seed=0)
+        moves = random_game(rules=rules, plies=20, seed=0)
         record = GameRecord(rules=rules, moves=moves)
 
         states = list(record.states())
 
         assert len(states) == len(moves) + 1
         assert [state.current_ply for state in states] == list(range(len(moves) + 1))
-        assert _snapshot(states[-1]) == _snapshot(record.replay())
+        assert snapshot(states[-1]) == snapshot(record.replay())
 
     def test_states_are_independent(self) -> None:
         rules = Rules()
-        record = GameRecord(rules=rules, moves=_random_game(rules, plies=4, seed=0))
+        record = GameRecord(rules=rules, moves=random_game(rules=rules, plies=4, seed=0))
 
         states = list(record.states())
         states[0].apply_move(rules.legal_moves(states[0])[0])
@@ -361,6 +372,7 @@ class TestGameRecord:
 
         with pytest.raises(IllegalMoveError, match="ply `1`"):
             record.replay()
+
         with pytest.raises(IllegalMoveError):
             list(record.states())
 
@@ -371,8 +383,8 @@ class TestGameRecord:
     def test_replay_from_setup(self) -> None:
         rules = Rules()
         board: GameBoard = {
-            (0, 0): [Piece(PieceType.QUEEN, Player.WHITE)],
-            (1, 0): [Piece(PieceType.QUEEN, Player.BLACK)],
+            (0, 0): [Piece(type=PieceType.QUEEN, owner=Player.WHITE)],
+            (1, 0): [Piece(type=PieceType.QUEEN, owner=Player.BLACK)],
         }
         setup = BoardSetup(board=board, current_player=Player.WHITE)
         move = Move(piece_type=PieceType.QUEEN, source_coord=(0, 0), target_coord=(1, -1))
@@ -384,8 +396,8 @@ class TestGameRecord:
 
     def test_rejects_invalid_setup(self) -> None:
         board: GameBoard = {
-            (0, 0): [Piece(PieceType.ANT, Player.WHITE)],
-            (2, 0): [Piece(PieceType.ANT, Player.BLACK)],
+            (0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)],
+            (2, 0): [Piece(type=PieceType.ANT, owner=Player.BLACK)],
         }
         setup = BoardSetup(board=board, current_player=Player.WHITE)
 
@@ -393,11 +405,13 @@ class TestGameRecord:
             GameRecord(rules=Rules(), setup=setup).replay()
 
     def test_setup_board_is_copied(self) -> None:
-        board: GameBoard = {(0, 0): [Piece(PieceType.ANT, Player.WHITE)]}
+        board: GameBoard = {(0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)]}
         record = GameRecord(
             rules=Rules(), setup=BoardSetup(board=board, current_player=Player.BLACK)
         )
 
-        record.replay().board[(0, 0)].append(Piece(PieceType.BEETLE, Player.BLACK))
+        record.replay().board[(0, 0)].append(
+            Piece(type=PieceType.BEETLE, owner=Player.BLACK)
+        )
 
-        assert board == {(0, 0): [Piece(PieceType.ANT, Player.WHITE)]}
+        assert board == {(0, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)]}

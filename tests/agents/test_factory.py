@@ -23,12 +23,12 @@ from hive.engine.state import GameState
 
 
 @dataclass(frozen=True, slots=True)
-class _Network:
+class Network:
     hidden: int = 8
     blocks: int = 2
 
 
-class _NeuralAgent(Agent):
+class NeuralAgent(Agent):
     """Agent with a required param and a nested config, like a future neural agent."""
 
     def __init__(
@@ -37,7 +37,7 @@ class _NeuralAgent(Agent):
         *,
         seed: int,
         weights: str,
-        network: _Network = _Network(),  # noqa: B008
+        network: Network = Network(),  # noqa: B008
         temperature: Annotated[float, Field(gt=0)] = 1.0,
     ) -> None:
         """Initialize the agent.
@@ -54,17 +54,19 @@ class _NeuralAgent(Agent):
             ValueError: If `weights` is empty, which this description must not extend
                 into the description of `temperature`.
         """
-        super().__init__(rules, seed=seed)
+        super().__init__(rules=rules, seed=seed)
+
         if not weights:
             msg = "Missing weights."
             raise ValueError(msg)
+
         self.weights = weights
         self.network = network
         self.temperature = temperature
 
     @override
     def think(self, state: GameState, turn: TurnContext) -> None:
-        turn.submit(None, final=True)
+        turn.submit(move=None, final=True)
 
 
 @pytest.fixture(scope="function")
@@ -81,11 +83,13 @@ class TestAgentSpecFromYaml:
             ("kind: random", AgentSpec("random")),
             (
                 "kind: negamax\nlabel: nm3\nparams:\n  depth: 3\n  mobility: 0.5\n",
-                AgentSpec("negamax", {"depth": 3, "mobility": 0.5}, label="nm3"),
+                AgentSpec(
+                    kind="negamax", params={"depth": 3, "mobility": 0.5}, label="nm3"
+                ),
             ),
             (
                 "{kind: minimax, params: {depth: null}}",
-                AgentSpec("minimax", {"depth": None}),
+                AgentSpec(kind="minimax", params={"depth": None}),
             ),
         ],
     )
@@ -114,6 +118,7 @@ class TestAgentSpecFromYaml:
 
     def test_lists_every_invalid_param(self) -> None:
         text = "kind: negamax\nparams: {depth: 0, depht: 2, mobility: high}"
+
         with pytest.raises(InvalidAgentSpecError) as excinfo:
             AgentSpec.from_yaml(text)
 
@@ -132,7 +137,9 @@ class TestAgentSpecFile:
         path = tmp_path / "nm3.yaml"
         path.write_text("kind: negamax\nlabel: nm3\nparams:\n  depth: 3\n")
 
-        assert AgentSpec.load(path) == AgentSpec("negamax", {"depth": 3}, label="nm3")
+        assert AgentSpec.load(path) == AgentSpec(
+            kind="negamax", params={"depth": 3}, label="nm3"
+        )
 
     def test_names_file_in_errors(self, tmp_path: Path) -> None:
         path = tmp_path / "bad.yaml"
@@ -145,7 +152,10 @@ class TestAgentSpecFile:
 
     @pytest.mark.parametrize(
         "spec",
-        [AgentSpec("random"), AgentSpec("negamax", {"depth": 2, "mobility": 0.5}, "nm2")],
+        [
+            AgentSpec("random"),
+            AgentSpec(kind="negamax", params={"depth": 2, "mobility": 0.5}, label="nm2"),
+        ],
     )
     def test_round_trips(self, spec: AgentSpec) -> None:
         assert AgentSpec.from_dict(spec.to_dict()) == spec
@@ -185,17 +195,20 @@ class TestAgentSpecResolve:
         (tmp_path / "nm3").write_text("kind: negamax\nlabel: mine\n")
         monkeypatch.chdir(tmp_path)
 
-        assert AgentSpec.resolve("nm3") == AgentSpec("negamax", label="mine")
+        assert AgentSpec.resolve("nm3") == AgentSpec(kind="negamax", label="mine")
 
     @pytest.mark.parametrize(
         ("value", "expected"),
         [
             ("nm2", AgentSpec(kind="negamax", params={"depth": 2}, label="nm2")),
             ("random", AgentSpec("random")),
-            ("{kind: negamax, params: {depth: 2}}", AgentSpec("negamax", {"depth": 2})),
+            (
+                "{kind: negamax, params: {depth: 2}}",
+                AgentSpec(kind="negamax", params={"depth": 2}),
+            ),
             (
                 "{kind: random, label: " + "x" * 300 + "}",
-                AgentSpec("random", label="x" * 300),
+                AgentSpec(kind="random", label="x" * 300),
             ),
         ],
     )
@@ -213,17 +226,23 @@ class TestBuildAgent:
         [("random", RandomAgent), ("minimax", MinimaxAgent), ("negamax", NegamaxAgent)],
     )
     def test_builds_registered_kind(self, kind: str, agent_class: type[Agent]) -> None:
-        assert type(build_agent(AgentSpec(kind), Rules(), seed=0)) is agent_class
+        assert (
+            type(build_agent(spec=AgentSpec(kind), rules=Rules(), seed=0)) is agent_class
+        )
 
     def test_applies_params(self) -> None:
-        spec = AgentSpec("negamax", {"depth": 3, "mobility": 0.5, "queen_safety": 0})
-        agent = build_agent(spec, Rules(), seed=0)
+        spec = AgentSpec(
+            kind="negamax", params={"depth": 3, "mobility": 0.5, "queen_safety": 0}
+        )
+        agent = build_agent(spec=spec, rules=Rules(), seed=0)
 
         assert isinstance(agent, NegamaxAgent)
         assert (agent.depth, agent.mobility, agent.queen_safety) == (3, 0.5, 0.0)
 
     def test_coerces_strings(self) -> None:
-        agent = build_agent(AgentSpec("negamax", {"depth": "2"}), Rules(), seed=0)
+        agent = build_agent(
+            spec=AgentSpec(kind="negamax", params={"depth": "2"}), rules=Rules(), seed=0
+        )
 
         assert isinstance(agent, NegamaxAgent)
         assert agent.depth == 2
@@ -231,19 +250,25 @@ class TestBuildAgent:
     def test_passes_rules(self) -> None:
         rules = Rules(max_turns=10)
 
-        assert build_agent(AgentSpec("random"), rules, seed=0).rules is rules
+        assert build_agent(spec=AgentSpec("random"), rules=rules, seed=0).rules is rules
 
     @pytest.mark.parametrize(
         ("spec", "match"),
         [
             (AgentSpec("alphazero"), "Unknown agent kind `alphazero`"),
-            (AgentSpec("random", {"depth": 1}), "params.depth: Unknown param"),
-            (AgentSpec("negamax", {"depth": 0}), "params.depth: Input should be greater"),
+            (
+                AgentSpec(kind="random", params={"depth": 1}),
+                "params.depth: Unknown param",
+            ),
+            (
+                AgentSpec(kind="negamax", params={"depth": 0}),
+                "params.depth: Input should be greater",
+            ),
         ],
     )
     def test_rejects_invalid(self, spec: AgentSpec, match: str) -> None:
         with pytest.raises(InvalidAgentSpecError, match=match):
-            build_agent(spec, Rules(), seed=0)
+            build_agent(spec=spec, rules=Rules(), seed=0)
 
 
 class TestListAgents:
@@ -290,16 +315,16 @@ class TestListAgents:
 @pytest.mark.usefixtures("agent_registry")
 class TestRegisterAgent:
     def test_registers_class_with_nested_params(self) -> None:
-        assert register_agent("neural")(_NeuralAgent) is _NeuralAgent
+        assert register_agent("neural")(NeuralAgent) is NeuralAgent
 
         spec = AgentSpec.from_yaml(
             "kind: neural\nparams:\n  weights: s3://a.onnx\n  network: {hidden: 64}"
         )
-        agent = build_agent(spec, Rules(), seed=0)
+        agent = build_agent(spec=spec, rules=Rules(), seed=0)
 
-        assert isinstance(agent, _NeuralAgent)
+        assert isinstance(agent, NeuralAgent)
         assert agent.weights == "s3://a.onnx"
-        assert agent.network == _Network(hidden=64, blocks=2)
+        assert agent.network == Network(hidden=64, blocks=2)
         assert agent.temperature == 1.0
         properties = list_agents()[-1].params_schema["properties"]
         assert isinstance(properties, dict)
@@ -312,7 +337,7 @@ class TestRegisterAgent:
         }
 
     def test_derives_required_and_constrained_params(self) -> None:
-        register_agent("neural")(_NeuralAgent)
+        register_agent("neural")(NeuralAgent)
         schema = {agent.kind: agent for agent in list_agents()}["neural"].params_schema
 
         assert schema["required"] == ["weights"]
@@ -323,10 +348,12 @@ class TestRegisterAgent:
             "title": "Weights",
             "type": "string",
         }
+
         with pytest.raises(InvalidAgentSpecError, match="temperature: Input should be"):
             AgentSpec.from_dict(
                 {"kind": "neural", "params": {"weights": "w", "temperature": 0}}
             )
+
         with pytest.raises(
             InvalidAgentSpecError, match=r"params\.weights: Field required"
         ):
@@ -334,32 +361,32 @@ class TestRegisterAgent:
 
     def test_rejects_duplicate_kind(self) -> None:
         with pytest.raises(ValueError, match="`random` is already registered"):
-            register_agent("random")(_NeuralAgent)
+            register_agent("random")(NeuralAgent)
 
     def test_rejects_missing_seed(self) -> None:
-        class _NoSeed(_NeuralAgent):
+        class NoSeedAgent(NeuralAgent):
             def __init__(self, rules: Rules) -> None:
-                super().__init__(rules, seed=0, weights="w")
+                super().__init__(rules=rules, seed=0, weights="w")
 
         with pytest.raises(TypeError, match="must start with `rules` and `seed`"):
-            register_agent("no-seed")(_NoSeed)
+            register_agent("no-seed")(NoSeedAgent)
 
     def test_rejects_positional_param(self) -> None:
-        class _Positional(_NeuralAgent):
+        class PositionalAgent(NeuralAgent):
             def __init__(self, rules: Rules, seed: int, depth: int) -> None:
-                super().__init__(rules, seed=seed, weights="w")
+                super().__init__(rules=rules, seed=seed, weights="w")
 
         with pytest.raises(
-            TypeError, match="`depth` of `_Positional` must be keyword-only"
+            TypeError, match="`depth` of `PositionalAgent` must be keyword-only"
         ):
-            register_agent("positional")(_Positional)
+            register_agent("positional")(PositionalAgent)
 
     def test_rejects_missing_annotation(self) -> None:
-        class _Unannotated(_NeuralAgent):
+        class UnannotatedAgent(NeuralAgent):
             def __init__(self, rules: Rules, *, seed: int, depth=1) -> None:  # noqa: ANN001
-                super().__init__(rules, seed=seed, weights="w")
+                super().__init__(rules=rules, seed=seed, weights="w")
 
         with pytest.raises(
-            TypeError, match="`depth` of `_Unannotated` has no annotation"
+            TypeError, match="`depth` of `UnannotatedAgent` has no annotation"
         ):
-            register_agent("unannotated")(_Unannotated)
+            register_agent("unannotated")(UnannotatedAgent)

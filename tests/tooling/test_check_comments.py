@@ -6,7 +6,7 @@ from check_comments import CommentBlock, main
 PATH = Path("example.py")
 
 
-def _messages(source: str) -> list[str]:
+def messages(source: str) -> list[str]:
     """Check a source string and return the violations as `line: message` strings."""
     return [
         f"{violation.line}: {violation.message}"
@@ -17,78 +17,78 @@ def _messages(source: str) -> list[str]:
 
 class TestCapitalisation:
     def test_capitalised_comment_passes(self) -> None:
-        assert _messages("# Short note\nx = 1\n") == []
+        assert messages("# Short note\nx = 1\n") == []
 
     def test_lowercase_comment_fails(self) -> None:
-        assert _messages("# short note\nx = 1\n") == [
+        assert messages("# short note\nx = 1\n") == [
             "1: comment should start with a capital letter"
         ]
 
     def test_non_letter_start_passes(self) -> None:
-        assert _messages("# `x` is the counter\nx = 1\n") == []
+        assert messages("# `x` is the counter\nx = 1\n") == []
 
     def test_inline_comment_is_checked(self) -> None:
-        assert _messages("x = 1  # lowercase\n") == [
+        assert messages("x = 1  # lowercase\n") == [
             "1: comment should start with a capital letter"
         ]
 
     def test_url_start_passes(self) -> None:
-        assert _messages("# https://example.com/some/long/path\nx = 1\n") == []
+        assert messages("# https://example.com/some/long/path\nx = 1\n") == []
 
 
 class TestPeriod:
     def test_short_comment_without_period_passes(self) -> None:
-        assert _messages("# Four words no period\nx = 1\n") == []
+        assert messages("# Four words no period\nx = 1\n") == []
 
     def test_long_comment_without_period_fails(self) -> None:
-        assert _messages("# Five words and no period\nx = 1\n") == [
+        assert messages("# Five words and no period\nx = 1\n") == [
             "1: comment of 5 or more words should end with a period"
         ]
 
     def test_long_comment_with_period_passes(self) -> None:
-        assert _messages("# Five words and a period.\nx = 1\n") == []
+        assert messages("# Five words and a period.\nx = 1\n") == []
 
     def test_long_inline_comment_without_period_fails(self) -> None:
-        assert _messages("x = 1  # Five words and no period\n") == [
+        assert messages("x = 1  # Five words and no period\n") == [
             "1: comment of 5 or more words should end with a period"
         ]
 
     def test_trailing_url_passes(self) -> None:
-        assert _messages("# See the reference at https://example.com/x\nx = 1\n") == []
+        assert messages("# See the reference at https://example.com/x\nx = 1\n") == []
 
 
 class TestBlocks:
     def test_block_is_checked_as_one_comment(self) -> None:
         source = "# This comment spans two lines and\n# continues in lowercase.\nx = 1\n"
 
-        assert _messages(source) == []
+        assert messages(source) == []
 
     def test_block_violation_reports_first_line(self) -> None:
         source = "# this comment spans two lines and\n# continues in lowercase.\nx = 1\n"
 
-        assert _messages(source) == ["1: comment should start with a capital letter"]
+        assert messages(source) == ["1: comment should start with a capital letter"]
 
     def test_block_period_violation_reports_last_line(self) -> None:
         source = "# This comment spans two lines and\n# has no final period\nx = 1\n"
 
-        assert _messages(source) == [
+        assert messages(source) == [
             "2: comment of 5 or more words should end with a period"
         ]
 
     def test_empty_comment_line_separates_paragraphs(self) -> None:
         source = "# First paragraph ends here.\n#\n# second paragraph\nx = 1\n"
 
-        assert _messages(source) == ["3: comment should start with a capital letter"]
+        assert messages(source) == ["3: comment should start with a capital letter"]
 
     def test_different_indentation_separates_blocks(self) -> None:
         source = "if True:\n    # Indented block\n    x = 1\n# dedented block\ny = 2\n"
 
-        assert _messages(source) == ["4: comment should start with a capital letter"]
+        assert messages(source) == ["4: comment should start with a capital letter"]
 
     def test_inline_comment_is_not_joined_with_next_line(self) -> None:
         source = "x = 1  # Inline note\n# next block\ny = 2\n"
 
-        assert _messages(source) == ["2: comment should start with a capital letter"]
+        assert messages(source) == ["2: comment should start with a capital letter"]
 
 
 class TestExemptions:
@@ -104,17 +104,17 @@ class TestExemptions:
         ],
     )
     def test_pragma_is_skipped(self, comment: str) -> None:
-        assert _messages(f"x = 1  {comment}\n") == []
-        assert _messages(f"{comment}\nx = 1\n") == []
+        assert messages(f"x = 1  {comment}\n") == []
+        assert messages(f"{comment}\nx = 1\n") == []
 
     def test_shebang_is_skipped(self) -> None:
-        assert _messages("#!/usr/bin/env python3\nx = 1\n") == []
+        assert messages("#!/usr/bin/env python3\nx = 1\n") == []
 
     def test_hash_in_string_is_not_a_comment(self) -> None:
-        assert _messages('color = "#ffffff"\n') == []
+        assert messages('color = "#ffffff"\n') == []
 
     def test_todo_with_owner_is_checked(self) -> None:
-        assert _messages("# TODO(WP 03): Replace this with the new rules.\nx = 1\n") == []
+        assert messages("# TODO(WP 03): Replace this with the new rules.\nx = 1\n") == []
 
 
 class TestMain:
@@ -126,6 +126,7 @@ class TestMain:
         nested.mkdir()
         (nested / "bad.py").write_text("x = 1  # bad comment\n")
         (nested / "notes.txt").write_text("# not python\n")
+
         return tmp_path
 
     def test_reports_violations_and_exits_non_zero(

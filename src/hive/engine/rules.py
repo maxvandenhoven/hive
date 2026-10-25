@@ -75,7 +75,7 @@ class Rules:
 
         # Validate that every piece type in the config has movement behaviour.
         for piece_type, count in piece_counts.items():
-            if count > 0 and piece_type not in self._TARGET_COORDS:
+            if count > 0 and piece_type not in self.PIECE_TARGET_COORDS:
                 msg = (
                     f"Missing movement behaviour for piece type `{piece_type.name}` with "
                     f"count `{count}`."
@@ -175,10 +175,12 @@ class Rules:
                 raise InvalidBoardError(msg)
 
             state.board[coord] = list(stack)
+
             for piece in stack:
                 state.hand[piece.owner][piece.type] = (
                     state.hand[piece.owner].get(piece.type, 0) - 1
                 )
+
                 if piece.type is PieceType.QUEEN:
                     state.queen_coord[piece.owner] = coord
 
@@ -200,11 +202,11 @@ class Rules:
             raise InvalidBoardError(msg)
 
         state.current_player = current_player
-        state.current_ply = self._validate_ply(state, current_ply)
+        state.current_ply = self.validate_ply(state=state, current_ply=current_ply)
 
         return state
 
-    def _validate_ply(self, state: GameState, current_ply: int | None) -> int:
+    def validate_ply(self, state: GameState, current_ply: int | None) -> int:
         """Validate the ply of a state built from a board, or derive the lowest valid one.
 
         Args:
@@ -219,6 +221,7 @@ class Rules:
                 player, or leaves a player with more pieces on the board than turns taken.
         """
         piece_count = {player: 0 for player in Player}
+
         for stack in state.board.values():
             for piece in stack:
                 piece_count[piece.owner] += 1
@@ -233,8 +236,10 @@ class Rules:
             current_ply = max(
                 2 * piece_count[starting_player] - 1, 2 * piece_count[second_player], 0
             )
+
             if (current_ply % 2 == 0) != expect_even:
                 current_ply += 1
+
             return current_ply
 
         if current_ply < 0:
@@ -252,6 +257,7 @@ class Rules:
             starting_player: (current_ply + 1) // 2,
             second_player: current_ply // 2,
         }
+
         for player in Player:
             if piece_count[player] > turns_taken[player]:
                 msg = (
@@ -328,6 +334,7 @@ class Rules:
         placeable_piece_types = self.placeable_piece_types(state)
 
         moves: list[Move] = []
+
         for coord in self.placeable_coords(state):
             for piece_type in placeable_piece_types:
                 moves.append(
@@ -335,6 +342,7 @@ class Rules:
                 )
 
         moves.sort(key=lambda move: (move.piece_type, move.target_coord))
+
         return moves
 
     def movement_moves(self, state: GameState) -> list[Move]:
@@ -348,8 +356,9 @@ class Rules:
             piece type, source and target coordinate.
         """
         moves: list[Move] = []
+
         for coord, piece_type in self.movable_pieces(state):
-            for target_coord in self._TARGET_COORDS[piece_type](self, state, coord):
+            for target_coord in self.PIECE_TARGET_COORDS[piece_type](self, state, coord):
                 moves.append(
                     Move(
                         piece_type=piece_type,
@@ -361,6 +370,7 @@ class Rules:
         moves.sort(
             key=lambda move: (move.piece_type, move.source_coord, move.target_coord)
         )
+
         return moves
 
     def movable_pieces(self, state: GameState) -> list[tuple[Coordinate, PieceType]]:
@@ -385,6 +395,7 @@ class Rules:
         articulation_points = state.get_articulation_points()
 
         movable_pieces: list[tuple[Coordinate, PieceType]] = []
+
         for coord in state.get_occupied_coords():
             top_piece = state.get_top_piece(coord)
 
@@ -418,7 +429,7 @@ class Rules:
 
         for movable_coord, piece_type in self.movable_pieces(state):
             if movable_coord == coord:
-                return self._TARGET_COORDS[piece_type](self, state, coord)
+                return self.PIECE_TARGET_COORDS[piece_type](self, state, coord)
 
         return []
 
@@ -443,8 +454,10 @@ class Rules:
             return get_neighbors((0, 0))
 
         placeable_coords = set()
+
         for coord in state.get_occupied_coords():
             top_piece = state.get_top_piece(coord)
+
             if top_piece.owner != state.current_player:
                 continue
 
@@ -474,6 +487,7 @@ class Rules:
 
         if self.queen_by_turn is not None:
             queen_placed = state.get_queen_coord(state.current_player) is not None
+
             if player_turn >= self.queen_by_turn and not queen_placed:
                 return [PieceType.QUEEN]
 
@@ -509,8 +523,10 @@ class Rules:
             return [Player.WHITE, Player.BLACK]
 
         winners: list[Player] = []
+
         for player in Player:
             queen_coord = state.get_queen_coord(player)
+
             if queen_coord is not None and state.is_surrounded(queen_coord):
                 winners.append(player.opponent)
 
@@ -527,7 +543,7 @@ class Rules:
         """
         return self.winners(state) is not None
 
-    def _slideable_neighbors(
+    def slideable_neighbors(
         self, state: GameState, coord: Coordinate
     ) -> list[Coordinate]:
         """Get the neighboring coordinates that a piece can slide into.
@@ -544,6 +560,7 @@ class Rules:
             The neighboring coordinates that satisfy all sliding constraints.
         """
         slideable_neighbors: list[Coordinate] = []
+
         for neighbor_coord in get_neighbors(coord):
             if state.is_occupied(neighbor_coord):
                 continue
@@ -553,7 +570,9 @@ class Rules:
 
             if not any(
                 state.is_occupied(flanking_coord)
-                for flanking_coord in get_flanking_coords(coord, neighbor_coord)
+                for flanking_coord in get_flanking_coords(
+                    source_coord=coord, target_coord=neighbor_coord
+                )
             ):
                 continue
 
@@ -561,7 +580,7 @@ class Rules:
 
         return slideable_neighbors
 
-    def _queen_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
+    def queen_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get the targets of a queen, which slides exactly one space.
 
         Args:
@@ -572,9 +591,9 @@ class Rules:
             The coordinates the queen can slide to.
         """
         with state.piece_lifted(coord):
-            return self._slideable_neighbors(state, coord)
+            return self.slideable_neighbors(state=state, coord=coord)
 
-    def _beetle_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
+    def beetle_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get the targets of a beetle, which moves one space and may climb the hive.
 
         On the ground, the beetle slides like the queen. A move where the beetle is on
@@ -593,17 +612,22 @@ class Rules:
         with state.piece_lifted(coord):
             source_height = state.get_stack_height(coord)
             destinations = (
-                [] if source_height else self._slideable_neighbors(state, coord)
+                []
+                if source_height
+                else self.slideable_neighbors(state=state, coord=coord)
             )
 
             for neighbor_coord in get_neighbors(coord):
                 height = max(source_height, state.get_stack_height(neighbor_coord))
+
                 if height == 0:
                     continue
 
                 if all(
                     state.get_stack_height(flanking_coord) > height
-                    for flanking_coord in get_flanking_coords(coord, neighbor_coord)
+                    for flanking_coord in get_flanking_coords(
+                        source_coord=coord, target_coord=neighbor_coord
+                    )
                 ):
                     continue
 
@@ -611,7 +635,7 @@ class Rules:
 
         return destinations
 
-    def _grasshopper_targets(
+    def grasshopper_targets(
         self, state: GameState, coord: Coordinate
     ) -> list[Coordinate]:
         """Get the targets of a grasshopper, which jumps in a straight line.
@@ -629,18 +653,19 @@ class Rules:
         destinations = []
 
         for direction in HEX_DIRECTIONS:
-            current_coord = add(coord, direction)
+            current_coord = add(coord=coord, direction=direction)
+
             if not state.is_occupied(current_coord):
                 continue
 
             while state.is_occupied(current_coord):
-                current_coord = add(current_coord, direction)
+                current_coord = add(coord=current_coord, direction=direction)
 
             destinations.append(current_coord)
 
         return destinations
 
-    def _spider_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
+    def spider_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get the targets of a spider, which slides exactly three spaces.
 
         Each step must be a valid slide and the path cannot revisit a coordinate. A
@@ -655,7 +680,7 @@ class Rules:
         """
         destinations = set()
 
-        def _dfs(
+        def walk_paths(
             current_coord: Coordinate, visited_coords: set[Coordinate], depth: int
         ) -> None:
             """Add every coordinate reachable in the remaining slides to `destinations`.
@@ -670,12 +695,14 @@ class Rules:
                 destinations.add(current_coord)
                 return
 
-            for neighbor_coord in self._slideable_neighbors(state, current_coord):
+            for neighbor_coord in self.slideable_neighbors(
+                state=state, coord=current_coord
+            ):
                 if neighbor_coord in visited_coords:
                     continue
 
                 visited_coords.add(neighbor_coord)
-                _dfs(
+                walk_paths(
                     current_coord=neighbor_coord,
                     visited_coords=visited_coords,
                     depth=depth + 1,
@@ -683,13 +710,13 @@ class Rules:
                 visited_coords.remove(neighbor_coord)
 
         with state.piece_lifted(coord):
-            _dfs(current_coord=coord, visited_coords={coord}, depth=0)
+            walk_paths(current_coord=coord, visited_coords={coord}, depth=0)
 
         destinations.discard(coord)
 
         return list(destinations)
 
-    def _ant_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
+    def ant_targets(self, state: GameState, coord: Coordinate) -> list[Coordinate]:
         """Get the targets of an ant, which slides any number of spaces.
 
         A search explores all unoccupied coordinates connected to the start through a
@@ -710,7 +737,10 @@ class Rules:
         with state.piece_lifted(coord):
             while frontier:
                 current_coord = frontier.pop()
-                for neighbor_coord in self._slideable_neighbors(state, current_coord):
+
+                for neighbor_coord in self.slideable_neighbors(
+                    state=state, coord=current_coord
+                ):
                     if neighbor_coord in visited_coords:
                         continue
 
@@ -724,14 +754,14 @@ class Rules:
 
     # Movement behaviour per piece type. Piece types missing here cannot be used in
     # `piece_counts`, which `__post_init__` validates.
-    _TARGET_COORDS: ClassVar[
+    PIECE_TARGET_COORDS: ClassVar[
         Mapping[PieceType, Callable[["Rules", GameState, Coordinate], list[Coordinate]]]
     ] = MappingProxyType(
         {
-            PieceType.QUEEN: _queen_targets,
-            PieceType.BEETLE: _beetle_targets,
-            PieceType.GRASSHOPPER: _grasshopper_targets,
-            PieceType.SPIDER: _spider_targets,
-            PieceType.ANT: _ant_targets,
+            PieceType.QUEEN: queen_targets,
+            PieceType.BEETLE: beetle_targets,
+            PieceType.GRASSHOPPER: grasshopper_targets,
+            PieceType.SPIDER: spider_targets,
+            PieceType.ANT: ant_targets,
         }
     )

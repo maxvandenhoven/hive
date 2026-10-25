@@ -6,7 +6,7 @@ import pytest
 from hive.engine.state import GameState, Move, Piece, PieceType, Player
 
 
-def _assert_state_equal(state: GameState, expected: GameState) -> None:
+def assert_state_equal(state: GameState, expected: GameState) -> None:
     """Assert that two GameState instances are equal in all properties."""
     assert state.board == expected.board
     assert state.current_player == expected.current_player
@@ -18,6 +18,7 @@ def _assert_state_equal(state: GameState, expected: GameState) -> None:
 def test_piece_frozen() -> None:
     """Test that piece fields cannot be reassigned."""
     piece = Piece(type=PieceType.ANT, owner=Player.WHITE)
+
     with pytest.raises(FrozenInstanceError):
         piece.owner = Player.BLACK  # ty: ignore[invalid-assignment]
 
@@ -98,7 +99,7 @@ class TestGameStateMovementAndPlacement:
         state.apply_placement(move)
         state.undo_placement(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
     def test_undo_placement_queen(self, default_state: GameState) -> None:
         """Test undoing queen placement also resets queen location."""
@@ -109,7 +110,7 @@ class TestGameStateMovementAndPlacement:
         state.apply_placement(move)
         state.undo_placement(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
         assert state.queen_coord[Player.WHITE] is None
 
     def test_apply_movement_non_queen(self, default_state: GameState) -> None:
@@ -207,7 +208,7 @@ class TestGameStateMovementAndPlacement:
         state.apply_movement(move)
         state.undo_movement(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
     def test_undo_movement_queen(self, default_state: GameState) -> None:
         """Test undoing queen movement restores board and queen coordinate."""
@@ -221,7 +222,7 @@ class TestGameStateMovementAndPlacement:
         state.apply_movement(move)
         state.undo_movement(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
     def test_undo_movement_from_stack(self, default_state: GameState) -> None:
         """Test undoing movement from a stack restores the original stack order."""
@@ -238,7 +239,7 @@ class TestGameStateMovementAndPlacement:
         state.apply_movement(move)
         state.undo_movement(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
     def test_undo_movement_onto_occupied(self, default_state: GameState) -> None:
         """Test undoing movement onto an occupied target restores both stacks."""
@@ -255,7 +256,7 @@ class TestGameStateMovementAndPlacement:
         state.apply_movement(move)
         state.undo_movement(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
     def test_undo_movement_raises_without_source(self, default_state: GameState) -> None:
         """Test undo movement raises ValueError when source coordinate is None."""
@@ -278,7 +279,7 @@ class TestGameStateMovementAndPlacement:
 
         state.undo_move(None)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
     def test_apply_and_undo_placement(self, default_state: GameState) -> None:
         """Test `apply_move`/`undo_move` with source None uses placement handlers."""
@@ -294,7 +295,7 @@ class TestGameStateMovementAndPlacement:
 
         state.undo_move(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
     def test_apply_and_undo_movement(self, default_state: GameState) -> None:
         """Test `apply_move`/`undo_move` with source coordinate uses movement handlers."""
@@ -314,7 +315,7 @@ class TestGameStateMovementAndPlacement:
 
         state.undo_move(move)
 
-        _assert_state_equal(state, expected=expected)
+        assert_state_equal(state=state, expected=expected)
 
 
 class TestGameStateIsOccupied:
@@ -485,12 +486,12 @@ class TestGameStateGetAdjacentPlayers:
 
 
 class TestCalculateBoundaryCoords:
-    """Test the `_calculate_boundary_coords` internal helper."""
+    """Test the `calculate_boundary_coords` internal helper."""
 
     def test_empty_board(self, default_state: GameState) -> None:
         """Test that an empty board has no boundary coordinates."""
         state = default_state
-        assert state._calculate_boundary_coords() == set()
+        assert state.calculate_boundary_coords() == set()
 
     def test_single_piece(self, default_state: GameState) -> None:
         """Test that a single piece yields its six neighbors as boundary."""
@@ -499,7 +500,7 @@ class TestCalculateBoundaryCoords:
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
         )
 
-        boundary = state._calculate_boundary_coords()
+        boundary = state.calculate_boundary_coords()
         assert boundary == {(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)}
 
     def test_two_adjacent_pieces(self, default_state: GameState) -> None:
@@ -512,7 +513,7 @@ class TestCalculateBoundaryCoords:
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0))
         )
 
-        boundary = state._calculate_boundary_coords()
+        boundary = state.calculate_boundary_coords()
         assert (0, 0) not in boundary
         assert (1, 0) not in boundary
         assert len(boundary) == 8
@@ -521,7 +522,7 @@ class TestCalculateBoundaryCoords:
         """Test that a ring of six pieces has both inner and outer boundary."""
         state = ring_6_state
 
-        boundary = state._calculate_boundary_coords()
+        boundary = state.calculate_boundary_coords()
         assert (0, 0) in boundary
         assert len(boundary) == 13
 
@@ -535,7 +536,7 @@ class TestCalculateBoundaryCoords:
             Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
         )
 
-        boundary = state._calculate_boundary_coords()
+        boundary = state.calculate_boundary_coords()
         assert boundary == {(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)}
 
 
@@ -548,6 +549,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)):
             assert not state.is_occupied((0, 0))
 
@@ -557,6 +559,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)):
             pass
 
@@ -569,6 +572,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)) as piece:
             assert piece.type is PieceType.QUEEN
             assert piece.owner is Player.WHITE
@@ -582,6 +586,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)) as piece:
             assert piece.type is PieceType.BEETLE
             assert state.is_occupied((0, 0))
@@ -596,6 +601,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
         )
+
         with state.piece_lifted((0, 0)):
             pass
 
@@ -608,6 +614,7 @@ class TestPieceLifted:
         state.apply_placement(
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
         )
+
         with pytest.raises(RuntimeError):
             with state.piece_lifted((0, 0)):
                 msg = "boom"
@@ -695,6 +702,7 @@ class TestIsConnected:
     def test_split_board(self, line_3_state: GameState) -> None:
         """Test that a board with two separate groups is not connected."""
         state = line_3_state
+
         with state.piece_lifted((0, 0)):
             assert not state.is_connected()
 
@@ -716,6 +724,7 @@ class TestIsConnectedAfterRemoving:
     def test_ring_stays_connected(self, ring_6_state: GameState) -> None:
         """Test that removing any piece from a ring keeps it connected."""
         state = ring_6_state
+
         for coord in state.get_occupied_coords():
             assert state.is_connected_after_removing(coord)
 
@@ -736,6 +745,7 @@ class TestIsConnectedAfterRemoving:
         """Test that articulation points match `is_connected_after_removing`."""
         state = l_shape_state
         articulation_points = state.get_articulation_points()
+
         for coord in state.get_occupied_coords():
             if coord in articulation_points:
                 assert not state.is_connected_after_removing(coord)
@@ -759,7 +769,7 @@ class TestCanSlide:
         state.apply_placement(
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
         )
-        assert state.can_slide((0, 0), (1, 0))
+        assert state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
 
     def test_blocked_when_target_occupied(self, default_state: GameState) -> None:
         """Test that sliding into an occupied target is blocked."""
@@ -770,12 +780,12 @@ class TestCanSlide:
         state.apply_placement(
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0))
         )
-        assert not state.can_slide((0, 0), (1, 0))
+        assert not state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
 
     def test_blocked_when_both_flanks_occupied(self, east_gate_state: GameState) -> None:
         """Test that two occupied flanks block the slide (gate)."""
         state = east_gate_state
-        assert not state.can_slide((0, 0), (1, 0))
+        assert not state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
 
     def test_one_flank_occupied_still_slides(self, default_state: GameState) -> None:
         """Test that a single occupied flank does not block the slide."""
@@ -786,4 +796,4 @@ class TestCanSlide:
         state.apply_placement(
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, -1))
         )
-        assert state.can_slide((0, 0), (1, 0))
+        assert state.can_slide(source_coord=(0, 0), target_coord=(1, 0))

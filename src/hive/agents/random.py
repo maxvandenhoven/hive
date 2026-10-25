@@ -18,4 +18,4 @@ class RandomAgent(Agent):
             turn: The context to submit the move to.
         """
         legal_moves = self.rules.legal_moves(state)
-        turn.submit(legal_moves[self._rng.randrange(len(legal_moves))], final=True)
+        turn.submit(move=legal_moves[self.rng.randrange(len(legal_moves))], final=True)

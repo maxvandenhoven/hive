@@ -126,9 +126,10 @@ class GameState:
         state.current_ply = self.current_ply
         state.hand = {player: dict(hand) for player, hand in self.hand.items()}
         state.queen_coord = dict(self.queen_coord)
+
         return state
 
-    def _calculate_boundary_coords(self) -> set[Coordinate]:
+    def calculate_boundary_coords(self) -> set[Coordinate]:
         """Determine which unoccupied coordinates have at least one occupied neighbor.
 
         This method is only used for internal testing purposes and is not optimized for
@@ -142,8 +143,10 @@ class GameState:
         # are not themselves occupied.
         boundary_coords: set[Coordinate] = set()
         occupied_coords = self.get_occupied_coords()
+
         for occupied_coord in occupied_coords:
             neighbor_coords = get_neighbors(occupied_coord)
+
             for neighbor_coord in neighbor_coords:
                 if not self.is_occupied(neighbor_coord):
                     boundary_coords.add(neighbor_coord)
@@ -164,6 +167,7 @@ class GameState:
             raise ValueError(msg) from e
 
         lifted_final_piece = False
+
         if len(self.board[coord]) == 0:
             del self.board[coord]
             lifted_final_piece = True
@@ -173,6 +177,7 @@ class GameState:
         finally:
             if lifted_final_piece:
                 self.board[coord] = []
+
             self.board[coord].append(lifted_piece)
 
     def is_surrounded(self, coord: Coordinate) -> bool:
@@ -185,6 +190,7 @@ class GameState:
             True if the coordinate to check has six occupied neighbors, otherwise False.
         """
         occupied_neighbor_count = 0
+
         for neighbor_coord in get_neighbors(coord):
             if self.is_occupied(neighbor_coord):
                 occupied_neighbor_count += 1
@@ -322,6 +328,7 @@ class GameState:
             # All neighbors have been processed; backtrack.
             if not advanced:
                 stack.pop()
+
                 if stack:
                     parent_coord = stack[-1]
                     low_values[parent_coord] = min(
@@ -355,6 +362,7 @@ class GameState:
             moving between direct neighbors, or if the board is empty.
         """
         occupied_coords = self.get_occupied_coords()
+
         if not occupied_coords:
             return True
 
@@ -364,6 +372,7 @@ class GameState:
 
         while stack:
             candidate_coord = stack.pop()
+
             for neighbor_coord in get_neighbors(candidate_coord):
                 if neighbor_coord in occupied_coords and neighbor_coord not in seen:
                     seen.add(neighbor_coord)
@@ -403,6 +412,7 @@ class GameState:
 
         while stack:
             candidate_coord = stack.pop()
+
             for neighbor_coord in get_neighbors(candidate_coord):
                 if neighbor_coord in occupied_coords and neighbor_coord not in seen:
                     seen.add(neighbor_coord)
@@ -427,8 +437,9 @@ class GameState:
         # The two coordinates flanking the source and target coordinates should not both
         # be occupied.
         anti_clockwise_coord, clockwise_coord = get_flanking_coords(
-            source_coord, target_coord
+            source_coord=source_coord, target_coord=target_coord
         )
+
         return not (
             self.is_occupied(anti_clockwise_coord) and self.is_occupied(clockwise_coord)
         )
@@ -443,6 +454,7 @@ class GameState:
             The players that own pieces directly neighboring the given coordinate.
         """
         owners: set[Player] = set()
+
         for neighbor_coord in get_neighbors(coord):
             if self.is_occupied(neighbor_coord):
                 top_piece = self.get_top_piece(neighbor_coord)
@@ -479,6 +491,7 @@ class GameState:
             move: The placement move to undo. The `source_coord` must be `None`.
         """
         self.board[move.target_coord].pop()
+
         if not self.board[move.target_coord]:
             del self.board[move.target_coord]
 
@@ -505,6 +518,7 @@ class GameState:
             raise ValueError(msg)
 
         piece = self.board[move.source_coord].pop()
+
         if not self.board[move.source_coord]:
             del self.board[move.source_coord]
 
@@ -531,6 +545,7 @@ class GameState:
             raise ValueError(msg)
 
         piece = self.board[move.target_coord].pop()
+
         if not self.board[move.target_coord]:
             del self.board[move.target_coord]
 

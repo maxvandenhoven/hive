@@ -57,6 +57,7 @@ def collect_turn(
         messages=ScriptedMessages(clock=clock, events=events),
         clock=clock,
     )
+
     return selection, clock
 
 
@@ -189,7 +190,7 @@ class TestCandidateSelection:
 
     def test_expired_deadline_receives_nothing(self) -> None:
         selection, _ = collect_turn(
-            [(0.0, SubmissionMessage(turn_id=1, move=LEGAL_MOVES[0], final=True))],
+            events=[(0.0, SubmissionMessage(turn_id=1, move=LEGAL_MOVES[0], final=True))],
             deadline=0.0,
         )
 
@@ -223,7 +224,7 @@ class TestPipeTurnContext:
         )
 
         turn.submit(LEGAL_MOVES[0])
-        turn.submit(None, final=True)
+        turn.submit(move=None, final=True)
 
         assert drain(runner_conn) == [
             SubmissionMessage(turn_id=3, move=LEGAL_MOVES[0], final=False),
@@ -248,7 +249,7 @@ class TestPipeTurnContext:
         event.set()
         assert stopped.should_stop()
 
-        closed.submit(LEGAL_MOVES[0], final=True)
+        closed.submit(move=LEGAL_MOVES[0], final=True)
         assert closed.should_stop()
 
     def test_rate_limits_info(self, pipe: tuple[Connection, Connection]) -> None:
@@ -292,7 +293,7 @@ class TestPipeTurnContext:
 
         turn.info(depth=1)
         turn.info(depth=2)
-        turn.submit(LEGAL_MOVES[0], final=True)
+        turn.submit(move=LEGAL_MOVES[0], final=True)
 
         assert drain(runner_conn) == [
             InfoMessage(turn_id=1, fields={"depth": 1}),

@@ -58,7 +58,11 @@ class BoardSetup:
         Raises:
             InvalidBoardError: If the board is not valid under `rules`.
         """
-        return rules.from_board(self.board, self.current_player, self.current_ply)
+        return rules.from_board(
+            board=self.board,
+            current_player=self.current_player,
+            current_ply=self.current_ply,
+        )
 
 
 @dataclass(slots=True)
@@ -101,8 +105,10 @@ class GameRecord:
             IllegalMoveError: If a move is not legal in the state it is played in.
         """
         state = self.initial_state()
+
         for move in self.moves:
-            self.rules.apply_checked_move(state, move)
+            self.rules.apply_checked_move(state=state, move=move)
+
         return state
 
     def states(self) -> Iterator[GameState]:
@@ -119,8 +125,9 @@ class GameRecord:
         """
         state = self.initial_state()
         yield state.copy()
+
         for move in self.moves:
-            self.rules.apply_checked_move(state, move)
+            self.rules.apply_checked_move(state=state, move=move)
             yield state.copy()
 
 
@@ -148,7 +155,7 @@ def deserialize_player(data: object) -> Player:
     Raises:
         ValueError: If `data` is not the name of a player.
     """
-    return _deserialize_enum(data, Player, "player")
+    return deserialize_enum(data=data, enum=Player, kind="player")
 
 
 def serialize_piece_type(piece_type: PieceType) -> str:
@@ -175,7 +182,7 @@ def deserialize_piece_type(data: object) -> PieceType:
     Raises:
         ValueError: If `data` is not the name of a piece type.
     """
-    return _deserialize_enum(data, PieceType, "piece type")
+    return deserialize_enum(data=data, enum=PieceType, kind="piece type")
 
 
 def serialize_coordinate(coord: Coordinate) -> list[JsonValue]:
@@ -205,7 +212,7 @@ def deserialize_coordinate(data: object) -> Coordinate:
     if (
         not isinstance(data, list | tuple)
         or len(data) != 2
-        or not all(_is_int(value) for value in data)
+        or not all(is_json_int(value) for value in data)
     ):
         msg = f"Expected a coordinate as a list of two integers, but got `{data!r}`."
         raise ValueError(msg)
@@ -250,8 +257,9 @@ def deserialize_move(data: object) -> Move | None:
     if data is None:
         return None
 
-    fields = _expect_object(data, "move", required={"piece", "from", "to"})
+    fields = expect_object(data=data, kind="move", required={"piece", "from", "to"})
     source = fields["from"]
+
     return Move(
         piece_type=deserialize_piece_type(fields["piece"]),
         source_coord=None if source is None else deserialize_coordinate(source),
@@ -295,20 +303,22 @@ def deserialize_rules(data: object) -> Rules:
             type, or describes an invalid configuration.
     """
     defaults = serialize_rules(Rules())
-    fields = defaults | _expect_object(data, "rules", optional=defaults.keys())
+    fields = defaults | expect_object(data=data, kind="rules", optional=defaults.keys())
 
     try:
         return Rules(
-            piece_counts=_deserialize_piece_counts(fields["piece_counts"]),
+            piece_counts=deserialize_piece_counts(fields["piece_counts"]),
             starting_player=deserialize_player(fields["starting_player"]),
-            queen_by_turn=_expect_optional_int(fields["queen_by_turn"], "queen_by_turn"),
-            allow_queen_first_turn=_expect_bool(
-                fields["allow_queen_first_turn"], "allow_queen_first_turn"
+            queen_by_turn=expect_optional_int(
+                value=fields["queen_by_turn"], name="queen_by_turn"
             ),
-            move_before_queen=_expect_bool(
-                fields["move_before_queen"], "move_before_queen"
+            allow_queen_first_turn=expect_bool(
+                value=fields["allow_queen_first_turn"], name="allow_queen_first_turn"
             ),
-            max_turns=_expect_optional_int(fields["max_turns"], "max_turns"),
+            move_before_queen=expect_bool(
+                value=fields["move_before_queen"], name="move_before_queen"
+            ),
+            max_turns=expect_optional_int(value=fields["max_turns"], name="max_turns"),
         )
     except ValueError as e:
         msg = f"Invalid rules: {e}"
@@ -328,7 +338,7 @@ def serialize_board(board: GameBoard) -> list[JsonValue]:
     return [
         {
             "coord": serialize_coordinate(coord),
-            "stack": [_serialize_piece(piece) for piece in board[coord]],
+            "stack": [serialize_piece(piece) for piece in board[coord]],
         }
         for coord in sorted(board)
     ]
@@ -354,18 +364,22 @@ def deserialize_board(data: object) -> GameBoard:
         raise ValueError(msg)
 
     board: GameBoard = {}
+
     for entry in data:
-        fields = _expect_object(entry, "stack", required={"coord", "stack"})
+        fields = expect_object(data=entry, kind="stack", required={"coord", "stack"})
         coord = deserialize_coordinate(fields["coord"])
+
         if coord in board:
             msg = f"The board has more than one stack at coordinate `{coord}`."
             raise ValueError(msg)
 
         pieces = fields["stack"]
+
         if not isinstance(pieces, list):
             msg = f"Expected the stack at `{coord}` to be a list, but got `{pieces!r}`."
             raise ValueError(msg)
-        board[coord] = [_deserialize_piece(piece) for piece in pieces]
+
+        board[coord] = [deserialize_piece(piece) for piece in pieces]
 
     return board
 
@@ -404,13 +418,19 @@ def deserialize_setup(data: object) -> BoardSetup | None:
     if data == INITIAL_SETUP:
         return None
 
-    fields = _expect_object(
-        data, "setup", required={"board", "current_player"}, optional={"current_ply"}
+    fields = expect_object(
+        data=data,
+        kind="setup",
+        required={"board", "current_player"},
+        optional={"current_ply"},
     )
+
     return BoardSetup(
         board=deserialize_board(fields["board"]),
         current_player=deserialize_player(fields["current_player"]),
-        current_ply=_expect_optional_int(fields.get("current_ply"), "current_ply"),
+        current_ply=expect_optional_int(
+            value=fields.get("current_ply"), name="current_ply"
+        ),
     )
 
 
@@ -444,13 +464,17 @@ def deserialize_record(data: object) -> GameRecord:
     Raises:
         ValueError: If `data` is not a valid game record object.
     """
-    fields = _expect_object(data, "game record", required={"rules", "setup", "moves"})
+    fields = expect_object(
+        data=data, kind="game record", required={"rules", "setup", "moves"}
+    )
     moves = fields["moves"]
+
     if not isinstance(moves, list):
         msg = f"Expected `moves` to be a list, but got `{moves!r}`."
         raise ValueError(msg)
 
     deserialized_moves: list[Move | None] = []
+
     for index, move in enumerate(moves):
         try:
             deserialized_moves.append(deserialize_move(move))
@@ -465,7 +489,7 @@ def deserialize_record(data: object) -> GameRecord:
     )
 
 
-def _serialize_piece(piece: Piece) -> JsonValue:
+def serialize_piece(piece: Piece) -> JsonValue:
     """Serialize a piece as an object with its `piece` type and `owner`.
 
     Args:
@@ -480,7 +504,7 @@ def _serialize_piece(piece: Piece) -> JsonValue:
     }
 
 
-def _deserialize_piece(data: object) -> Piece:
+def deserialize_piece(data: object) -> Piece:
     """Deserialize a piece from an object with its `piece` type and `owner`.
 
     Args:
@@ -492,14 +516,14 @@ def _deserialize_piece(data: object) -> Piece:
     Raises:
         ValueError: If `data` is not a valid piece object.
     """
-    fields = _expect_object(data, "piece", required={"piece", "owner"})
+    fields = expect_object(data=data, kind="piece", required={"piece", "owner"})
     return Piece(
         type=deserialize_piece_type(fields["piece"]),
         owner=deserialize_player(fields["owner"]),
     )
 
 
-def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
+def deserialize_piece_counts(data: object) -> dict[PieceType, int]:
     """Deserialize piece counts from an object keyed by piece type name.
 
     Args:
@@ -517,19 +541,21 @@ def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
         raise ValueError(msg)
 
     piece_counts: dict[PieceType, int] = {}
+
     for name, count in data.items():
-        if not _is_int(count) or count < 0:
+        if not is_json_int(count) or count < 0:
             msg = (
                 f"Expected the count of `{name}` to be a non-negative integer, but got "
                 f"`{count!r}`."
             )
             raise ValueError(msg)
+
         piece_counts[deserialize_piece_type(name)] = count
 
     return piece_counts
 
 
-def _deserialize_enum[E: IntEnum](data: object, enum: type[E], kind: str) -> E:
+def deserialize_enum[E: IntEnum](data: object, enum: type[E], kind: str) -> E:
     """Deserialize an enum member from its lower case name.
 
     Args:
@@ -554,7 +580,7 @@ def _deserialize_enum[E: IntEnum](data: object, enum: type[E], kind: str) -> E:
     return enum[data.upper()]
 
 
-def _expect_object(
+def expect_object(
     data: object,
     kind: str,
     required: Set[str] = frozenset(),
@@ -580,11 +606,13 @@ def _expect_object(
         raise ValueError(msg)
 
     missing = required - data.keys()
+
     if missing:
         msg = f"The {kind} object is missing the keys `{sorted(missing)}`."
         raise ValueError(msg)
 
     unknown = data.keys() - required - optional
+
     if unknown:
         msg = f"The {kind} object has the unknown keys `{sorted(unknown)}`."
         raise ValueError(msg)
@@ -592,7 +620,7 @@ def _expect_object(
     return data
 
 
-def _expect_optional_int(value: object, name: str) -> int | None:
+def expect_optional_int(value: object, name: str) -> int | None:
     """Check that a field value is an integer or `None`.
 
     Args:
@@ -605,14 +633,14 @@ def _expect_optional_int(value: object, name: str) -> int | None:
     Raises:
         ValueError: If `value` is neither an integer nor `None`.
     """
-    if value is not None and not _is_int(value):
+    if value is not None and not is_json_int(value):
         msg = f"Expected `{name}` to be an integer or null, but got `{value!r}`."
         raise ValueError(msg)
 
     return value
 
 
-def _expect_bool(value: object, name: str) -> bool:
+def expect_bool(value: object, name: str) -> bool:
     """Check that a field value is a boolean.
 
     Args:
@@ -632,7 +660,7 @@ def _expect_bool(value: object, name: str) -> bool:
     return value
 
 
-def _is_int(value: object) -> TypeIs[int]:
+def is_json_int(value: object) -> TypeIs[int]:
     """Check that a value is an integer, excluding booleans.
 
     `bool` is a subclass of `int`, so `isinstance(True, int)` alone would accept `true`

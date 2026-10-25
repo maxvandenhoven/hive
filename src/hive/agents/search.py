@@ -11,10 +11,10 @@ from hive.engine.rules import Rules
 from hive.engine.serialization import serialize_move
 from hive.engine.state import GameState, Move, PieceType, Player
 
-WIN_SCORE = 1_000_000.0
+SEARCH_WIN_SCORE = 1_000_000.0
 """The score of a won position, reduced by one per ply so faster wins score higher."""
 
-PIECE_VALUES: dict[PieceType, float] = {
+SEARCH_PIECE_VALUES: dict[PieceType, float] = {
     PieceType.QUEEN: 10.0,
     PieceType.ANT: 7.0,
     PieceType.BEETLE: 4.0,
@@ -39,11 +39,13 @@ class SearchAgent(Agent):
 
     Leaf positions are scored by a weighted sum of evaluation terms, each from the
     perspective of the given player. Terms with weight zero are skipped. Finished games
-    score `WIN_SCORE` minus the plies from the root for a win, the negation for a loss,
-    and zero for a draw.
+    score `SEARCH_WIN_SCORE` minus the plies from the root for a win, the negation for a
+    loss, and zero for a draw.
 
-    Subclasses implement `_search` for one fixed depth and call `_visit_node` at every
+    Subclasses implement `_search` for one fixed depth and call `visit_node` at every
     node, which counts nodes and checks `should_stop` every `STOP_CHECK_INTERVAL` nodes.
+    `_search` stays private because it is a hook for subclasses: only `think` may call it,
+    after setting up `turn`, `nodes` and `cutoff` for the decision.
 
     Registered subclasses take the depth limit and the evaluation weights as agent
     parameters, described in `__init__`.
@@ -55,12 +57,17 @@ class SearchAgent(Agent):
         positioning: The weight of the positioning term.
         material_on_board: The weight of the on-board material term.
         material_in_hand: The weight of the in-hand material term.
+        evaluation_terms: The weight and method of every term with a nonzero weight.
+        turn: The context of the decision in progress, set by `think`.
+        nodes: The number of nodes visited in the decision in progress.
+        cutoff: Whether the search of the current depth stopped at the depth limit
+            somewhere, so deeper searches could change the result.
     """
 
     STOP_CHECK_INTERVAL = 32
     """The number of nodes visited between two calls of `TurnContext.should_stop`."""
 
-    _turn: TurnContext
+    turn: TurnContext
 
     def __init__(
         self,
@@ -91,7 +98,7 @@ class SearchAgent(Agent):
             material_in_hand: The weight of the value of the player's pieces in hand
                 minus the opponent's.
         """
-        super().__init__(rules, seed=seed)
+        super().__init__(rules=rules, seed=seed)
         self.depth = depth
         self.queen_safety = queen_safety
         self.mobility = mobility
@@ -100,15 +107,17 @@ class SearchAgent(Agent):
         self.material_in_hand = material_in_hand
 
         terms: list[tuple[float, Callable[[GameState, Player], float]]] = [
-            (queen_safety, self._queen_safety),
-            (mobility, self._mobility),
-            (positioning, self._positioning),
-            (material_on_board, self._material_on_board),
-            (material_in_hand, self._material_in_hand),
+            (queen_safety, self.queen_safety_score),
+            (mobility, self.mobility_score),
+            (positioning, self.positioning_score),
+            (material_on_board, self.material_on_board_score),
+            (material_in_hand, self.material_in_hand_score),
         ]
-        self._terms = [(weight, term) for weight, term in terms if weight != 0.0]
-        self._nodes = 0
-        self._cutoff = False
+        self.evaluation_terms = [
+            (weight, term) for weight, term in terms if weight != 0.0
+        ]
+        self.nodes = 0
+        self.cutoff = False
 
     @override
     def think(self, state: GameState, turn: TurnContext) -> None:
@@ -122,37 +131,43 @@ class SearchAgent(Agent):
             turn: The context to submit moves and report progress to.
         """
         legal_moves = self.rules.legal_moves(state)
+
         if len(legal_moves) == 1:
-            turn.submit(legal_moves[0], final=True)
+            turn.submit(move=legal_moves[0], final=True)
             return
 
-        turn.submit(legal_moves[self._rng.randrange(len(legal_moves))])
+        turn.submit(legal_moves[self.rng.randrange(len(legal_moves))])
 
-        self._turn = turn
-        self._nodes = 0
+        self.turn = turn
+        self.nodes = 0
         start = time.perf_counter()
         depth = 1
+
         while not turn.should_stop():
             # The search sets the cutoff flag when it stops at the depth limit, so an
             # unset flag means the whole game tree below the root was searched.
-            self._cutoff = False
+            self.cutoff = False
+
             try:
-                score, pv = self._search(state, depth)
+                score, pv = self._search(state=state, depth=depth)
             except SearchStoppedError:
                 return
 
             elapsed = time.perf_counter() - start
             turn.info(
                 depth=depth,
-                nodes=self._nodes,
+                nodes=self.nodes,
                 score=score,
                 pv=[serialize_move(move) for move in pv],
-                nps=round(self._nodes / elapsed) if elapsed > 0 else None,
+                nps=round(self.nodes / elapsed) if elapsed > 0 else None,
             )
             final = (
-                depth == self.depth or not self._cutoff or abs(score) >= WIN_SCORE - depth
+                depth == self.depth
+                or not self.cutoff
+                or abs(score) >= SEARCH_WIN_SCORE - depth
             )
-            turn.submit(pv[0], final=final)
+            turn.submit(move=pv[0], final=final)
+
             if final:
                 return
 
@@ -169,7 +184,8 @@ class SearchAgent(Agent):
             A score where positive values favour `player`.
         """
         score = 0.0
-        for weight, term in self._terms:
+
+        for weight, term in self.evaluation_terms:
             score += weight * term(state, player)
 
         return score
@@ -190,17 +206,18 @@ class SearchAgent(Agent):
             SearchStoppedError: If the turn context asks the agent to stop.
         """
 
-    def _visit_node(self) -> None:
+    def visit_node(self) -> None:
         """Count a visited node and check whether to stop every few nodes.
 
         Raises:
             SearchStoppedError: If the turn context asks the agent to stop.
         """
-        self._nodes += 1
-        if self._nodes % self.STOP_CHECK_INTERVAL == 0 and self._turn.should_stop():
+        self.nodes += 1
+
+        if self.nodes % self.STOP_CHECK_INTERVAL == 0 and self.turn.should_stop():
             raise SearchStoppedError
 
-    def _terminal_score(self, state: GameState, player: Player, ply: int) -> float | None:
+    def terminal_score(self, state: GameState, player: Player, ply: int) -> float | None:
         """Score a finished game.
 
         Args:
@@ -212,15 +229,19 @@ class SearchAgent(Agent):
             The score of a finished game, or `None` if the game is still in progress.
         """
         winners = self.rules.winners(state)
+
         if winners is None:
             return None
+
         if len(winners) == len(Player):
             return 0.0
-        if player in winners:
-            return WIN_SCORE - ply
-        return -(WIN_SCORE - ply)
 
-    def _queen_safety(self, state: GameState, player: Player) -> float:
+        if player in winners:
+            return SEARCH_WIN_SCORE - ply
+
+        return -(SEARCH_WIN_SCORE - ply)
+
+    def queen_safety_score(self, state: GameState, player: Player) -> float:
         """Compare how surrounded the opponent's queen is to the player's own queen.
 
         Args:
@@ -231,11 +252,11 @@ class SearchAgent(Agent):
             The occupied neighbours of the opponent's queen minus those of the player's
             queen, in the range [-6, 6].
         """
-        return self._occupied_queen_neighbors(
-            state, player.opponent
-        ) - self._occupied_queen_neighbors(state, player)
+        return self.occupied_queen_neighbors(
+            state=state, owner=player.opponent
+        ) - self.occupied_queen_neighbors(state=state, owner=player)
 
-    def _occupied_queen_neighbors(self, state: GameState, owner: Player) -> float:
+    def occupied_queen_neighbors(self, state: GameState, owner: Player) -> float:
         """Count the occupied neighbours of a player's queen.
 
         Args:
@@ -246,12 +267,13 @@ class SearchAgent(Agent):
             The number of occupied neighbours, or 0 if the queen has not been placed.
         """
         queen_coord = state.get_queen_coord(owner)
+
         if queen_coord is None:
             return 0.0
 
         return float(sum(state.is_occupied(c) for c in get_neighbors(queen_coord)))
 
-    def _mobility(self, state: GameState, player: Player) -> float:
+    def mobility_score(self, state: GameState, player: Player) -> float:
         """Compare the number of legal moves of the player and of the opponent.
 
         Args:
@@ -263,11 +285,11 @@ class SearchAgent(Agent):
             pass counts as zero moves.
         """
         return float(
-            self._count_legal_moves(state, player)
-            - self._count_legal_moves(state, player.opponent)
+            self.count_legal_moves(state=state, player=player)
+            - self.count_legal_moves(state=state, player=player.opponent)
         )
 
-    def _count_legal_moves(self, state: GameState, player: Player) -> int:
+    def count_legal_moves(self, state: GameState, player: Player) -> int:
         """Count the legal moves of a player by temporarily making them the current one.
 
         Args:
@@ -284,9 +306,10 @@ class SearchAgent(Agent):
         move_count = sum(move is not None for move in self.rules.legal_moves(state))
 
         state.current_player = original_player
+
         return move_count
 
-    def _positioning(self, state: GameState, player: Player) -> float:
+    def positioning_score(self, state: GameState, player: Player) -> float:
         """Compare the pressure each player puts on the opponent's queen.
 
         Args:
@@ -297,11 +320,11 @@ class SearchAgent(Agent):
             The player's pieces next to the opponent's queen minus the opponent's pieces
             next to the player's queen, counting only the top piece of each stack.
         """
-        return self._queen_pressure(state, player) - self._queen_pressure(
-            state, player.opponent
+        return self.queen_pressure(state=state, attacker=player) - self.queen_pressure(
+            state=state, attacker=player.opponent
         )
 
-    def _queen_pressure(self, state: GameState, attacker: Player) -> float:
+    def queen_pressure(self, state: GameState, attacker: Player) -> float:
         """Count the attacker's pieces next to the defender's queen.
 
         Args:
@@ -313,6 +336,7 @@ class SearchAgent(Agent):
             0 if the defender's queen has not been placed.
         """
         queen_coord = state.get_queen_coord(attacker.opponent)
+
         if queen_coord is None:
             return 0.0
 
@@ -323,7 +347,7 @@ class SearchAgent(Agent):
             )
         )
 
-    def _material_on_board(self, state: GameState, player: Player) -> float:
+    def material_on_board_score(self, state: GameState, player: Player) -> float:
         """Compare the value of the pieces each player has on the board.
 
         Args:
@@ -334,13 +358,14 @@ class SearchAgent(Agent):
             The value of the player's pieces on the board minus the opponent's.
         """
         scores = dict.fromkeys(Player, 0.0)
+
         for stack in state.board.values():
             for piece in stack:
-                scores[piece.owner] += PIECE_VALUES.get(piece.type, 0.0)
+                scores[piece.owner] += SEARCH_PIECE_VALUES.get(piece.type, 0.0)
 
         return scores[player] - scores[player.opponent]
 
-    def _material_in_hand(self, state: GameState, player: Player) -> float:
+    def material_in_hand_score(self, state: GameState, player: Player) -> float:
         """Compare the value of the pieces each player still has in hand.
 
         Args:
@@ -351,8 +376,9 @@ class SearchAgent(Agent):
             The value of the player's pieces in hand minus the opponent's.
         """
         scores = dict.fromkeys(Player, 0.0)
+
         for owner, hand in state.hand.items():
             for piece_type, count in hand.items():
-                scores[owner] += count * PIECE_VALUES.get(piece_type, 0.0)
+                scores[owner] += count * SEARCH_PIECE_VALUES.get(piece_type, 0.0)
 
         return scores[player] - scores[player.opponent]

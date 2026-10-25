@@ -77,7 +77,8 @@ See `docs/plans/tooling.md` for the full rules and how each one is enforced.
   the class `Attributes:` section. This applies to tests as well.
 - Separate distinct blocks of logic with a blank line: before and after every compound
   statement (`if`, `for`, `while`, `with`, `try`, `match`) unless it starts or ends its
-  enclosing block, and before the closing `return` of a function with several steps.
+  enclosing block, and before the closing `return` of a function with several steps
+  (three or more statements, not counting the docstring).
 - Pass arguments by keyword in calls to our own functions, methods and classes with two
   or more arguments, for example `worker.decide(state=state, budget_s=1.0)` and
   `Move(piece_type=..., source_coord=None, target_coord=(0, 0))`. Positional is fine for

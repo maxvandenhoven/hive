@@ -24,7 +24,7 @@ class TurnContext(Protocol):
 class Agent(ABC):
     def __init__(self, rules: Rules, *, seed: int) -> None:
         self.rules = rules
-        self._rng = random.Random(seed)
+        self.rng = random.Random(seed)
 
     @abstractmethod
     def think(self, state: GameState, turn: TurnContext) -> None: ...
@@ -43,7 +43,7 @@ Contract:
 - `info(...)` reports search progress, modelled on UCI `info` lines: `depth`, `nodes`,
   `score`, `pv` (principal variation as serialized moves), `nps`, free-form extras. It
   is fire-and-forget and rate-limited by the context.
-- All randomness comes from `self._rng`; the seed is recorded by the runner.
+- All randomness comes from `self.rng`; the seed is recorded by the runner.
 - Perfect information means no `PlayerView`: agents see the full state. Agents receive
   `rules` at construction because they search.
 - An agent object lives for the whole match (persistent worker), so it may keep caches
@@ -69,8 +69,8 @@ iterative deepening loop:
   move. The submission is `final=True` when the depth limit is reached, the game is
   decided (a forced win or loss within the horizon), or the whole tree was searched (no
   line was cut off at the depth limit).
-- Finished games score `WIN_SCORE - ply` for a win (so faster wins rank higher), the
-  negation for a loss and 0 for a draw.
+- Finished games score `SEARCH_WIN_SCORE - ply` for a win (so faster wins rank higher),
+  the negation for a loss and 0 for a draw.
 
 The alpha-beta variants were removed with the old `choose_move` agents. They come back in
 WP 28 on top of this loop.
@@ -79,15 +79,16 @@ WP 28 on top of this loop.
 
 The old `Evaluator` ABC, with one class per heuristic and a `WeightedCompositeEvaluator`,
 is gone for the same reason `Ruleset` became `Rules` (D2, D22): every agent used one
-weighted sum, and the only real variation was the weights. The heuristics are private
-methods of `SearchAgent`, and each weight is a flat agent parameter next to `depth`:
+weighted sum, and the only real variation was the weights. The heuristics are methods of
+`SearchAgent` (`queen_safety_score`, `mobility_score`, ...), and each weight is a flat
+agent parameter next to `depth`:
 
 | Param | Default | Term (from the evaluated player's perspective) |
 |---|---|---|
 | `queen_safety` | 1.0 | Occupied neighbours of the opponent's queen minus those of the own queen |
 | `mobility` | 0.0 | Own legal moves minus the opponent's (slow: generates moves at every leaf) |
 | `positioning` | 0.0 | Own top pieces next to the opponent's queen minus the reverse |
-| `material_on_board` | 0.0 | Value of own pieces on the board minus the opponent's (`PIECE_VALUES`) |
+| `material_on_board` | 0.0 | Value of own pieces on the board minus the opponent's (`SEARCH_PIECE_VALUES`) |
 | `material_in_hand` | 0.0 | Value of own pieces in hand minus the opponent's |
 
 Terms with weight 0 are skipped, so an unused expensive term costs nothing. Flat weights

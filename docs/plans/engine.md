@@ -76,9 +76,9 @@ Notes:
   piece that is not in `movable_pieces`, so the frontend can call it for any tile.
   `movement_moves` dispatches to the per-piece methods directly, so it does not recompute
   articulation points per piece.
-- Per-piece movement becomes private methods (`_queen_targets`, `_beetle_targets`,
-  `_grasshopper_targets`, `_spider_targets`, `_ant_targets`) dispatched by piece type,
-  sharing a private slide helper. Port the existing logic unchanged; correctness is proven
+- Per-piece movement becomes methods (`queen_targets`, `beetle_targets`,
+  `grasshopper_targets`, `spider_targets`, `ant_targets`) dispatched by piece type through
+  `PIECE_TARGET_COORDS`, sharing the `slideable_neighbors` helper. Port the existing logic unchanged; correctness is proven
   by perft, not by rewriting.
 - `allow_queen_first_turn` is new. Some reference engines forbid placing the queen on a
   player's first turn (tournament rule), and perft parity may depend on it.

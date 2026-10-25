@@ -25,7 +25,7 @@ type Snapshot = tuple[
     dict[Player, Coordinate | None],
 ]
 
-_RULES = [
+RULES = [
     Rules(),
     Rules(move_before_queen=True),
     Rules(queen_by_turn=None, allow_queen_first_turn=False),
@@ -34,27 +34,28 @@ _RULES = [
 
 
 @dataclass(frozen=True, slots=True)
-class _Profile:
+class Profile:
     settings: settings
     max_plies: int
 
 
-_FAST = _Profile(settings(max_examples=100, deadline=None), max_plies=100)
-_SLOW = _Profile(settings(max_examples=500, deadline=None), max_plies=300)
-_PROFILES = [
-    pytest.param(_FAST, id="fast"),
-    pytest.param(_SLOW, id="slow", marks=pytest.mark.slow),
+FAST = Profile(settings=settings(max_examples=100, deadline=None), max_plies=100)
+SLOW = Profile(settings=settings(max_examples=500, deadline=None), max_plies=300)
+PROFILES = [
+    pytest.param(FAST, id="fast"),
+    pytest.param(SLOW, id="slow", marks=pytest.mark.slow),
 ]
 
 
 @st.composite
-def _games(draw: st.DrawFn, max_plies: int) -> Game:
+def game_strategy(draw: st.DrawFn, max_plies: int) -> Game:
     """Draw rules and a random sequence of legal moves, stopping when the game ends."""
-    rules = draw(st.sampled_from(_RULES))
+    rules = draw(st.sampled_from(RULES))
     plies = draw(st.integers(min_value=0, max_value=max_plies))
 
     state = rules.create_initial_state()
     moves: list[Move | None] = []
+
     while len(moves) < plies and not rules.is_finished(state):
         move = draw(st.sampled_from(rules.legal_moves(state)))
         state.apply_move(move)
@@ -63,7 +64,7 @@ def _games(draw: st.DrawFn, max_plies: int) -> Game:
     return rules, moves
 
 
-def _snapshot(state: GameState) -> Snapshot:
+def snapshot(state: GameState) -> Snapshot:
     """Copy every field of the state into plain values for comparison."""
     return (
         {coord: list(stack) for coord, stack in state.board.items()},
@@ -86,6 +87,7 @@ def assert_invariants(state: GameState, rules: Rules) -> None:
     on_board = Counter(
         (piece.owner, piece.type) for stack in state.board.values() for piece in stack
     )
+
     for player in Player:
         for piece_type, count in rules.piece_counts.items():
             in_hand = state.hand[player].get(piece_type, 0)
@@ -111,78 +113,86 @@ def assert_invariants(state: GameState, rules: Rules) -> None:
     assert state.current_player is expected_player
 
 
-def _run(profile: _Profile, check: Callable[[Game], None]) -> None:
+def run_profile(profile: Profile, check: Callable[[Game], None]) -> None:
     """Run `check` on random games drawn with the settings of `profile`."""
-    profile.settings(given(_games(max_plies=profile.max_plies))(check))()
+    profile.settings(given(game_strategy(max_plies=profile.max_plies))(check))()
 
 
-@pytest.mark.parametrize("profile", _PROFILES)
-def test_undo_restores_state(profile: _Profile) -> None:
+@pytest.mark.parametrize("profile", PROFILES)
+def test_undo_restores_state(profile: Profile) -> None:
     """Test that every move keeps the invariants and undoing it restores the state."""
 
     def check(game: Game) -> None:
         rules, moves = game
         state = rules.create_initial_state()
-        assert_invariants(state, rules)
+        assert_invariants(state=state, rules=rules)
 
-        snapshots = [_snapshot(state)]
+        snapshots = [snapshot(state)]
+
         for move in moves:
-            before = _snapshot(state)
+            before = snapshot(state)
             state.apply_move(move)
-            assert_invariants(state, rules)
+            assert_invariants(state=state, rules=rules)
 
             state.undo_move(move)
-            assert _snapshot(state) == before
+            assert snapshot(state) == before
 
             state.apply_move(move)
-            snapshots.append(_snapshot(state))
+            snapshots.append(snapshot(state))
 
         # Undoing the whole game walks back through every earlier state.
         for move in reversed(moves):
             snapshots.pop()
             state.undo_move(move)
-            assert _snapshot(state) == snapshots[-1]
+            assert snapshot(state) == snapshots[-1]
 
-    _run(profile, check)
+    run_profile(profile=profile, check=check)
 
 
-@pytest.mark.parametrize("profile", _PROFILES)
-def test_replay_reproduces_state(profile: _Profile) -> None:
+@pytest.mark.parametrize("profile", PROFILES)
+def test_replay_reproduces_state(profile: Profile) -> None:
     """Test that replaying with `Rules.apply_checked_move` gives the same state."""
 
     def check(game: Game) -> None:
         rules, moves = game
         fast_state = rules.create_initial_state()
+
         for move in moves:
             fast_state.apply_move(move)
 
         replayed_state = rules.create_initial_state()
+
         for move in moves:
-            rules.apply_checked_move(replayed_state, move)
+            rules.apply_checked_move(state=replayed_state, move=move)
 
-        assert _snapshot(replayed_state) == _snapshot(fast_state)
+        assert snapshot(replayed_state) == snapshot(fast_state)
 
-    _run(profile, check)
+    run_profile(profile=profile, check=check)
 
 
-@pytest.mark.parametrize("profile", _PROFILES)
-def test_from_board_reproduces_state(profile: _Profile) -> None:
+@pytest.mark.parametrize("profile", PROFILES)
+def test_from_board_reproduces_state(profile: Profile) -> None:
     """Test that `from_board` derives the hands and queen coordinates of every state."""
 
     def check(game: Game) -> None:
         rules, moves = game
         state = rules.create_initial_state()
+
         for move in moves:
             state.apply_move(move)
 
             rebuilt = rules.from_board(
-                state.board, state.current_player, state.current_ply
+                board=state.board,
+                current_player=state.current_player,
+                current_ply=state.current_ply,
             )
-            assert _snapshot(rebuilt) == _snapshot(state)
+            assert snapshot(rebuilt) == snapshot(state)
 
             # The derived ply is the lowest valid one, so it never exceeds the real ply.
-            derived = rules.from_board(state.board, state.current_player)
+            derived = rules.from_board(
+                board=state.board, current_player=state.current_player
+            )
             assert derived.current_ply <= state.current_ply
-            assert_invariants(derived, rules)
+            assert_invariants(state=derived, rules=rules)
 
-    _run(profile, check)
+    run_profile(profile=profile, check=check)

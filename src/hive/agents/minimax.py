@@ -27,9 +27,11 @@ class MinimaxAgent(SearchAgent):
             The score of the root from the perspective of the player to move, and the
             principal variation starting with the best move.
         """
-        return self._minimax(state, depth, 0, state.current_player)
+        return self.minimax(
+            state=state, depth=depth, ply=0, root_player=state.current_player
+        )
 
-    def _minimax(
+    def minimax(
         self, state: GameState, depth: int, ply: int, root_player: Player
     ) -> tuple[float, list[Move | None]]:
         """Recursively search the game tree using minimax.
@@ -44,23 +46,29 @@ class MinimaxAgent(SearchAgent):
             The score of the node from the perspective of `root_player`, and the
             principal variation from this node, which is empty at leaves.
         """
-        self._visit_node()
-        terminal_score = self._terminal_score(state, root_player, ply)
+        self.visit_node()
+        terminal_score = self.terminal_score(state=state, player=root_player, ply=ply)
+
         if terminal_score is not None:
             return terminal_score, []
+
         if depth == 0:
-            self._cutoff = True
-            return self.evaluate(state, root_player), []
+            self.cutoff = True
+            return self.evaluate(state=state, player=root_player), []
 
         # If the player to move at the node is the player to move at the root, maximize
         # the score of the child nodes, otherwise minimize it.
         maximizing = state.current_player == root_player
         best_score = -math.inf if maximizing else math.inf
         best_pv: list[Move | None] = []
+
         for move in self.rules.legal_moves(state):
             state.apply_move(move)
+
             try:
-                score, pv = self._minimax(state, depth - 1, ply + 1, root_player)
+                score, pv = self.minimax(
+                    state=state, depth=depth - 1, ply=ply + 1, root_player=root_player
+                )
             finally:
                 state.undo_move(move)
 

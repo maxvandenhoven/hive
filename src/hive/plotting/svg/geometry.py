@@ -52,6 +52,7 @@ def get_hex_points(
     angle_offset = 30.0 if orientation is HexOrientation.POINTY_TOP else 0.0
 
     points: list[float] = []
+
     for i in range(6):
         angle_rad = math.radians(60.0 * i + angle_offset)
         points.append(cx + size * math.cos(angle_rad))
@@ -70,9 +71,11 @@ def get_grid_coords(radius: int) -> list[Coordinate]:
         All axial coordinates `(q, r)` within the specified radius.
     """
     coords: list[Coordinate] = []
+
     for q in range(-radius, radius + 1):
         r_min = max(-radius, -q - radius)
         r_max = min(radius, -q + radius)
+
         for r in range(r_min, r_max + 1):
             coords.append((q, r))
 

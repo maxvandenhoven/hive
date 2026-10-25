@@ -16,7 +16,7 @@ from hive.plotting.matplotlib.geometry import (
 )
 
 
-def _draw_piece_hex(
+def draw_piece_hex(
     ax: Axes,
     cx: float,
     cy: float,
@@ -46,7 +46,7 @@ def _draw_piece_hex(
             `use_sprites` is `True`.
     """
     # Slightly smaller hex so the grid lines remain visible.
-    hex_verts = get_hex_verts(cx, cy, orientation=orientation, size=size * 0.88)
+    hex_verts = get_hex_verts(cx=cx, cy=cy, orientation=orientation, size=size * 0.88)
     poly = plt.Polygon(
         hex_verts,
         closed=True,
@@ -81,7 +81,7 @@ def _draw_piece_hex(
         )
 
 
-def _draw_stack_badge(
+def draw_stack_badge(
     ax: Axes, cx: float, cy: float, stack_height: int, size: float
 ) -> None:
     """Draw a small badge indicating how many pieces are stacked at a position.
@@ -127,8 +127,10 @@ def draw_grid(
         size: The radius of each hexagon.
     """
     for coord in grid_coords:
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
-        hex_verts = get_hex_verts(cx, cy, orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
+        hex_verts = get_hex_verts(cx=cx, cy=cy, orientation=orientation, size=size)
         poly = plt.Polygon(
             hex_verts,
             closed=True,
@@ -162,13 +164,15 @@ def draw_pieces(
         sprite_resolution: The pixel size for sprite rendering.
     """
     for coord in state.get_occupied_coords():
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
         top_piece = state.get_top_piece(coord)
 
-        _draw_piece_hex(
-            ax,
-            cx,
-            cy,
+        draw_piece_hex(
+            ax=ax,
+            cx=cx,
+            cy=cy,
             piece_type=top_piece.type,
             owner=top_piece.owner,
             orientation=orientation,
@@ -177,7 +181,7 @@ def draw_pieces(
             sprite_resolution=sprite_resolution,
         )
 
-        _draw_stack_badge(
+        draw_stack_badge(
             ax=ax, cx=cx, cy=cy, stack_height=state.get_stack_height(coord), size=size
         )
 
@@ -200,9 +204,11 @@ def draw_highlights(
     for color, coords in highlights.items():
         for coord in coords:
             cx, cy = axial_to_pixel(
-                coord[0], coord[1], orientation=orientation, size=size
+                q=coord[0], r=coord[1], orientation=orientation, size=size
             )
-            ring_verts = get_hex_verts(cx, cy, orientation=orientation, size=size * 0.9)
+            ring_verts = get_hex_verts(
+                cx=cx, cy=cy, orientation=orientation, size=size * 0.9
+            )
             ring_poly = plt.Polygon(
                 ring_verts,
                 closed=True,
@@ -227,7 +233,7 @@ def fit_axes_to_grid(
     """
     all_x, all_y = zip(
         *[
-            axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
+            axial_to_pixel(q=coord[0], r=coord[1], orientation=orientation, size=size)
             for coord in grid_coords
         ],
         strict=True,
@@ -264,6 +270,7 @@ def draw_hand_panel(
     all_types: list[PieceType] = sorted(
         set(state.hand[Player.WHITE].keys()) | set(state.hand[Player.BLACK].keys())
     )
+
     if not all_types:
         return
 
@@ -330,7 +337,7 @@ def draw_hand_panel(
             icon_x = icon_x_start + type_idx * icon_spacing
             count = state.hand[player].get(piece_type, 0)
 
-            _draw_piece_hex(
+            draw_piece_hex(
                 ax=ax,
                 cx=icon_x,
                 cy=icon_y,
@@ -345,7 +352,7 @@ def draw_hand_panel(
             # Semi-transparent overlay to dim exhausted pieces.
             if count == 0:
                 dim_verts = get_hex_verts(
-                    icon_x, icon_y, orientation=orientation, size=size * 0.88
+                    cx=icon_x, cy=icon_y, orientation=orientation, size=size * 0.88
                 )
                 dim_poly = plt.Polygon(
                     dim_verts,

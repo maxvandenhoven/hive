@@ -14,7 +14,7 @@ from hive.engine.state import Player
 from hive.match.gauntlet import (
     GAUNTLET_REPORT_VERSION,
     DecisionStats,
-    DistributionSummary,
+    DecisionTimeSummary,
     GauntletConfig,
     GauntletReport,
     estimate_elo,
@@ -39,6 +39,7 @@ def make_config(
         "seed": 0,
     }
     fields.update(overrides)
+
     return GauntletConfig(**fields)
 
 
@@ -193,12 +194,12 @@ class TestStatistics:
         assert elo[0] > elo[1] > elo[2]
 
     def test_distribution_summary(self) -> None:
-        summary = DistributionSummary.from_values([0.4, 0.1, 0.3, 0.2])
+        summary = DecisionTimeSummary.from_values([0.4, 0.1, 0.3, 0.2])
 
-        assert summary == DistributionSummary(
+        assert summary == DecisionTimeSummary(
             count=4, mean=0.25, p50=0.2, p90=0.4, max=0.4
         )
-        assert DistributionSummary.from_values([]).count == 0
+        assert DecisionTimeSummary.from_values([]).count == 0
 
     def test_decision_stats(self) -> None:
         decisions = [
@@ -370,6 +371,7 @@ class TestRun:
                 seed=seed, max_turns=8, jobs=2, replays=True, budget_s=2.0
             ).run(match_callback=lambda match, result: seen.append(match.index))
             assert report.replays is not None
+
             return [
                 (m.white, m.black, m.seed, m.outcome, m.winner, r.record.moves)
                 for m, r in zip(report.matches, report.replays, strict=True)

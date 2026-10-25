@@ -69,9 +69,11 @@ def get_grid_coords(radius: int) -> list[Coordinate]:
         All axial coordinates `(q, r)` within the specified radius.
     """
     coords: list[Coordinate] = []
+
     for q in range(-radius, radius + 1):
         r_min = max(-radius, -q - radius)
         r_max = min(radius, -q + radius)
+
         for r in range(r_min, r_max + 1):
             coords.append((q, r))
 
