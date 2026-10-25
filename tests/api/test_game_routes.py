@@ -7,9 +7,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hive.api.db.models import GameRow, MoveRow, MoveSource, PhotoRow
-from hive.api.storage import ObjectStore
+from hive.api.storage import ObjectStore, ObjectStoreError
 from hive.engine.rules import Rules
-from hive.engine.serialization import serialize_move, serialize_rules
 from hive.engine.state import Move, PieceType
 
 AGENT: dict[str, Any] = {
@@ -39,14 +38,18 @@ async def add_moves(
     for ply, move in enumerate(moves):
         session.add(
             MoveRow(
-                game_id=uuid.UUID(game_id),
-                ply=ply,
-                move=serialize_move(move),
-                source=MoveSource.MANUAL,
+                game_id=uuid.UUID(game_id), ply=ply, move=move, source=MoveSource.MANUAL
             )
         )
 
     await session.commit()
+
+
+def list_keys(store: ObjectStore) -> list[str]:
+    """List the keys of every object in the store."""
+    response = store.client.list_objects_v2(Bucket=store.bucket)
+
+    return [item["Key"] for item in response.get("Contents", [])]
 
 
 async def count_rows(
@@ -67,8 +70,8 @@ class TestCreateGame:
         assert game["result"] is None
         assert game["white"] == HUMAN
         assert game["black"] == {**AGENT, "spec": {**AGENT["spec"], "label": None}}
-        assert game["rules"] == serialize_rules(Rules(max_turns=40))
-        assert game["setup"] == "initial"
+        assert game["rules"] == Rules(max_turns=40).to_json()
+        assert game["setup"] is None
         assert game["moves"] == []
         assert game["ply_count"] == 0
 
@@ -107,6 +110,15 @@ class TestListGames:
         assert (first["total"], first["limit"], first["offset"]) == (3, 2, 0)
         assert "moves" not in first["items"][0]
 
+    async def test_counts_moves_without_loading_them(
+        self, client: httpx2.AsyncClient, session: AsyncSession
+    ) -> None:
+        game = await create_game(client=client)
+        await add_moves(session=session, game_id=game["id"], moves=[None, None])
+        page = (await client.get("/api/games")).json()
+
+        assert page["items"][0]["ply_count"] == 2
+
     async def test_filters_by_status(self, client: httpx2.AsyncClient) -> None:
         active = await create_game(client=client)
         finished = await create_game(client=client)
@@ -138,7 +150,7 @@ class TestReadGame:
         assert body["ply_count"] == 2
         assert [move["ply"] for move in body["moves"]] == [0, 1]
         assert [move["move"] for move in body["moves"]] == [
-            serialize_move(move) for move in moves
+            None if move is None else move.to_json() for move in moves
         ]
         assert body["moves"][0]["source"] == "manual"
 
@@ -201,7 +213,7 @@ class TestDeleteGame:
         await session.commit()
 
         for key in (photo.object_key, "photos/other/1.jpg"):
-            await store.put(key=key, data=b"jpeg", content_type="image/jpeg")
+            store.client.put_object(Bucket=store.bucket, Key=key, Body=b"jpeg")
 
         response = await client.delete(f"/api/games/{game_id}")
         session.expunge_all()
@@ -210,7 +222,7 @@ class TestDeleteGame:
         assert await session.get(GameRow, game_id) is None
         assert await count_rows(session=session, model=MoveRow, game_id=game_id) == 0
         assert await count_rows(session=session, model=PhotoRow, game_id=game_id) == 0
-        assert await store.list_keys() == ["photos/other/1.jpg"]
+        assert list_keys(store) == ["photos/other/1.jpg"]
         assert (await client.get(f"/api/games/{game_id}")).status_code == 404
 
     async def test_keeps_deletion_when_objects_fail(
@@ -220,7 +232,7 @@ class TestDeleteGame:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         async def fail(prefix: str) -> int:
-            raise ConnectionError(prefix)
+            raise ObjectStoreError(prefix)
 
         monkeypatch.setattr(store, "delete_prefix", fail)
         game = await create_game(client=client)
@@ -251,10 +263,26 @@ class TestExportGame:
             f'attachment; filename="game-{game["id"]}.json"'
         )
         assert response.json() == {
-            "rules": serialize_rules(Rules()),
+            "rules": Rules().to_json(),
             "setup": setup,
-            "moves": [serialize_move(move)],
+            "moves": [move.to_json()],
         }
 
     async def test_missing(self, client: httpx2.AsyncClient) -> None:
         assert (await client.get(f"/api/games/{uuid.uuid4()}/export")).status_code == 404
+
+
+async def test_round_trip_through_real_sessions(
+    committing_client: httpx2.AsyncClient,
+) -> None:
+    game = await create_game(client=committing_client)
+
+    try:
+        response = await committing_client.get(f"/api/games/{game['id']}")
+
+        assert response.status_code == 200
+        assert response.json()["name"] == "Game"
+    finally:
+        await committing_client.delete(f"/api/games/{game['id']}")
+
+    assert (await committing_client.get(f"/api/games/{game['id']}")).status_code == 404

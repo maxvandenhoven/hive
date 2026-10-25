@@ -1,6 +1,7 @@
 """Object storage for photos, datasets and models in an S3 bucket.
 
 boto3 blocks, so every request runs in a worker thread and never stalls the event loop.
+Only what the app uses is wrapped; uploads and downloads arrive with photos (WP 16).
 """
 
 from functools import partial
@@ -12,9 +13,6 @@ from botocore.config import Config
 
 from hive.api.settings import ApiSettings
 
-S3_DELETE_BATCH_SIZE = 1000
-"""The most keys one S3 `DeleteObjects` request may delete."""
-
 S3_CLIENT_CONFIG = Config(
     s3={"addressing_style": "path"},
     connect_timeout=2,
@@ -25,8 +23,8 @@ S3_CLIENT_CONFIG = Config(
 retries, so readiness checks and requests fail quickly when the store is down."""
 
 
-class ObjectNotFoundError(KeyError):
-    """Raised when an object key does not exist in the store."""
+class ObjectStoreError(Exception):
+    """Raised when the store reports that an operation failed for some objects."""
 
 
 class ObjectStore:
@@ -68,115 +66,55 @@ class ObjectStore:
 
         return cls(client=client, bucket=settings.s3_bucket)
 
-    async def put(self, key: str, data: bytes, content_type: str) -> None:
-        """Store an object, replacing any object with the same key.
+    async def request(self, operation: str, **params: Any) -> Any:
+        """Call a client operation on the bucket in a worker thread.
 
         Args:
-            key: The object key, for example `photos/<game_id>/<photo_id>.jpg`.
-            data: The object contents.
-            content_type: The media type of the contents, for example `image/jpeg`.
+            operation: The name of the client method, for example `head_bucket`.
+            **params: The parameters of the operation besides `Bucket`.
+
+        Returns:
+            The response of the operation.
         """
-        await anyio.to_thread.run_sync(
-            partial(
-                self.client.put_object,
-                Bucket=self.bucket,
-                Key=key,
-                Body=data,
-                ContentType=content_type,
-            )
+        method = getattr(self.client, operation)
+
+        return await anyio.to_thread.run_sync(
+            partial(method, Bucket=self.bucket, **params)
         )
-
-    async def get(self, key: str) -> bytes:
-        """Read an object.
-
-        Args:
-            key: The object key.
-
-        Returns:
-            The object contents.
-
-        Raises:
-            ObjectNotFoundError: If there is no object with the key.
-        """
-        return await anyio.to_thread.run_sync(self.get_blocking, key)
-
-    def get_blocking(self, key: str) -> bytes:
-        """Read an object in the calling thread.
-
-        Args:
-            key: The object key.
-
-        Returns:
-            The object contents.
-
-        Raises:
-            ObjectNotFoundError: If there is no object with the key.
-        """
-        try:
-            response = self.client.get_object(Bucket=self.bucket, Key=key)
-        except self.client.exceptions.NoSuchKey as e:
-            raise ObjectNotFoundError(key) from e
-
-        return response["Body"].read()
 
     async def delete_prefix(self, prefix: str) -> int:
         """Delete every object whose key starts with a prefix.
+
+        Each round lists up to 1000 keys, the most one `DeleteObjects` request takes, and
+        deletes them, until no keys are left.
 
         Args:
             prefix: The key prefix, for example `photos/<game_id>/`.
 
         Returns:
             The number of deleted objects.
+
+        Raises:
+            ObjectStoreError: If the store could not delete some of the objects.
         """
-        return await anyio.to_thread.run_sync(self.delete_prefix_blocking, prefix)
+        deleted = 0
 
-    def delete_prefix_blocking(self, prefix: str) -> int:
-        """Delete every object whose key starts with a prefix, in the calling thread.
+        while True:
+            page = await self.request("list_objects_v2", Prefix=prefix)
+            keys = [{"Key": item["Key"]} for item in page.get("Contents", [])]
 
-        Args:
-            prefix: The key prefix.
+            if not keys:
+                return deleted
 
-        Returns:
-            The number of deleted objects.
-        """
-        keys = self.list_keys_blocking(prefix)
-
-        for start in range(0, len(keys), S3_DELETE_BATCH_SIZE):
-            batch = keys[start : start + S3_DELETE_BATCH_SIZE]
-            self.client.delete_objects(
-                Bucket=self.bucket,
-                Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True},
+            response = await self.request(
+                "delete_objects", Delete={"Objects": keys, "Quiet": True}
             )
 
-        return len(keys)
+            if errors := response.get("Errors"):
+                msg = f"Could not delete {len(errors)} objects, for example {errors[0]}."
+                raise ObjectStoreError(msg)
 
-    async def list_keys(self, prefix: str = "") -> list[str]:
-        """List the keys of the objects whose key starts with a prefix.
-
-        Args:
-            prefix: The key prefix, or `""` for every object.
-
-        Returns:
-            The keys in lexicographic order.
-        """
-        return await anyio.to_thread.run_sync(self.list_keys_blocking, prefix)
-
-    def list_keys_blocking(self, prefix: str = "") -> list[str]:
-        """List the keys of the objects under a prefix, in the calling thread.
-
-        Args:
-            prefix: The key prefix, or `""` for every object.
-
-        Returns:
-            The keys in lexicographic order.
-        """
-        paginator = self.client.get_paginator("list_objects_v2")
-
-        return [
-            item["Key"]
-            for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix)
-            for item in page.get("Contents", [])
-        ]
+            deleted += len(keys)
 
     async def check(self) -> None:
         """Check that the bucket exists and the keys may access it, for readiness probes.
@@ -185,6 +123,4 @@ class ObjectStore:
             botocore.exceptions.ClientError: If the bucket is missing or not accessible.
             botocore.exceptions.EndpointConnectionError: If the endpoint is unreachable.
         """
-        await anyio.to_thread.run_sync(
-            partial(self.client.head_bucket, Bucket=self.bucket)
-        )
+        await self.request("head_bucket")

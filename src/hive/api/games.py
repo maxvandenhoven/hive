@@ -51,9 +51,19 @@ class GameService:
         Returns:
             The new game, active and without moves.
         """
-        game = body.to_row()
+        game = GameRow(
+            name=body.name,
+            rules=body.rules,
+            setup=body.setup,
+            white_player=body.white,
+            black_player=body.black,
+            moves=[],
+            photos=[],
+        )
         self.session.add(game)
         await self.session.commit()
+        # Writes expire the counted `ply_count`, which async sessions cannot load lazily.
+        await self.session.refresh(game, attribute_names=["ply_count"])
         logger.info("Created game `%s`.", game.id, extra={"game_id": str(game.id)})
 
         return game
@@ -82,7 +92,7 @@ class GameService:
     async def list_games(
         self, status: GameStatus | None, limit: int, offset: int
     ) -> tuple[Sequence[GameRow], int]:
-        """List games with their moves, newest first.
+        """List games, newest first, without loading their moves.
 
         Args:
             status: Only list games with this status, or `None` for every game.
@@ -102,8 +112,7 @@ class GameService:
             select(func.count()).select_from(query.subquery())
         )
         games = await self.session.scalars(
-            query.options(selectinload(GameRow.moves))
-            .order_by(GameRow.created_at.desc(), GameRow.id)
+            query.order_by(GameRow.created_at.desc(), GameRow.id)
             .limit(limit)
             .offset(offset)
         )
@@ -124,8 +133,12 @@ class GameService:
             GameNotFoundError: If there is no game with the ID.
         """
         game = await self.get_game(game_id)
-        body.apply(game)
+
+        for name, value in body.model_dump(exclude_none=True).items():
+            setattr(game, name, value)
+
         await self.session.commit()
+        await self.session.refresh(game, attribute_names=["ply_count"])
 
         return game
 

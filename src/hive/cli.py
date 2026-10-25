@@ -1,6 +1,5 @@
 """Command line interface for the `hive` package."""
 
-import asyncio
 import json
 import logging
 import time
@@ -9,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
+from pydantic import ValidationError
 
 from hive import __version__, bench
 from hive.agents.factory import AgentSpec, InvalidAgentSpecError
@@ -26,7 +26,7 @@ from hive.match.runner import MatchRunner
 from hive.match.worker import DEFAULT_GRACE_S, AgentWorkerError
 
 if TYPE_CHECKING:
-    from hive.api.settings import ApiSettings
+    from hive.api.settings import DatabaseSettings
 
 logger = logging.getLogger(__name__)
 
@@ -480,8 +480,11 @@ def require_api_extra() -> None:
         raise typer.Exit(code=1) from e
 
 
-def load_api_settings() -> "ApiSettings":
-    """Read the API settings from `HIVE_` environment variables and `.env`.
+def load_settings[S: DatabaseSettings](kind: type[S]) -> S:
+    """Read settings from `HIVE_` environment variables and `.env`.
+
+    Args:
+        kind: The settings class, `ApiSettings` or the smaller `DatabaseSettings`.
 
     Returns:
         The settings.
@@ -490,17 +493,11 @@ def load_api_settings() -> "ApiSettings":
         typer.Exit: With code 1 and the missing or invalid settings if they do not
             validate.
     """
-    require_api_extra()
-
-    from pydantic import ValidationError
-
-    from hive.api.settings import ApiSettings
-
     try:
-        return ApiSettings()
+        return kind()
     except ValidationError as e:
         logger.error(
-            "Invalid API settings; set `HIVE_` environment variables or create `.env` "
+            "Invalid settings; set `HIVE_` environment variables or create `.env` "
             "from `.env.example`.\n%s",
             e,
         )
@@ -528,11 +525,14 @@ def serve(
         reload: Whether to restart the server when the code changes.
     """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    settings = load_api_settings()
+    require_api_extra()
 
     import uvicorn
 
     from hive.api.observability import logging_config
+    from hive.api.settings import ApiSettings
+
+    settings = load_settings(ApiSettings)
 
     uvicorn.run(
         "hive.api.app:create_app",
@@ -541,7 +541,6 @@ def serve(
         port=port,
         reload=reload,
         log_config=logging_config(settings.log_level),
-        access_log=False,
         timeout_graceful_shutdown=SERVE_GRACEFUL_SHUTDOWN_S,
     )
 
@@ -565,20 +564,13 @@ def db_upgrade(
     """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
-    settings = load_api_settings()
+    require_api_extra()
 
-    from hive.api.db.session import Database
+    from alembic import command
 
-    async def upgrade() -> None:
-        """Migrate the database, then close its connections."""
-        database = Database.from_url(settings.database_url)
+    from hive.api.settings import DatabaseSettings
 
-        try:
-            await database.upgrade(revision)
-        finally:
-            await database.dispose()
-
-    asyncio.run(upgrade())
+    command.upgrade(load_settings(DatabaseSettings).alembic_config(), revision)
     logger.info("Migrated the database to `%s`.", revision)
 
 

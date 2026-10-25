@@ -1,60 +1,50 @@
 """Alembic migration environment.
 
-Migrations run over the connection that `Database.upgrade` attaches to the configuration.
-Run from the command line (`uv run alembic ...` with the root `alembic.ini`), they connect
-to `HIVE_DATABASE_URL`.
+Migrations run synchronously over their own connection to the URL that
+`DatabaseSettings.alembic_config` attaches, or, run from the command line
+(`uv run alembic ...` with the root `alembic.ini`), to `HIVE_DATABASE_URL`.
 """
 
 from alembic import context
-from sqlalchemy import Connection, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 
-from hive.api.db.models import Base
-from hive.api.settings import ApiSettings
+from hive.api.db.models import DatabaseBase
+from hive.api.settings import DatabaseSettings
 
 
-def command_line_database_url() -> str:
-    """Read the database URL for a migration run from the command line.
+def database_url() -> str:
+    """Get the URL of the database to migrate.
 
     Returns:
-        The database URL from `HIVE_` environment variables or `.env`.
+        The attached URL, or `HIVE_DATABASE_URL` from the environment or `.env`.
     """
-    return ApiSettings().database_url
-
-
-def run_migrations(connection: Connection) -> None:
-    """Run the migrations over a connection.
-
-    Args:
-        connection: The database connection.
-    """
-    context.configure(
-        connection=connection, target_metadata=Base.metadata, compare_type=True
+    return (
+        context.config.attributes.get("database_url") or DatabaseSettings().database_url
     )
 
-    with context.begin_transaction():
-        context.run_migrations()
 
+def run_migrations() -> None:
+    """Run the migrations, offline as SQL or online over a new connection."""
+    if context.is_offline_mode():
+        context.configure(url=database_url(), target_metadata=DatabaseBase.metadata)
 
-def run_migrations_online() -> None:
-    """Run the migrations over the attached connection, or a new one from the settings."""
-    connection = context.config.attributes.get("connection")
+        with context.begin_transaction():
+            context.run_migrations()
 
-    if connection is not None:
-        run_migrations(connection)
         return
 
-    engine = create_engine(command_line_database_url())
+    engine = create_engine(database_url(), poolclass=NullPool)
 
-    with engine.connect() as new_connection:
-        run_migrations(new_connection)
+    with engine.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=DatabaseBase.metadata,
+            compare_type=True,
+        )
 
-    engine.dispose()
+        with context.begin_transaction():
+            context.run_migrations()
 
 
-if context.is_offline_mode():
-    context.configure(url=command_line_database_url(), target_metadata=Base.metadata)
-
-    with context.begin_transaction():
-        context.run_migrations()
-else:
-    run_migrations_online()
+run_migrations()

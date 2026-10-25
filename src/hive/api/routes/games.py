@@ -7,22 +7,19 @@ from fastapi import APIRouter, Query, Response, status
 
 from hive.api.db.models import GameStatus
 from hive.api.dependencies import GameServiceDependency
-from hive.api.errors import ApiError, GameNotFoundError
+from hive.api.errors import GAME_NOT_FOUND_RESPONSES
 from hive.api.routes import API_PREFIX
 from hive.api.schemas import (
     GAME_PAGE_MAX_LIMIT,
     GameCreate,
     GameDetail,
-    GameExport,
     GamePage,
     GameSummary,
     GameUpdate,
 )
+from hive.engine.record import GameRecord
 
 router = APIRouter(prefix=f"{API_PREFIX}/games", tags=["games"])
-
-GAME_NOT_FOUND_RESPONSES = ApiError.openapi_responses(GameNotFoundError)
-"""The error responses of every route on one game."""
 
 
 @router.post(
@@ -40,7 +37,7 @@ async def create_game(body: GameCreate, games: GameServiceDependency) -> GameDet
     Returns:
         The new game, active and without moves.
     """
-    return GameDetail.from_row(await games.create_game(body))
+    return GameDetail.model_validate(await games.create_game(body))
 
 
 @router.get("", description="List games, newest first.")
@@ -67,7 +64,7 @@ async def list_games(
     rows, total = await games.list_games(status=game_status, limit=limit, offset=offset)
 
     return GamePage(
-        items=[GameSummary.from_row(row) for row in rows],
+        items=[GameSummary.model_validate(row) for row in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -92,7 +89,7 @@ async def read_game(game_id: uuid.UUID, games: GameServiceDependency) -> GameDet
     Raises:
         GameNotFoundError: If there is no game with the ID.
     """
-    return GameDetail.from_row(await games.get_game(game_id))
+    return GameDetail.model_validate(await games.get_game(game_id))
 
 
 @router.patch(
@@ -116,7 +113,7 @@ async def update_game(
     Raises:
         GameNotFoundError: If there is no game with the ID.
     """
-    return GameDetail.from_row(await games.update_game(game_id=game_id, body=body))
+    return GameDetail.model_validate(await games.update_game(game_id=game_id, body=body))
 
 
 @router.delete(
@@ -146,7 +143,7 @@ async def delete_game(game_id: uuid.UUID, games: GameServiceDependency) -> None:
 )
 async def export_game(
     game_id: uuid.UUID, games: GameServiceDependency, response: Response
-) -> GameExport:
+) -> GameRecord:
     """Download the game as a serialized `GameRecord` with its rules, setup and moves.
 
     Args:
@@ -160,9 +157,9 @@ async def export_game(
     Raises:
         GameNotFoundError: If there is no game with the ID.
     """
-    export = GameExport.from_row(await games.get_game(game_id))
+    record = (await games.get_game(game_id)).to_record()
     response.headers["Content-Disposition"] = (
         f'attachment; filename="game-{game_id}.json"'
     )
 
-    return export
+    return record

@@ -50,7 +50,7 @@ async def get_session(
     Yields:
         The session, closed when the handler returns; uncommitted changes are rolled back.
     """
-    async with database.session() as session:
+    async with database.session_factory() as session:
         yield session
 
 

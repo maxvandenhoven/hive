@@ -1,18 +1,14 @@
-"""JSON logging, request IDs and access logs for the API service.
+"""JSON logging with request IDs for the API service.
 
-Request IDs come from `asgi-correlation-id` and JSON lines from `python-json-logger`. Both
-middlewares here are plain ASGI rather than Starlette's `BaseHTTPMiddleware`, so streamed
-responses such as the agent thinking stream pass through unbuffered.
+Request IDs come from `asgi-correlation-id` and JSON lines from `python-json-logger`; the
+access log is uvicorn's, written through the same formatter. Latency and route metrics
+come from Prometheus in WP 12. There is no Starlette `BaseHTTPMiddleware`, which would
+buffer streamed responses such as the agent thinking stream.
 """
 
-import logging
-import time
 from typing import Any
 
 from pythonjsonlogger.core import RESERVED_ATTRS
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
-
-logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "X-Request-ID"
 """The header that carries the request ID in requests and responses."""
@@ -72,68 +68,3 @@ def logging_config(level: str) -> dict[str, Any]:
             "alembic.runtime.plugins": {"level": "WARNING"},
         },
     }
-
-
-class AccessLogMiddleware:
-    """Log one line per request with its route, status and latency.
-
-    The line is written when the response is complete, so for a stream the latency is
-    the time until the stream ended.
-
-    Attributes:
-        app: The wrapped ASGI app.
-    """
-
-    def __init__(self, app: ASGIApp) -> None:
-        """Wrap an app.
-
-        Args:
-            app: The ASGI app.
-        """
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Handle a request, then log it.
-
-        Args:
-            scope: The connection scope.
-            receive: Receives messages from the client.
-            send: Sends messages to the client.
-        """
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        start = time.perf_counter()
-        status_code = 500
-
-        async def send_and_record_status(message: Message) -> None:
-            """Send a message, noting the status code of the response.
-
-            Args:
-                message: The ASGI message.
-            """
-            nonlocal status_code
-
-            if message["type"] == "http.response.start":
-                status_code = message["status"]
-
-            await send(message)
-
-        try:
-            await self.app(scope, receive, send_and_record_status)
-        finally:
-            route = scope.get("route")
-            logger.info(
-                "%s %s %d",
-                scope["method"],
-                scope["path"],
-                status_code,
-                extra={
-                    "method": scope["method"],
-                    "path": scope["path"],
-                    "route": getattr(route, "path", None),
-                    "status": status_code,
-                    "duration_ms": round((time.perf_counter() - start) * 1000, 2),
-                },
-            )

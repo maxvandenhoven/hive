@@ -1,43 +1,50 @@
+from collections.abc import Generator
+
 import pytest
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import Connection, inspect
+from sqlalchemy import Engine, create_engine, inspect
+from sqlalchemy.pool import NullPool
 
-from hive.api.db.models import Base
-from hive.api.db.session import Database
-
-pytestmark = pytest.mark.anyio
-
-
-def schema_differences(connection: Connection) -> list[object]:
-    """Compare the schema of the database with the ORM models."""
-    context = MigrationContext.configure(connection, opts={"compare_type": True})
-
-    return compare_metadata(context, Base.metadata)
+from hive.api.db.models import DatabaseBase
+from hive.api.settings import DatabaseSettings
 
 
-def table_names(connection: Connection) -> set[str]:
-    """List the tables of the database."""
-    return set(inspect(connection).get_table_names())
+@pytest.fixture(scope="function")
+def engine(postgres_url: str) -> Generator[Engine]:
+    """Yield a synchronous engine on the migrated test database."""
+    engine = create_engine(postgres_url, poolclass=NullPool)
+    yield engine
+    engine.dispose()
 
 
-async def test_schema_matches_models(database: Database) -> None:
-    async with database.engine.connect() as connection:
-        assert await connection.run_sync(schema_differences) == []
+def test_schema_matches_models(engine: Engine) -> None:
+    with engine.connect() as connection:
+        context = MigrationContext.configure(connection, opts={"compare_type": True})
+
+        assert compare_metadata(context, DatabaseBase.metadata) == []
 
 
-async def test_downgrade_and_upgrade_from_scratch(database: Database) -> None:
-    await database.downgrade("base")
+def test_downgrade_and_upgrade_from_scratch(postgres_url: str, engine: Engine) -> None:
+    config = DatabaseSettings(_env_file=None, database_url=postgres_url).alembic_config()
+    command.downgrade(config, "base")
 
-    async with database.engine.connect() as connection:
-        assert await connection.run_sync(table_names) == {"alembic_version"}
+    assert set(inspect(engine).get_table_names()) == {"alembic_version"}
 
-    await database.upgrade()
+    command.upgrade(config, "head")
 
-    async with database.engine.connect() as connection:
-        assert await connection.run_sync(table_names) == {
-            "alembic_version",
-            "game",
-            "move",
-            "photo",
-        }
+    assert set(inspect(engine).get_table_names()) == {
+        "alembic_version",
+        "game",
+        "move",
+        "photo",
+    }
+
+
+def test_offline_migration_writes_sql(capsys: pytest.CaptureFixture[str]) -> None:
+    url = "postgresql+psycopg://hive@db.invalid/hive"
+    config = DatabaseSettings(_env_file=None, database_url=url).alembic_config()
+    command.upgrade(config, "head", sql=True)
+
+    assert "CREATE TABLE game" in capsys.readouterr().out

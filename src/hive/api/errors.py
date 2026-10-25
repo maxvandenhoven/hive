@@ -2,7 +2,7 @@
 
 Services raise subclasses of `ApiError`; one exception handler turns them into an
 `ErrorResponse` body with the status code of the error. Routes list the errors they may
-return with `ApiError.openapi_responses`, so the generated client knows their shape.
+return in their `responses`, so the generated client knows their shape.
 """
 
 import uuid
@@ -53,37 +53,6 @@ class ApiError(Exception):
         super().__init__(detail)
         self.detail = detail
 
-    def to_response(self) -> JSONResponse:
-        """Build the HTTP response of the error.
-
-        Returns:
-            An `ErrorResponse` body with the status code of the error.
-        """
-        body = ErrorResponse(code=self.code, detail=self.detail)
-
-        return JSONResponse(status_code=self.status_code, content=body.model_dump())
-
-    @classmethod
-    def openapi_responses(cls, *errors: type["ApiError"]) -> dict[int | str, Any]:
-        """Describe the error responses of a route for its `responses` argument.
-
-        Args:
-            *errors: The errors the route may return.
-
-        Returns:
-            The `ErrorResponse` model under the status code of each error, with the
-            possible error codes in the description.
-        """
-        responses: dict[int | str, Any] = {}
-
-        for error in errors:
-            response = responses.setdefault(
-                error.status_code, {"model": ErrorResponse, "description": ""}
-            )
-            response["description"] += f"`{error.code}`: {error.__doc__}\n"
-
-        return responses
-
 
 class GameNotFoundError(ApiError):
     """There is no game with the ID.
@@ -105,6 +74,12 @@ class GameNotFoundError(ApiError):
         self.game_id = game_id
 
 
+GAME_NOT_FOUND_RESPONSES: dict[int | str, dict[str, Any]] = {
+    status.HTTP_404_NOT_FOUND: {"model": ErrorResponse, "description": "Game not found."}
+}
+"""The error responses of every route on one game, for its `responses`."""
+
+
 async def handle_api_error(request: Request, error: Exception) -> JSONResponse:
     """Turn an `ApiError` raised while handling a request into its response.
 
@@ -113,7 +88,7 @@ async def handle_api_error(request: Request, error: Exception) -> JSONResponse:
         error: The error, always an `ApiError` since the handler is registered for it.
 
     Returns:
-        The response of the error.
+        An `ErrorResponse` body with the status code of the error.
 
     Raises:
         TypeError: If the error is not an `ApiError`.
@@ -121,4 +96,6 @@ async def handle_api_error(request: Request, error: Exception) -> JSONResponse:
     if not isinstance(error, ApiError):
         raise TypeError(error)
 
-    return error.to_response()
+    body = ErrorResponse(code=error.code, detail=error.detail)
+
+    return JSONResponse(status_code=error.status_code, content=body.model_dump())

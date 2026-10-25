@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from alembic.config import Config
 from typer.testing import CliRunner
 
 from hive import __version__
 from hive.agents.factory import AgentSpec
-from hive.api.db.session import Database
 from hive.cli import app, describe_match_result, log_decision
 from hive.engine.rules import Rules
 from hive.engine.state import Player
@@ -518,7 +518,6 @@ class TestServe:
             True,
         )
         assert kwargs["log_config"]["root"]["level"] == "DEBUG"
-        assert kwargs["access_log"] is False
         assert kwargs["timeout_graceful_shutdown"] > 0
 
     def test_needs_api_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -551,11 +550,24 @@ class TestDbUpgrade:
     ) -> None:
         upgrades: list[tuple[str, str]] = []
 
-        async def upgrade(database: Database, revision: str) -> None:
-            upgrades.append((str(database.engine.url), revision))
+        def upgrade(config: Config, revision: str) -> None:
+            upgrades.append((config.attributes["database_url"], revision))
 
-        monkeypatch.setattr(Database, "upgrade", upgrade)
+        monkeypatch.setattr("alembic.command.upgrade", upgrade)
         result = CliRunner().invoke(app, ["db", "upgrade", "--revision", "0001"])
 
         assert result.exit_code == 0
         assert upgrades == [("postgresql+psycopg://u@db.invalid/x", "0001")]
+
+    def test_needs_only_the_database_url(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        for name in API_ENV:
+            monkeypatch.delenv(name, raising=False)
+
+        monkeypatch.setenv("HIVE_DATABASE_URL", "postgresql+psycopg://u@db.invalid/x")
+        monkeypatch.setattr("alembic.command.upgrade", lambda config, revision: None)
+
+        assert CliRunner().invoke(app, ["db", "upgrade"]).exit_code == 0

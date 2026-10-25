@@ -5,30 +5,14 @@ from contextlib import asynccontextmanager
 
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
-from fastapi.routing import APIRoute
 
 from hive import __version__
 from hive.api.db.session import Database
 from hive.api.errors import ApiError, handle_api_error
-from hive.api.observability import REQUEST_ID_HEADER, AccessLogMiddleware
+from hive.api.observability import REQUEST_ID_HEADER
 from hive.api.routes import agents, games, health
 from hive.api.settings import ApiSettings
 from hive.api.storage import ObjectStore
-
-
-def operation_id(route: APIRoute) -> str:
-    """Name the OpenAPI operation of a route after its handler function.
-
-    The generated frontend client uses these names, so they must stay stable and unique;
-    FastAPI's default appends the path and method.
-
-    Args:
-        route: The route.
-
-    Returns:
-        The name of the handler function, for example `create_game`.
-    """
-    return route.name
 
 
 def create_app(
@@ -71,18 +55,17 @@ def create_app(
             yield
         finally:
             if database is None:
-                await app.state.database.dispose()
+                await app.state.database.engine.dispose()
 
     app = FastAPI(
         title="Hive",
         version=__version__,
         lifespan=lifespan,
-        generate_unique_id_function=operation_id,
+        # Operation IDs are the handler names, which the generated client uses.
+        generate_unique_id_function=lambda route: route.name,
     )
     app.state.settings = resolved_settings
     app.add_exception_handler(ApiError, handle_api_error)
-    # The last middleware added is the outermost, so the access log has the request ID.
-    app.add_middleware(AccessLogMiddleware)
     app.add_middleware(CorrelationIdMiddleware, header_name=REQUEST_ID_HEADER)
     app.include_router(health.router)
     app.include_router(agents.router)

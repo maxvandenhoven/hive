@@ -4,12 +4,16 @@ import uuid
 import pytest
 from fastapi import Request, status
 
-from hive.api.errors import ApiError, ErrorResponse, GameNotFoundError, handle_api_error
+from hive.api.errors import GameNotFoundError, handle_api_error
+
+pytestmark = pytest.mark.anyio
 
 
-def test_to_response() -> None:
+async def test_handler_builds_error_response() -> None:
     game_id = uuid.uuid4()
-    response = GameNotFoundError(game_id).to_response()
+    response = await handle_api_error(
+        request=Request({"type": "http"}), error=GameNotFoundError(game_id)
+    )
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert json.loads(bytes(response.body)) == {
@@ -18,15 +22,6 @@ def test_to_response() -> None:
     }
 
 
-def test_openapi_responses() -> None:
-    responses = ApiError.openapi_responses(GameNotFoundError)
-
-    assert list(responses) == [404]
-    assert responses[404]["model"] is ErrorResponse
-    assert "`game_not_found`" in responses[404]["description"]
-
-
-@pytest.mark.anyio
 async def test_handler_rejects_other_errors() -> None:
     with pytest.raises(TypeError):
         await handle_api_error(request=Request({"type": "http"}), error=ValueError())

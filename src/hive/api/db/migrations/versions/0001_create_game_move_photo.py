@@ -44,7 +44,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("rules", postgresql.JSONB(), nullable=False),
-        sa.Column("setup", postgresql.JSONB(), nullable=False),
+        sa.Column("setup", postgresql.JSONB(), nullable=True),
         sa.Column("white_player", postgresql.JSONB(), nullable=False),
         sa.Column("black_player", postgresql.JSONB(), nullable=False),
         sa.Column(

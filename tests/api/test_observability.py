@@ -8,9 +8,8 @@ from collections.abc import Generator
 import httpx2
 import pytest
 from asgi_correlation_id import correlation_id
-from starlette.types import Message, Receive, Scope, Send
 
-from hive.api.observability import AccessLogMiddleware, logging_config
+from hive.api.observability import logging_config
 
 pytestmark = pytest.mark.anyio
 
@@ -75,6 +74,27 @@ class TestLoggingConfig:
 
         assert entry["request_id"] == "abc"
 
+    def test_formats_uvicorn_access_lines(self, handler: logging.Handler) -> None:
+        record = logging.LogRecord(
+            "uvicorn.access",
+            logging.INFO,
+            __file__,
+            1,
+            '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1:1", "GET", "/healthz", "1.1", 200),
+            None,
+        )
+        token = correlation_id.set("abc")
+
+        try:
+            entry = format_json(handler=handler, record=record)
+        finally:
+            correlation_id.reset(token)
+
+        assert entry["logger"] == "uvicorn.access"
+        assert entry["message"] == '127.0.0.1:1 - "GET /healthz HTTP/1.1" 200'
+        assert entry["request_id"] == "abc"
+
     def test_includes_exception(self, handler: logging.Handler) -> None:
         msg = "boom"
 
@@ -98,47 +118,3 @@ async def test_request_id_is_returned(offline_client: httpx2.AsyncClient) -> Non
     assert given.headers["X-Request-ID"] == request_id
     assert len(invalid.headers["X-Request-ID"]) == 32
     assert len(generated.headers["X-Request-ID"]) == 32
-
-
-async def test_logs_route_with_api_prefix(
-    offline_client: httpx2.AsyncClient, caplog: pytest.LogCaptureFixture
-) -> None:
-    with caplog.at_level(logging.INFO, logger="hive.api.observability"):
-        await offline_client.get("/api/agents")
-
-    [record] = caplog.records
-    assert record.__dict__["route"] == "/api/agents"
-
-
-async def test_logs_one_line_per_request(
-    offline_client: httpx2.AsyncClient, caplog: pytest.LogCaptureFixture
-) -> None:
-    with caplog.at_level(logging.INFO, logger="hive.api.observability"):
-        await offline_client.get("/healthz")
-
-    [record] = caplog.records
-    assert record.getMessage() == "GET /healthz 200"
-    assert record.__dict__["route"] == "/healthz"
-    assert record.__dict__["status"] == 200
-    assert record.__dict__["duration_ms"] >= 0
-
-
-async def test_access_log_passes_other_scopes_through(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    scopes: list[Scope] = []
-
-    async def app(scope: Scope, receive: Receive, send: Send) -> None:
-        scopes.append(scope)
-
-    async def receive() -> Message:
-        return {"type": "lifespan.startup"}
-
-    async def send(message: Message) -> None:
-        pass
-
-    with caplog.at_level(logging.INFO, logger="hive.api.observability"):
-        await AccessLogMiddleware(app)({"type": "lifespan"}, receive, send)
-
-    assert scopes == [{"type": "lifespan"}]
-    assert caplog.records == []

@@ -4,9 +4,9 @@ import pytest
 from pydantic import ValidationError
 
 from hive.api.db.models import GameStatus
-from hive.api.schemas import AgentPlayer, GameCreate, GameUpdate
+from hive.api.players import AgentPlayer
+from hive.api.schemas import GameCreate, GameUpdate
 from hive.engine.rules import Rules
-from hive.engine.serialization import serialize_rules
 
 AGENT = {"type": "agent", "spec": {"kind": "random"}, "budget_s": 1.0}
 HUMAN = {"type": "human"}
@@ -23,15 +23,15 @@ class TestGameCreate:
     def test_defaults_rules_and_setup(self) -> None:
         body = game_create()
 
-        assert body.rules == serialize_rules(Rules())
-        assert body.setup == "initial"
+        assert body.rules == Rules()
+        assert body.setup is None
         assert isinstance(body.black, AgentPlayer)
-        assert body.black.agent_spec().kind == "random"
+        assert body.black.spec.kind == "random"
 
     def test_fills_in_missing_rule_fields(self) -> None:
         body = game_create(rules={"max_turns": 30})
 
-        assert body.rules == serialize_rules(Rules(max_turns=30))
+        assert body.rules == Rules(max_turns=30)
 
     def test_agent_vs_agent(self) -> None:
         body = game_create(white=AGENT)
@@ -53,9 +53,10 @@ class TestGameCreate:
         with pytest.raises(ValidationError, match=message):
             game_create(black={"type": "agent", "spec": spec})
 
-    def test_rejects_non_positive_budget(self) -> None:
+    @pytest.mark.parametrize("budget_s", [0, float("inf"), float("nan")])
+    def test_rejects_invalid_budget(self, budget_s: float) -> None:
         with pytest.raises(ValidationError, match="budget_s"):
-            game_create(black={**AGENT, "budget_s": 0})
+            game_create(black={**AGENT, "budget_s": budget_s})
 
     def test_rejects_invalid_rules(self) -> None:
         with pytest.raises(ValidationError, match="unknown"):
@@ -67,7 +68,10 @@ class TestGameCreate:
             "current_player": "black",
         }
 
-        assert game_create(setup=setup).setup == {**setup, "current_ply": None}
+        body = game_create(setup=setup)
+
+        assert body.setup is not None
+        assert body.setup.to_json() == {**setup, "current_ply": None}
 
     def test_rejects_setup_invalid_under_rules(self) -> None:
         setup = {

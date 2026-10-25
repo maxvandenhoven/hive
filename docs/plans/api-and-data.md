@@ -9,14 +9,14 @@ stateless per request: load the game's moves from Postgres, replay them with
 
 | Concern | Choice | Notes |
 |---|---|---|
-| Web framework | FastAPI + uvicorn | Async throughout (see "Code structure"). Pydantic v2 request/response models in `api/schemas.py`, separate from DB models. |
-| Settings | pydantic-settings | Env vars prefixed `HIVE_` or a `.env` file: database URL, S3 endpoint/keys/bucket, model name/version, pool size, budgets. Connection settings have no defaults; `make dev` copies `.env.example` (matching the compose stack) to `.env`. |
-| Database | SQLAlchemy 2.x typed ORM (`Mapped[...]`) with its asyncio extension, psycopg 3, Alembic | No SQLModel. The same `postgresql+psycopg://` URL serves the async app and sync Alembic (run through `AsyncConnection.run_sync`). Relationships are `lazy="raise"` and loaded with `selectinload`. Migrations in `src/hive/api/db/migrations/`. |
-| Object storage | Garage via `boto3` (S3 API) | A small async `ObjectStore` class (`put`, `get`, `delete_prefix`, `list_keys`, `check`) that runs boto3 calls in worker threads. Tests use `moto`'s in-process S3. |
-| Logging | stdlib `logging`, `python-json-logger`, `asgi-correlation-id` | JSON lines with the `X-Request-ID` request ID; a pure ASGI access log middleware (route, status, latency). No `BaseHTTPMiddleware`, which breaks streaming. No `print` (`T20`). |
+| Web framework | FastAPI + uvicorn | Async throughout (see "Code structure"). Pydantic v2 request/response models in `api/schemas.py`; engine, agent and match values (`Rules`, `BoardSetup`, `Move`, `AgentSpec`, `AgentRegistration`, `DecisionRecord`, `GameRecord`) are used as they are (D25), so the OpenAPI schema types them. |
+| Settings | pydantic-settings | `DatabaseSettings` (only the database URL, all migrations need) and `ApiSettings` extending it. Env vars prefixed `HIVE_` or a `.env` file: database URL, S3 endpoint/keys/bucket, model name/version, pool size, budgets. Connection settings have no defaults; `make dev` copies `.env.example` (matching the compose stack) to `.env`. |
+| Database | SQLAlchemy 2.x typed ORM (`Mapped[...]`) with its asyncio extension, psycopg 3, Alembic | No SQLModel. The same `postgresql+psycopg://` URL serves the async app and the synchronous Alembic migrations (`hive db upgrade`, `DatabaseSettings.alembic_config()`). JSONB columns hold typed values through `TypedJsonb`; `GameRow.ply_count` is counted in SQL. Relationships are `lazy="raise"` and loaded with `selectinload`. Migrations in `src/hive/api/db/migrations/`. |
+| Object storage | Garage via `boto3` (S3 API) | A small async `ObjectStore` with what is used (`delete_prefix`, `check`), running boto3 calls in worker threads through one `request` helper; uploads and downloads come with photos (WP 16). Failed deletions raise `ObjectStoreError`. Tests use `moto`'s in-process S3. |
+| Logging | stdlib `logging`, `python-json-logger`, `asgi-correlation-id` | JSON lines with the `X-Request-ID` request ID, including uvicorn's access log (written when the response starts, so without latency; route and latency metrics come from Prometheus in WP 12). No `BaseHTTPMiddleware`, which breaks streaming. No `print` (`T20`). |
 | Metrics | `prometheus-client` | `/metrics` endpoint. |
 | Local dev | `deploy/compose.yaml` with Postgres and single-node Garage | `make dev` starts compose, migrates, and runs `hive serve --reload` (plus `vite` from WP 13). Garage bootstraps itself with `server --single-node --default-bucket` (v2.3+), creating the layout, the `hive` bucket and a fixed dev key, which `.env.example` matches. |
-| Tests | pytest with the `anyio` plugin; `httpx2.AsyncClient` over `ASGITransport`; `moto` for S3; testcontainers Postgres | Async tests (`pytestmark = pytest.mark.anyio`) share one event loop per session (`anyio_backend` is session-scoped), so the async engine outlives single tests. No SQLite, so JSONB and Postgres behaviour are tested for real. A session-scoped container is migrated from scratch; each test runs in a rolled-back transaction. Without Docker the database tests skip locally (never in CI), or run against `HIVE_TEST_DATABASE_URL`, whose schema they drop and recreate. |
+| Tests | pytest with the `anyio` plugin; `httpx2.AsyncClient` over `ASGITransport`; `moto` for S3; testcontainers Postgres | Async tests (`pytestmark = pytest.mark.anyio`) share one event loop per session (`anyio_backend` is session-scoped), so the async engine outlives single tests. No SQLite, so JSONB and Postgres behaviour are tested for real. A session-scoped container is migrated from scratch; each test runs in a rolled-back transaction, and every request opens its own session in it. One test goes through the real session dependency and cleans up after itself. Without Docker the database tests skip locally (never in CI), or run against `HIVE_TEST_DATABASE_URL`, whose schema they drop and recreate. |
 
 ## Code structure (WP 10)
 
@@ -24,14 +24,18 @@ stateless per request: load the game's moves from Postgres, replay them with
   service method, build the response model. Every resource router carries the full
   `API_PREFIX` (`/api`) itself, since FastAPI keeps route paths relative to the defining
   router and logs and metrics label requests by that path.
-- **Services** (`api/games.py`, `GameService`) hold the behaviour on stored games. Each
-  method that writes commits before it returns, so a call is one unit of work. WP 11 (moves,
+- **Services** (`api/games.py`, `GameService`) hold the behaviour on stored games and
+  build the rows; request models only validate. Each method that writes commits before it
+  returns, so a call is one unit of work. Deleting a game commits the rows first, then
+  deletes its photo objects; a failure there is logged and leaves orphaned objects that a
+  later sweep of `photos/<id>/` prefixes without a game can remove. WP 11 (moves,
   undo, state) and WP 12 (committing agent decisions) extend the service rather than the
   routes.
 - **Errors** (`api/errors.py`): services raise `ApiError` subclasses (`GameNotFoundError`,
   later for example `PlyConflictError`), which one exception handler turns into an
-  `ErrorResponse` (`{code, detail}`) with the error's status code. Routes declare them with
-  `ApiError.openapi_responses(...)`, so the generated client knows every error shape.
+  `ErrorResponse` (`{code, detail}`) with the error's status code. Routes declare them in
+  `responses` (for example `GAME_NOT_FOUND_RESPONSES`), so the generated client knows
+  every error shape.
 - **OpenAPI**: operation IDs are the handler names (`create_game`, `list_games`), so they
   must be unique and stable; every response, including `/readyz` and the export download,
   has a schema.
@@ -49,8 +53,8 @@ game
   id            uuid pk
   name          text
   status        text      -- active | finished | abandoned
-  rules         jsonb     -- serialized Rules
-  setup         jsonb     -- "initial" or serialized BoardSetup from the editor
+  rules         jsonb     -- Rules
+  setup         jsonb null -- BoardSetup from the editor, or null for the initial state
   white_player  jsonb     -- {"type": "human"} or {"type": "agent", "spec": AgentSpec, "budget_s": 5.0}
   black_player  jsonb
   result        text null -- white | black | draw
@@ -60,7 +64,7 @@ game
 move
   game_id       uuid fk → game (on delete cascade)
   ply           int       -- pk (game_id, ply)
-  move          jsonb     -- serialized Move or null (pass)
+  move          jsonb     -- Move, or JSON null for a pass
   source        text      -- manual | photo | agent
   photo_id      uuid null fk → photo
   decision      jsonb null -- DecisionRecord for agent moves
@@ -131,8 +135,9 @@ to `index.html` for client-side routes.
   OpenAPI schema.
 - A streaming route takes `DatabaseDependency`, not `SessionDependency`: function-scoped
   dependencies are closed while the generator still runs (an `IllegalStateChangeError`).
-  Open short sessions with `database.session()`: one to load the game before streaming,
-  one to commit the decision at the end. No connection is held during the stream.
+  Open short sessions with `database.session_factory()`: one to load the game before
+  streaming, one to commit the decision at the end. No connection is held during the
+  stream.
 - `AgentWorker.decide` blocks on pipes, so it runs in `anyio.to_thread.run_sync` with a
   `CapacityLimiter` sized to the pool (not the default limiter shared with other blocking
   calls). Its `message_callback` forwards messages into an `anyio` memory object stream

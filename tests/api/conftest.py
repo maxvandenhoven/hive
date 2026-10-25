@@ -1,22 +1,23 @@
 import os
-from collections.abc import AsyncGenerator, Callable, Generator
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager
 
 import boto3
 import docker
 import httpx2
 import pytest
+from alembic import command
 from docker.errors import DockerException
 from fastapi import FastAPI
 from moto import mock_aws
 from pydantic import SecretStr
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from testcontainers.community.postgres import PostgresContainer
 
 from hive.api.app import create_app
 from hive.api.db.session import Database
 from hive.api.dependencies import get_session
-from hive.api.settings import ApiSettings
+from hive.api.settings import ApiSettings, DatabaseSettings
 from hive.api.storage import S3_CLIENT_CONFIG, ObjectStore
 
 POSTGRES_IMAGE = "postgres:17-alpine"
@@ -48,9 +49,16 @@ def settings() -> ApiSettings:
     )
 
 
+def migrate_from_scratch(url: str) -> None:
+    """Drop the schema of a database and migrate it to the latest revision."""
+    config = DatabaseSettings(_env_file=None, database_url=url).alembic_config()
+    command.downgrade(config, "base")
+    command.upgrade(config, "head")
+
+
 @pytest.fixture(scope="session")
 def postgres_url() -> Generator[str]:
-    """Start a Postgres container for the test session and yield its URL.
+    """Start a Postgres container for the test session, migrated from scratch.
 
     Uses the database at `HIVE_TEST_DATABASE_URL` instead if it is set; its schema is
     dropped and recreated. Skips the tests that need a database when Docker is not
@@ -59,6 +67,7 @@ def postgres_url() -> Generator[str]:
     external_url = os.environ.get("HIVE_TEST_DATABASE_URL")
 
     if external_url:
+        migrate_from_scratch(external_url)
         yield external_url
         return
 
@@ -71,32 +80,40 @@ def postgres_url() -> Generator[str]:
         pytest.skip(f"Docker is not available: {e}")
 
     with PostgresContainer(POSTGRES_IMAGE, driver="psycopg") as container:
-        yield container.get_connection_url()
+        url = container.get_connection_url()
+        migrate_from_scratch(url)
+        yield url
 
 
 @pytest.fixture(scope="session")
 async def database(postgres_url: str) -> AsyncGenerator[Database]:
-    """Migrate the test database from scratch and yield it."""
+    """Yield the migrated test database."""
     database = Database.from_url(postgres_url)
-    await database.downgrade("base")
-    await database.upgrade()
     yield database
-    await database.dispose()
+    await database.engine.dispose()
 
 
 @pytest.fixture(scope="function")
-async def session(database: Database) -> AsyncGenerator[AsyncSession]:
-    """Yield a session whose changes, commits included, are rolled back after the test."""
+async def connection(database: Database) -> AsyncGenerator[AsyncConnection]:
+    """Yield a connection in a transaction that is rolled back after the test."""
     async with database.engine.connect() as connection:
         transaction = await connection.begin()
-        session = AsyncSession(
-            bind=connection,
-            join_transaction_mode="create_savepoint",
-            expire_on_commit=False,
-        )
-        yield session
-        await session.close()
+        yield connection
         await transaction.rollback()
+
+
+def join_session(connection: AsyncConnection) -> AsyncSession:
+    """Open a session in the transaction of the test, whose commits become savepoints."""
+    return AsyncSession(
+        bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
+    )
+
+
+@pytest.fixture(scope="function")
+async def session(connection: AsyncConnection) -> AsyncGenerator[AsyncSession]:
+    """Yield a session for preparing and checking data in the transaction of the test."""
+    async with join_session(connection) as session:
+        yield session
 
 
 @pytest.fixture(scope="function")
@@ -126,28 +143,40 @@ async def serve(app: FastAPI) -> AsyncGenerator[httpx2.AsyncClient]:
         yield client
 
 
-type AppServer = Callable[[FastAPI], AbstractAsyncContextManager[httpx2.AsyncClient]]
-"""Runs the lifespan of an app and yields a client that calls it in-process."""
-
-
-@pytest.fixture(scope="function")
-def app_server() -> AppServer:
-    """Get `serve`, for tests that build their own app."""
-    return serve
-
-
 @pytest.fixture(scope="function")
 async def client(
-    settings: ApiSettings, database: Database, session: AsyncSession, store: ObjectStore
+    settings: ApiSettings,
+    database: Database,
+    connection: AsyncConnection,
+    store: ObjectStore,
 ) -> AsyncGenerator[httpx2.AsyncClient]:
-    """Yield a client of an app on the test database, with every request in `session`."""
-    app = create_app(settings, database=database, store=store)
+    """Yield a client of an app on the test database.
 
-    async def get_test_session() -> AsyncSession:
-        """Hand every request the rolled-back session of the test."""
-        return session
+    Every request gets its own session, joined to the transaction of the test.
+    """
+    app = create_app(settings=settings, database=database, store=store)
+
+    async def get_test_session() -> AsyncGenerator[AsyncSession]:
+        """Open the session of one request in the transaction of the test."""
+        async with join_session(connection) as session:
+            yield session
 
     app.dependency_overrides[get_session] = get_test_session
+
+    async with serve(app) as client:
+        yield client
+
+
+@pytest.fixture(scope="function")
+async def committing_client(
+    settings: ApiSettings, postgres_url: str, store: ObjectStore
+) -> AsyncGenerator[httpx2.AsyncClient]:
+    """Yield a client of an app that opens the test database and its sessions itself.
+
+    Its changes are committed for real, so tests clean up what they create.
+    """
+    app_settings = settings.model_copy(update={"database_url": postgres_url})
+    app = create_app(settings=app_settings, store=store)
 
     async with serve(app) as client:
         yield client
@@ -159,9 +188,9 @@ async def offline_client(
 ) -> AsyncGenerator[httpx2.AsyncClient]:
     """Yield a client of an app whose database refuses connections."""
     database = Database.from_url(UNREACHABLE_DATABASE_URL)
-    app = create_app(settings, database=database, store=store)
+    app = create_app(settings=settings, database=database, store=store)
 
     async with serve(app) as client:
         yield client
 
-    await database.dispose()
+    await database.engine.dispose()
