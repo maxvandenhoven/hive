@@ -12,6 +12,7 @@ from hive.agents.factory import (
     InvalidAgentSpecError,
     build_agent,
     list_agents,
+    list_presets,
     register_agent,
 )
 from hive.agents.minimax import MinimaxAgent
@@ -151,6 +152,59 @@ class TestAgentSpecFile:
 
     def test_serializes_without_label(self) -> None:
         assert AgentSpec("random").to_dict() == {"kind": "random", "params": {}}
+
+    def test_display_label(self) -> None:
+        assert AgentSpec("random").display_label == "random"
+        assert AgentSpec(kind="random", label="r").display_label == "r"
+
+
+class TestPresets:
+    def test_lists_presets(self) -> None:
+        assert {"nm2", "nm3"} <= set(list_presets())
+        assert list_presets() == sorted(list_presets())
+
+    @pytest.mark.parametrize("name", list_presets())
+    def test_every_preset_is_valid(self, name: str) -> None:
+        spec = AgentSpec.from_preset(name)
+
+        build_agent(spec=spec, rules=Rules(), seed=0)
+        assert spec.label is not None
+
+    def test_labels_preset_with_its_name(self) -> None:
+        assert AgentSpec.from_preset("nm3") == AgentSpec(
+            kind="negamax", params={"depth": 3}, label="nm3"
+        )
+
+    def test_rejects_unknown_preset(self) -> None:
+        with pytest.raises(InvalidAgentSpecError, match="Unknown agent preset `nope`"):
+            AgentSpec.from_preset("nope")
+
+
+class TestAgentSpecResolve:
+    def test_prefers_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        (tmp_path / "nm3").write_text("kind: negamax\nlabel: mine\n")
+        monkeypatch.chdir(tmp_path)
+
+        assert AgentSpec.resolve("nm3") == AgentSpec("negamax", label="mine")
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("nm2", AgentSpec(kind="negamax", params={"depth": 2}, label="nm2")),
+            ("random", AgentSpec("random")),
+            ("{kind: negamax, params: {depth: 2}}", AgentSpec("negamax", {"depth": 2})),
+            (
+                "{kind: random, label: " + "x" * 300 + "}",
+                AgentSpec("random", label="x" * 300),
+            ),
+        ],
+    )
+    def test_reads_preset_or_inline_yaml(self, value: str, expected: AgentSpec) -> None:
+        assert AgentSpec.resolve(value) == expected
+
+    def test_rejects_invalid(self) -> None:
+        with pytest.raises(InvalidAgentSpecError, match="Unknown agent kind `nm4`"):
+            AgentSpec.resolve("nm4")
 
 
 class TestBuildAgent:

@@ -117,7 +117,7 @@ class AgentWorker:
     @property
     def label(self) -> str:
         """The label of the agent, or its kind if it has no label."""
-        return self.spec.label or self.spec.kind
+        return self.spec.display_label
 
     @property
     def running(self) -> bool:
