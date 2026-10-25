@@ -56,7 +56,9 @@ def draw_board(
 
     # Determine the grid extent based on the furthest occupied coordinate. Always show at
     # least a radius of 3 to give some breathing room around the starting pieces.
-    max_distance = max(get_distance((0, 0), c) for c in state.board)
+    max_distance = max(
+        get_distance(source_coord=(0, 0), target_coord=c) for c in state.board
+    )
     grid_radius = max(3, max_distance + 1)
     grid_coords = get_grid_coords(grid_radius)
 

@@ -43,7 +43,7 @@ def draw_piece_hex(
     # Slightly smaller hex so the grid lines remain visible.
     inner_size = size * 0.88
     resolved_stroke_width = stroke_width if stroke_width is not None else size * 0.03
-    points = get_hex_points(cx, cy, orientation=orientation, size=inner_size)
+    points = get_hex_points(cx=cx, cy=cy, orientation=orientation, size=inner_size)
     group.append(
         dw.Lines(
             *points,
@@ -131,8 +131,10 @@ def draw_grid(
         size: The radius of each hexagon.
     """
     for coord in grid_coords:
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
-        points = get_hex_points(cx, cy, orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
+        points = get_hex_points(cx=cx, cy=cy, orientation=orientation, size=size)
         group.append(
             dw.Lines(
                 *points,
@@ -164,7 +166,9 @@ def draw_pieces(
         use_sprites: If `True`, render pieces as SVG sprite images.
     """
     for coord in state.get_occupied_coords():
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
         top_piece = state.get_top_piece(coord)
 
         draw_piece_hex(
@@ -205,9 +209,11 @@ def draw_highlights(
     for color, coords in highlights.items():
         for coord in coords:
             cx, cy = axial_to_pixel(
-                coord[0], coord[1], orientation=orientation, size=size
+                q=coord[0], r=coord[1], orientation=orientation, size=size
             )
-            ring_points = get_hex_points(cx, cy, orientation=orientation, size=size * 0.9)
+            ring_points = get_hex_points(
+                cx=cx, cy=cy, orientation=orientation, size=size * 0.9
+            )
             group.append(
                 dw.Lines(
                     *ring_points,
@@ -331,7 +337,7 @@ def draw_hand_panel(
             # Semi-transparent overlay to dim exhausted pieces.
             if count == 0:
                 dim_points = get_hex_points(
-                    icon_x, icon_y, orientation=orientation, size=icon_size * 0.88
+                    cx=icon_x, cy=icon_y, orientation=orientation, size=icon_size * 0.88
                 )
                 group.append(
                     dw.Lines(

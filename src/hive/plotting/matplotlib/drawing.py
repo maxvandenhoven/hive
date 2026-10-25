@@ -46,7 +46,7 @@ def draw_piece_hex(
             `use_sprites` is `True`.
     """
     # Slightly smaller hex so the grid lines remain visible.
-    hex_verts = get_hex_verts(cx, cy, orientation=orientation, size=size * 0.88)
+    hex_verts = get_hex_verts(cx=cx, cy=cy, orientation=orientation, size=size * 0.88)
     poly = plt.Polygon(
         hex_verts,
         closed=True,
@@ -127,8 +127,10 @@ def draw_grid(
         size: The radius of each hexagon.
     """
     for coord in grid_coords:
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
-        hex_verts = get_hex_verts(cx, cy, orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
+        hex_verts = get_hex_verts(cx=cx, cy=cy, orientation=orientation, size=size)
         poly = plt.Polygon(
             hex_verts,
             closed=True,
@@ -162,13 +164,15 @@ def draw_pieces(
         sprite_resolution: The pixel size for sprite rendering.
     """
     for coord in state.get_occupied_coords():
-        cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
+        cx, cy = axial_to_pixel(
+            q=coord[0], r=coord[1], orientation=orientation, size=size
+        )
         top_piece = state.get_top_piece(coord)
 
         draw_piece_hex(
-            ax,
-            cx,
-            cy,
+            ax=ax,
+            cx=cx,
+            cy=cy,
             piece_type=top_piece.type,
             owner=top_piece.owner,
             orientation=orientation,
@@ -200,9 +204,11 @@ def draw_highlights(
     for color, coords in highlights.items():
         for coord in coords:
             cx, cy = axial_to_pixel(
-                coord[0], coord[1], orientation=orientation, size=size
+                q=coord[0], r=coord[1], orientation=orientation, size=size
             )
-            ring_verts = get_hex_verts(cx, cy, orientation=orientation, size=size * 0.9)
+            ring_verts = get_hex_verts(
+                cx=cx, cy=cy, orientation=orientation, size=size * 0.9
+            )
             ring_poly = plt.Polygon(
                 ring_verts,
                 closed=True,
@@ -227,7 +233,7 @@ def fit_axes_to_grid(
     """
     all_x, all_y = zip(
         *[
-            axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
+            axial_to_pixel(q=coord[0], r=coord[1], orientation=orientation, size=size)
             for coord in grid_coords
         ],
         strict=True,
@@ -346,7 +352,7 @@ def draw_hand_panel(
             # Semi-transparent overlay to dim exhausted pieces.
             if count == 0:
                 dim_verts = get_hex_verts(
-                    icon_x, icon_y, orientation=orientation, size=size * 0.88
+                    cx=icon_x, cy=icon_y, orientation=orientation, size=size * 0.88
                 )
                 dim_poly = plt.Polygon(
                     dim_verts,
