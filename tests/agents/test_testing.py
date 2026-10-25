@@ -1,6 +1,6 @@
 import pytest
 
-from hive.agents.testing import FakeClock, LocalTurnContext, Submission
+from hive.agents.testing import FakeClock, LocalTurnContext, TurnSubmission
 from hive.engine.state import Move, PieceType
 
 _MOVE = Move(PieceType.QUEEN, None, (0, 0))
@@ -56,9 +56,9 @@ class TestLocalTurnContext:
         turn.submit(_MOVE)
 
         assert turn.submissions == [
-            Submission(None, final=False, after_stop=False),
-            Submission(_MOVE, final=False, after_stop=False),
-            Submission(_MOVE, final=False, after_stop=True),
+            TurnSubmission(None, final=False, after_stop=False),
+            TurnSubmission(_MOVE, final=False, after_stop=False),
+            TurnSubmission(_MOVE, final=False, after_stop=True),
         ]
 
     def test_records_infos(self) -> None:

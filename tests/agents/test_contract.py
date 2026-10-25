@@ -8,7 +8,7 @@ from hive.engine.rules import Rules
 from hive.engine.serialization import serialize_board
 from hive.engine.state import GameState
 
-_KINDS = [agent.name for agent in list_agents()]
+_AGENT_KINDS = [agent.kind for agent in list_agents()]
 
 
 def _snapshot(state: GameState) -> object:
@@ -27,7 +27,7 @@ def _ticking_turn(budget_s: float) -> LocalTurnContext:
     return LocalTurnContext(budget_s=budget_s, clock=FakeClock(step=0.001))
 
 
-@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("kind", _AGENT_KINDS)
 def test_submits_legal_move_without_time(
     kind: str, rules: Rules, position: GameState
 ) -> None:
@@ -41,7 +41,7 @@ def test_submits_legal_move_without_time(
     assert turn.submissions[0].move in rules.legal_moves(position)
 
 
-@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("kind", _AGENT_KINDS)
 def test_respects_should_stop(kind: str, rules: Rules, position: GameState) -> None:
     """Test that unbounded thinking returns at the deadline with only legal moves."""
     agent = build_agent(AgentSpec(kind), rules, seed=0)
@@ -55,7 +55,7 @@ def test_respects_should_stop(kind: str, rules: Rules, position: GameState) -> N
     assert not any(submission.after_stop for submission in turn.submissions)
 
 
-@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("kind", _AGENT_KINDS)
 def test_stops_after_cancel(kind: str, rules: Rules, position: GameState) -> None:
     """Test that a cancelled turn still ends with a legal move."""
     agent = build_agent(AgentSpec(kind), rules, seed=0)
@@ -67,7 +67,7 @@ def test_stops_after_cancel(kind: str, rules: Rules, position: GameState) -> Non
     assert turn.move in rules.legal_moves(position)
 
 
-@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("kind", _AGENT_KINDS)
 def test_restores_state(kind: str, rules: Rules, position: GameState) -> None:
     """Test that thinking, interrupted or not, leaves the given state unchanged."""
     agent = build_agent(AgentSpec(kind), rules, seed=0)
@@ -79,7 +79,7 @@ def test_restores_state(kind: str, rules: Rules, position: GameState) -> None:
     assert _snapshot(state) == before
 
 
-@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("kind", _AGENT_KINDS)
 def test_deterministic_for_seed(kind: str, rules: Rules, position: GameState) -> None:
     """Test that two agents with equal seeds submit the same moves over several turns."""
     runs = []

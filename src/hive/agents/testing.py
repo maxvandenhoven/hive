@@ -44,7 +44,7 @@ class FakeClock:
 
 
 @dataclass(frozen=True, slots=True)
-class Submission:
+class TurnSubmission:
     """A move submitted to a `LocalTurnContext`.
 
     Attributes:
@@ -75,7 +75,7 @@ class LocalTurnContext(TurnContext):
 
     budget_s: float = float("inf")
     clock: Callable[[], float] = time.monotonic
-    submissions: list[Submission] = field(default_factory=list)
+    submissions: list[TurnSubmission] = field(default_factory=list)
     infos: list[dict[str, SearchInfoValue]] = field(default_factory=list)
     _deadline: float = field(init=False)
     _stopped: bool = field(default=False, init=False)
@@ -130,7 +130,7 @@ class LocalTurnContext(TurnContext):
             move: The proposed move, or `None` to pass.
             final: Whether the agent is done, which closes the turn.
         """
-        self.submissions.append(Submission(move, final, after_stop=self._stop_seen))
+        self.submissions.append(TurnSubmission(move, final, after_stop=self._stop_seen))
 
     @override
     def remaining_seconds(self) -> float:

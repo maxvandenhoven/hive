@@ -20,7 +20,7 @@ from hive.agents.base import Agent
 from hive.engine.rules import Rules
 from hive.engine.serialization import JsonValue
 
-_INJECTED_PARAMS = ("rules", "seed")
+INJECTED_AGENT_PARAMS = ("rules", "seed")
 """The constructor parameters the factory passes itself, which are not agent params."""
 
 _ARG_PATTERN = re.compile(r"^    (\w+)(?: \(.*\))?: (.*)$")
@@ -32,39 +32,95 @@ class InvalidAgentSpecError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class AgentInfo:
-    """A description of a registered agent kind, for listing agents and param forms.
+class AgentRegistration:
+    """A registered agent kind: the agent class and the model that validates its params.
 
     Attributes:
-        name: The kind name used in `AgentSpec.kind`.
-        description: The summary line of the agent class docstring.
-        params_schema: The JSON schema of the parameters.
-    """
-
-    name: str
-    description: str
-    params_schema: dict[str, JsonValue]
-
-
-@dataclass(frozen=True, slots=True)
-class _Registration:
-    """A registered agent kind.
-
-    Attributes:
+        kind: The kind name used in `AgentSpec.kind`.
         agent_class: The agent class, called with the rules, a keyword `seed` and the
-            validated parameters as keywords.
-        params_model: The model that validates the parameters.
+            validated params as keywords.
+        params_model: The model that validates the params, derived from the signature of
+            the agent constructor.
     """
 
+    kind: str
     agent_class: type[Agent]
     params_model: type[BaseModel]
 
+    @classmethod
+    def from_class(cls, kind: str, agent_class: type[Agent]) -> "AgentRegistration":
+        """Register an agent class, deriving its params model from the constructor.
 
-_REGISTRY: dict[str, _Registration] = {}
+        The keyword-only parameters after `seed` become the fields of the model: their
+        annotations (including `Annotated` constraints) and defaults define validation,
+        and the `Args:` section of the constructor docstring gives the descriptions.
+
+        Args:
+            kind: The kind name used in `AgentSpec.kind`.
+            agent_class: The agent class to inspect.
+
+        Returns:
+            The registration, with a frozen params model that rejects unknown params.
+
+        Raises:
+            TypeError: If the constructor does not start with `rules` and `seed`, or an
+                agent param is not keyword-only or has no annotation.
+        """
+        init = agent_class.__init__
+        parameters = list(inspect.signature(init).parameters.values())[1:]
+        if [p.name for p in parameters[:2]] != list(INJECTED_AGENT_PARAMS):
+            msg = f"`{agent_class.__name__}.__init__` must start with `rules` and `seed`."
+            raise TypeError(msg)
+
+        hints = get_type_hints(init, include_extras=True)
+        descriptions = _arg_descriptions(inspect.getdoc(init))
+        fields: dict[str, Any] = {}
+        for parameter in parameters[2:]:
+            if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
+                msg = (
+                    f"Agent param `{parameter.name}` of `{agent_class.__name__}` must be "
+                    "keyword-only."
+                )
+                raise TypeError(msg)
+            if parameter.name not in hints:
+                msg = (
+                    f"Agent param `{parameter.name}` of `{agent_class.__name__}` has no "
+                    "annotation."
+                )
+                raise TypeError(msg)
+
+            default = (
+                ... if parameter.default is inspect.Parameter.empty else parameter.default
+            )
+            fields[parameter.name] = (
+                hints[parameter.name],
+                Field(default, description=descriptions.get(parameter.name)),
+            )
+
+        params_model = create_model(
+            f"{agent_class.__name__}Params",
+            __config__=ConfigDict(frozen=True, extra="forbid"),
+            **fields,
+        )
+        return cls(kind, agent_class, params_model)
+
+    @property
+    def description(self) -> str:
+        """The summary line of the agent class docstring."""
+        return (inspect.getdoc(self.agent_class) or "").partition("\n")[0]
+
+    @property
+    def params_schema(self) -> dict[str, JsonValue]:
+        """The JSON schema of the params, for rendering parameter forms."""
+        return self.params_model.model_json_schema()
 
 
-class _SpecDocument(BaseModel):
-    """The shape of a serialized agent spec, before its params are validated."""
+AGENT_REGISTRY: dict[str, AgentRegistration] = {}
+"""The registered agent kinds by kind name, filled by `register_agent`."""
+
+
+class AgentSpecDocument(BaseModel):
+    """The serialized form of an `AgentSpec`, checking its shape but not its params."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -114,7 +170,7 @@ class AgentSpec:
                 the params are invalid. All problems are listed in the message.
         """
         try:
-            document = _SpecDocument.model_validate(data)
+            document = AgentSpecDocument.model_validate(data)
         except ValidationError as e:
             raise InvalidAgentSpecError(_format_errors(source, e.errors())) from e
 
@@ -190,11 +246,11 @@ class AgentSpec:
             InvalidAgentSpecError: If the kind is not registered or the params are
                 invalid. All invalid params are listed in the message.
         """
-        registration = _REGISTRY.get(self.kind)
+        registration = AGENT_REGISTRY.get(self.kind)
         if registration is None:
             msg = (
                 f"Unknown agent kind `{self.kind}`{_in(source)}, expected one of: "
-                f"{', '.join(_REGISTRY)}."
+                f"{', '.join(AGENT_REGISTRY)}."
             )
             raise InvalidAgentSpecError(msg)
 
@@ -225,11 +281,11 @@ def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:
     """
 
     def register(agent_class: type[A]) -> type[A]:
-        if kind in _REGISTRY:
+        if kind in AGENT_REGISTRY:
             msg = f"Agent kind `{kind}` is already registered."
             raise ValueError(msg)
 
-        _REGISTRY[kind] = _Registration(agent_class, _params_model(agent_class))
+        AGENT_REGISTRY[kind] = AgentRegistration.from_class(kind, agent_class)
         return agent_class
 
     return register
@@ -250,75 +306,17 @@ def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent:
         InvalidAgentSpecError: If the kind is not registered or the params are invalid.
     """
     params = spec.validate_params()
-    agent_class = _REGISTRY[spec.kind].agent_class
+    agent_class = AGENT_REGISTRY[spec.kind].agent_class
     return agent_class(rules, seed=seed, **dict(params))
 
 
-def list_agents() -> list[AgentInfo]:
-    """List the registered agent kinds with their descriptions and parameter schemas.
+def list_agents() -> list[AgentRegistration]:
+    """List the registered agent kinds, with their descriptions and params schemas.
 
     Returns:
-        One entry per registered kind, in registration order.
+        One registration per kind, in registration order.
     """
-    return [
-        AgentInfo(
-            name,
-            (inspect.getdoc(registration.agent_class) or "").partition("\n")[0],
-            registration.params_model.model_json_schema(),
-        )
-        for name, registration in _REGISTRY.items()
-    ]
-
-
-def _params_model(agent_class: type[Agent]) -> type[BaseModel]:
-    """Build the params model of an agent class from its constructor signature.
-
-    Args:
-        agent_class: The agent class to inspect.
-
-    Returns:
-        A frozen model that rejects unknown params, with one field per agent param.
-
-    Raises:
-        TypeError: If the constructor does not take `rules` first, or an agent param is
-            not keyword-only or has no annotation.
-    """
-    init = agent_class.__init__
-    parameters = list(inspect.signature(init).parameters.values())[1:]
-    if [p.name for p in parameters[:2]] != list(_INJECTED_PARAMS):
-        msg = f"`{agent_class.__name__}.__init__` must start with `rules` and `seed`."
-        raise TypeError(msg)
-
-    hints = get_type_hints(init, include_extras=True)
-    descriptions = _arg_descriptions(inspect.getdoc(init))
-    fields: dict[str, Any] = {}
-    for parameter in parameters[2:]:
-        if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
-            msg = (
-                f"Agent param `{parameter.name}` of `{agent_class.__name__}` must be "
-                "keyword-only."
-            )
-            raise TypeError(msg)
-        if parameter.name not in hints:
-            msg = (
-                f"Agent param `{parameter.name}` of `{agent_class.__name__}` has no "
-                "annotation."
-            )
-            raise TypeError(msg)
-
-        default = (
-            ... if parameter.default is inspect.Parameter.empty else parameter.default
-        )
-        fields[parameter.name] = (
-            hints[parameter.name],
-            Field(default, description=descriptions.get(parameter.name)),
-        )
-
-    return create_model(
-        f"{agent_class.__name__}Params",
-        __config__=ConfigDict(frozen=True, extra="forbid"),
-        **fields,
-    )
+    return list(AGENT_REGISTRY.values())
 
 
 def _arg_descriptions(docstring: str | None) -> dict[str, str]:
@@ -364,7 +362,7 @@ def _format_errors(
     for error in errors:
         location = ".".join(str(part) for part in error["loc"]) or "spec"
         if error["type"] == "extra_forbidden" and kind is not None:
-            known = ", ".join(_REGISTRY[kind].params_model.model_fields) or "none"
+            known = ", ".join(AGENT_REGISTRY[kind].params_model.model_fields) or "none"
             lines.append(f"  {location}: Unknown param, expected one of: {known}.")
         elif error["type"] == "missing":
             lines.append(f"  {location}: Field required.")

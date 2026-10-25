@@ -67,12 +67,12 @@ class _NeuralAgent(Agent):
 
 
 @pytest.fixture(scope="function")
-def registry(monkeypatch: pytest.MonkeyPatch) -> None:
+def agent_registry(monkeypatch: pytest.MonkeyPatch) -> None:
     """Register test agents in a copy of the registry that is restored afterwards."""
-    monkeypatch.setattr(factory, "_REGISTRY", dict(factory._REGISTRY))
+    monkeypatch.setattr(factory, "AGENT_REGISTRY", dict(factory.AGENT_REGISTRY))
 
 
-class TestSpecFromYaml:
+class TestAgentSpecFromYaml:
     @pytest.mark.parametrize(
         ("text", "expected"),
         [
@@ -126,7 +126,7 @@ class TestSpecFromYaml:
         ]
 
 
-class TestSpecFile:
+class TestAgentSpecFile:
     def test_loads_file(self, tmp_path: Path) -> None:
         path = tmp_path / "nm3.yaml"
         path.write_text("kind: negamax\nlabel: nm3\nparams:\n  depth: 3\n")
@@ -194,10 +194,10 @@ class TestBuildAgent:
 
 class TestListAgents:
     def test_lists_all_kinds(self) -> None:
-        assert {agent.name for agent in list_agents()} == {"random", "minimax", "negamax"}
+        assert {agent.kind for agent in list_agents()} == {"random", "minimax", "negamax"}
 
     def test_describes_agents_from_docstrings(self) -> None:
-        agents = {agent.name: agent for agent in list_agents()}
+        agents = {agent.kind: agent for agent in list_agents()}
 
         assert agents["random"].description == (
             "Agent that selects moves uniformly at random from the set of legal moves."
@@ -205,7 +205,7 @@ class TestListAgents:
         assert agents["random"].params_schema["properties"] == {}
 
     def test_derives_schema_from_signature(self) -> None:
-        agents = {agent.name: agent for agent in list_agents()}
+        agents = {agent.kind: agent for agent in list_agents()}
         properties = agents["negamax"].params_schema["properties"]
         assert isinstance(properties, dict)
 
@@ -233,7 +233,7 @@ class TestListAgents:
         )
 
 
-@pytest.mark.usefixtures("registry")
+@pytest.mark.usefixtures("agent_registry")
 class TestRegisterAgent:
     def test_registers_class_with_nested_params(self) -> None:
         assert register_agent("neural")(_NeuralAgent) is _NeuralAgent
@@ -259,7 +259,7 @@ class TestRegisterAgent:
 
     def test_derives_required_and_constrained_params(self) -> None:
         register_agent("neural")(_NeuralAgent)
-        schema = {agent.name: agent for agent in list_agents()}["neural"].params_schema
+        schema = {agent.kind: agent for agent in list_agents()}["neural"].params_schema
 
         assert schema["required"] == ["weights"]
         properties = schema["properties"]

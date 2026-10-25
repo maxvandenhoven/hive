@@ -152,7 +152,7 @@ class AgentSpec:
     def validate_params(self, *, source: str | None = None) -> BaseModel: ...
 
 def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent: ...
-def list_agents() -> list[AgentInfo]: ...   # name, description, param schema
+def list_agents() -> list[AgentRegistration]: ...   # kind, description, params schema
 ```
 
 - The serialized form is a mapping with `kind`, an optional `label` and optional
@@ -181,8 +181,10 @@ def list_agents() -> list[AgentInfo]: ...   # name, description, param schema
 
   YAML syntax errors report the line and column. `build_agent` validates again, so a
   spec constructed in code gets the same errors.
-- `list_agents()` returns each kind's name, the summary line of its class docstring and
-  the JSON schema of its params, so the API can list agents and render parameter forms.
+- `register_agent` stores an `AgentRegistration` (kind, agent class, params model) in
+  `AGENT_REGISTRY`. `list_agents()` returns the registrations, whose `description` is the
+  summary line of the class docstring and whose `params_schema` is the JSON schema of the
+  params, so the API can list agents and render parameter forms.
 - pydantic and PyYAML are core dependencies (not extras), since workers, the CLI and the
   API all build agents.
 
