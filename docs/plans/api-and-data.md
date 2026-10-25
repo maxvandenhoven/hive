@@ -94,7 +94,7 @@ to `index.html` for client-side routes.
 - A `think` request borrows a worker, runs one timed decision through the match runner's
   decision API, and streams the worker's messages to the client as SSE events. If the
   client disconnects, the decision is cancelled (stop event) and the worker returns to the
-  pool after Idle.
+  pool after `IdleMessage`.
 - Budgets are clamped to `HIVE_MAX_BUDGET_S`. Requests for a busy pool wait with a timeout
   and then fail with 503.
 - The pool is shut down cleanly on app shutdown (lifespan handler).

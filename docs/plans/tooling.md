@@ -17,6 +17,8 @@ linting, typing and tests for free.
 | No manual line splitting or trailing commas to force splits; let the formatter wrap | `skip-magic-trailing-comma = true` |
 | Pytest fixtures always state `scope="function"` (or another explicit scope) | review (documented in `CLAUDE.md`) |
 | Behaviour is a method on the type that owns the data; functions only for math on primitives | review (see `README.md` D3) |
+| Specific, consistent names: prefix types, enums and constants with their domain (`MatchOutcome`, `TurnCloseReason`, `AgentRegistration`, `INJECTED_AGENT_PARAMS`), never a bare generic word (`Outcome`, `Info`, `Worker`); related types share a naming pattern (`ThinkMessage`, `IdleMessage`, ...) | review (documented in `CLAUDE.md`) |
+| Public by default: no leading underscore on functions, methods, attributes or constants unless hiding them clearly matters (for example state that must only change through methods, or hooks such as `SearchAgent._search` that subclasses implement but callers must not use); document public attributes in `Attributes:` | review (documented in `CLAUDE.md`) |
 
 Ruff rule selection carries over from the current packages (`B`, `D`, `E`, `F`, `I`, `EM`,
 `T20`, `RET`, `ANN`) with these changes: add `UP` (pyupgrade) and set
