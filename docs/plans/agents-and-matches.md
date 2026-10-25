@@ -281,8 +281,8 @@ Implementation notes (WP 08):
   streams decisions, which `MatchResult.add_decision` records together with their moves.
   `AgentWorker.decide(message_callback=...)` streams submissions and info for the API.
 - `hive play --white SPEC --black SPEC --budget 1.0 [--max-turns 100] [--seed 0]
-  [--grace 1.0] [--out result.json]` takes a YAML spec file or inline YAML per seat
-  (presets come with WP 09) and logs one line per decision and the result.
+  [--grace 1.0] [--out result.json]` takes a YAML spec file, a preset name or inline YAML
+  per seat (`AgentSpec.resolve`) and logs one line per decision and the result.
 - Coverage measures worker processes (`concurrency = ["multiprocessing", "thread"]`),
   except for workers that are killed.
 
@@ -322,8 +322,9 @@ hive gauntlet \
 - Schedule: round robin, each pairing played with both colours equally often.
 - Seeds: derived deterministically from the experiment seed per match and seat (as in
   `shed.gauntlet.derive_seed`), so any match can be reproduced.
-- Fairness: concurrent matches are capped at `cpu_count // 2` by default (two timed workers
-  per match), and the CLI refuses higher `--jobs` unless `--allow-oversubscribe` is given.
+- Fairness: concurrent matches default to and are capped at `cpu_count` (a match has two
+  workers, but only the seat to move thinks), and the CLI refuses higher `--jobs` unless
+  `--allow-oversubscribe` is given.
 - Output: a versioned JSON document with config, per-participant results (wins, draws,
   losses, win rate with confidence interval, Elo estimate), per-participant decision stats
   (depth reached distribution, nodes/s, timeout rate, overrun distribution, failures,
@@ -331,6 +332,38 @@ hive gauntlet \
 - A short human-readable summary table is logged at the end.
 - `hive replay <report> --match N` prints or plots a recorded match using the existing
   plotting helpers.
+
+Implementation notes (WP 09):
+
+- `match/gauntlet.py`: `GauntletConfig(participants, games_per_pair, budget_s, max_turns,
+  seed, jobs, grace_s, rules, replays)` validates itself (at least two participants,
+  unique display labels, an even `games_per_pair`) and owns `schedule()`, `run()` and
+  serialization. `AgentSpec.display_label` is the label, or the kind without one.
+- The schedule is played in rounds: every pair plays once per round and swaps colours
+  between rounds. The match seed is `derive_seed(seed, "match", index)`, and the runner
+  derives the seat seeds from it, so a report reproduces any match from its config.
+- Matches run in a `ThreadPoolExecutor` with `jobs` threads, each driving the two worker
+  processes of its match; the parent only waits on pipes and checks moves. A worker that
+  fails to start cancels the matches that have not started. The cap was `cpu_count // 2`
+  in the first plan; it is `cpu_count` because only one seat of a match thinks at a time.
+- `GauntletReport` (schema `version` 1) holds the config, one `ParticipantResult` per
+  participant, one `MatchSummary` per match and, with `--replays`, every `MatchResult`.
+  Draws include games stopped at the turn cap, also counted separately as `turn_caps`.
+  The win rate counts a draw as half a win, with a 95% Wilson score interval. Elo is a
+  Bradley-Terry fit (minorization-maximization) over all results with one virtual draw
+  per pairing, so perfect scores stay finite, centred on a field mean of 0.
+- `DecisionStats` per participant: the reported `depth` histogram and mean, the mean
+  reported `nps`, counts per close reason, the timeout rate (closed by the deadline),
+  elapsed and overrun distributions (mean, p50, p90, max), overruns beyond 0.05 s,
+  failures, worker restarts and illegal submissions. A participant is flagged if it has
+  failures, overruns, restarts or `no_candidate` decisions. Derived values (rates, mean
+  depth, win rate, interval, flag) are written to the JSON and recomputed when loading.
+- `hive gauntlet` defaults to two games per pair, `jobs = cpu_count` and
+  `reports/gauntlet-<timestamp>.json` (git-ignored). `hive replay` needs a report written
+  with `--replays`; `--plot-dir DIR` writes one SVG per ply with `hive.plotting.svg`.
+- Presets: `AgentSpec.from_preset(name)`, `list_presets()` and `AgentSpec.resolve(value)`
+  (file, then preset, then inline YAML) live in `agents/factory.py`. Shipped presets:
+  `nm2` and `nm3` (negamax at depth 2 and 3).
 
 ## Observability
 

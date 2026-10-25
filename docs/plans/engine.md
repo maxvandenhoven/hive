@@ -31,7 +31,7 @@ Source: `packages/hive-engine/src/hive_engine/`.
   which keeps `from_board` simple.
 
 The core engine stays as is during M1 apart from the `Rules` change and the validated entry
-points below. Speed work happens in M6 (`performance.md`).
+points below. Speed work happens in M6 and repetition handling in M7 (`performance.md`).
 
 ## `Rules` (WP 03)
 

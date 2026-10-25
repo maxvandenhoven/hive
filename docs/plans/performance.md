@@ -1,7 +1,9 @@
-# Performance: engine speed and agent strength (M6)
+# Performance: engine speed (M6) and agent strength (M7)
 
 Correctness comes first (M1, perft parity). Only then does a separate round make the engine
-faster and the agents stronger. Each stage happens only if the previous one is not enough.
+faster (M6), and after that the agents stronger (M7). Each speed stage happens only if the
+previous one is not enough. Agent strength is measured by gauntlets between agents, and
+the goal of M7 is an agent that beats an experienced human player.
 
 ## Stage 1: profiling and targeted speedups (WP 27)
 
@@ -36,7 +38,24 @@ If profiling and autoresearch leave the engine too slow for useful search depth,
 API and vision are unaffected. Perft parity is the acceptance test. Not planned as a work
 package until the data says so.
 
-## Agent strength (WP 28)
+## Agent strength (M7)
+
+### Repetition (WP 30)
+
+The first nm2 vs nm3 gauntlet (WP 09, seed 42, 2 s per move, 100 turns) drew all four
+games at the turn cap. In one game the black agent blocked every white move and then
+moved its queen back and forth for 140 plies at a constant +4, and games with the same
+colours repeated move for move despite different seeds. WP 30 fixes this first, so later
+gauntlets measure strength rather than stalling:
+
+- A position key (Zobrist hash, shared with the WP 28 transposition table) and a count of
+  every position in the game, kept in sync by `apply_move` / `undo_move`.
+- A repetition draw in `Rules` (for example a third occurrence), reported separately from
+  turn caps.
+- Search scores a repeated position as a draw, so an agent that is ahead looks for progress.
+- Ties between equal moves are broken with the agent's seed, so seeds give different games.
+
+### Search and tuning (WP 28)
 
 - Alpha-beta pruning in negamax, move ordering (moves that fill the opponent queen's
   free neighbors first, killer moves, history heuristic), transposition table keyed by Zobrist hash, iterative deepening

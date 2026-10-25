@@ -9,7 +9,8 @@ validates specs, and the `Args:` section of the constructor docstring describes 
 import inspect
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, get_type_hints
 
@@ -22,6 +23,9 @@ from hive.engine.serialization import JsonValue
 
 INJECTED_AGENT_PARAMS = ("rules", "seed")
 """The constructor parameters the factory passes itself, which are not agent params."""
+
+AGENT_PRESET_PACKAGE = "hive.agents.presets"
+"""The package holding the preset spec files, one `<name>.yaml` per preset."""
 
 _ARG_PATTERN = re.compile(r"^    (\w+)(?: \(.*\))?: (.*)$")
 """A line starting an argument description in a cleaned Google-style docstring."""
@@ -221,6 +225,64 @@ class AgentSpec:
         """
         return cls.from_yaml(path.read_text(), source=f"`{path}`")
 
+    @classmethod
+    def from_preset(cls, name: str) -> "AgentSpec":
+        """Read and validate a preset spec shipped in `hive.agents.presets`.
+
+        Args:
+            name: The name of the preset, which is its file name without `.yaml`.
+
+        Returns:
+            The spec, labelled with the preset name unless the file sets a label.
+
+        Raises:
+            InvalidAgentSpecError: If there is no such preset or the preset is invalid.
+        """
+        presets = list_presets()
+
+        if name not in presets:
+            msg = f"Unknown agent preset `{name}`, expected one of: {', '.join(presets)}."
+            raise InvalidAgentSpecError(msg)
+
+        text = files(AGENT_PRESET_PACKAGE).joinpath(f"{name}.yaml").read_text()
+        spec = cls.from_yaml(text, source=f"preset `{name}`")
+
+        return spec if spec.label is not None else replace(spec, label=name)
+
+    @classmethod
+    def resolve(cls, value: str) -> "AgentSpec":
+        """Read a spec from a YAML file, a preset name or inline YAML, in that order.
+
+        Args:
+            value: The path of a YAML spec file, the name of a preset, or inline YAML such
+                as `random` or `{kind: negamax, params: {depth: 2}}`.
+
+        Returns:
+            The validated spec.
+
+        Raises:
+            InvalidAgentSpecError: If the spec is invalid.
+            OSError: If the file exists but cannot be read.
+        """
+        try:
+            is_file = Path(value).is_file()
+        except OSError:
+            # Long inline YAML is not a valid file name.
+            is_file = False
+
+        if is_file:
+            return cls.load(Path(value))
+
+        if value in list_presets():
+            return cls.from_preset(value)
+
+        return cls.from_yaml(value)
+
+    @property
+    def display_label(self) -> str:
+        """The label of the agent, or its kind if it has no label."""
+        return self.label or self.kind
+
     def to_dict(self) -> dict[str, JsonValue]:
         """Serialize the spec.
 
@@ -317,6 +379,19 @@ def list_agents() -> list[AgentRegistration]:
         One registration per kind, in registration order.
     """
     return list(AGENT_REGISTRY.values())
+
+
+def list_presets() -> list[str]:
+    """List the preset specs shipped in `hive.agents.presets`.
+
+    Returns:
+        The preset names, sorted.
+    """
+    return sorted(
+        resource.name.removesuffix(".yaml")
+        for resource in files(AGENT_PRESET_PACKAGE).iterdir()
+        if resource.name.endswith(".yaml")
+    )
 
 
 def _arg_descriptions(docstring: str | None) -> dict[str, str]:

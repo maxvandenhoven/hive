@@ -1,0 +1,3 @@
+kind: negamax
+params:
+  depth: 2
