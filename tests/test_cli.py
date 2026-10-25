@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -138,8 +139,11 @@ class TestPlay:
             ["play", "--white", "{kind: negamax, params: {depth: 0}}", "--black", "x"],
         )
 
+        # CI forces colours, so Rich styles the option name inside the message.
+        stderr = re.sub(r"\x1b\[[0-9;]*m", "", result.stderr)
         assert result.exit_code == 2
-        assert "Invalid value for --white" in result.stderr
+        assert "Invalid value for --white" in stderr
+        assert "params.depth" in stderr
 
     def test_worker_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def fail(self: MatchRunner, **kwargs: object) -> MatchResult:
