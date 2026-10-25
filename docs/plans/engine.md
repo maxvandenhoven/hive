@@ -68,6 +68,8 @@ Notes:
   `MappingProxyType` is not hashable itself, so `Rules` defines `__hash__` explicitly,
   hashing `piece_counts` as a tuple of its items; the generated `__eq__` is kept. The
   default is a `default_factory`, because dataclasses reject unhashable defaults.
+  A `MappingProxyType` cannot be pickled either, so `Rules.__reduce__` pickles the
+  fields with `piece_counts` as a dict, which match workers need (WP 08).
 - `__post_init__` also rejects `queen_by_turn=1` with `allow_queen_first_turn=False`,
   which would leave the first player without a legal placement.
 - `target_coords` raises `ValueError` for an unoccupied coordinate and returns `[]` for a

@@ -99,4 +99,5 @@ markers = ["slow: long-running tests, excluded from `make test` (run with `make 
 [tool.coverage.run]
 source = ["src/hive"]
 core = "sysmon"
+concurrency = ["multiprocessing", "thread"]
 omit = ["src/hive/plotting/*", "src/hive/assets/*"]

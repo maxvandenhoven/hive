@@ -17,6 +17,10 @@ linting, typing and tests for free.
 | No manual line splitting or trailing commas to force splits; let the formatter wrap | `skip-magic-trailing-comma = true` |
 | Pytest fixtures always state `scope="function"` (or another explicit scope) | review (documented in `CLAUDE.md`) |
 | Behaviour is a method on the type that owns the data; functions only for math on primitives | review (see `README.md` D3) |
+| Specific, consistent names: prefix types, enums and constants with their domain (`MatchOutcome`, `TurnCloseReason`, `AgentRegistration`, `INJECTED_AGENT_PARAMS`), never a bare generic word (`Outcome`, `Info`, `Worker`); related types share a naming pattern (`ThinkMessage`, `IdleMessage`, ...) | review (documented in `CLAUDE.md`) |
+| Public by default: no leading underscore on functions, methods, attributes or constants unless hiding them clearly matters (for example state that must only change through methods, or hooks such as `SearchAgent._search` that subclasses implement but callers must not use); document public attributes in `Attributes:` | review (documented in `CLAUDE.md`) |
+| Blank lines between distinct blocks of logic: a blank line before and after every compound statement (`if`, `for`, `while`, `with`, `try`, `match`) unless it starts or ends its enclosing block, and before the closing `return` of a function with several steps | review (documented in `CLAUDE.md`) |
+| Keyword arguments for calls to our own functions, methods and classes with two or more arguments (`worker.decide(state=state, budget_s=1.0)`); positional is fine for single-argument calls, the standard library, builtins, third-party APIs and `*args` parameters | review (documented in `CLAUDE.md`) |
 
 Ruff rule selection carries over from the current packages (`B`, `D`, `E`, `F`, `I`, `EM`,
 `T20`, `RET`, `ANN`) with these changes: add `UP` (pyupgrade) and set
@@ -84,7 +88,7 @@ One root `Makefile`; every command a session needs is a target.
 | `make format` | `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` once it exists |
 | `make lint` | `ruff check --fix`, comment checker; `eslint` in `frontend/` |
 | `make type` | `ty check`; `tsc --noEmit` in `frontend/` |
-| `make test` | `pytest` with coverage (excludes `slow`, `core = "sysmon"` keeps tracing cheap); `vitest run` in `frontend/` |
+| `make test` | `pytest` with coverage (excludes `slow`, `core = "sysmon"` keeps tracing cheap, `concurrency = ["multiprocessing", "thread"]` measures match worker processes); `vitest run` in `frontend/` |
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
 | `make check` | `format lint type` (no tests) |
 | `make perft` | `hive bench perft --depth 6` on the start position: a speed baseline that also fails on a count mismatch |

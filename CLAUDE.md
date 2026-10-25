@@ -66,6 +66,24 @@ See `docs/plans/tooling.md` for the full rules and how each one is enforced.
 - Pytest fixtures always state their scope explicitly, for example `scope="function"`.
 - Behaviour is a method on the type that owns the data it reads. Plain functions only for
   math on primitives without an owning type (for example `engine/grid.py`).
+- Use specific, descriptive names, consistent across the package. Prefix types, enums and
+  constants with their domain (`MatchOutcome`, `TurnCloseReason`, `AgentRegistration`,
+  `INJECTED_AGENT_PARAMS`) instead of a bare generic word (`Outcome`, `Info`, `Worker`).
+  Related types share a pattern, for example the worker messages `ThinkMessage`,
+  `SubmissionMessage`, `IdleMessage`.
+- Prefer public over private. Do not prefix functions, methods, attributes or constants
+  with `_` unless hiding them clearly matters (state that must only change through
+  methods, or a subclass hook that callers must not use). Document public attributes in
+  the class `Attributes:` section. This applies to tests as well.
+- Separate distinct blocks of logic with a blank line: before and after every compound
+  statement (`if`, `for`, `while`, `with`, `try`, `match`) unless it starts or ends its
+  enclosing block, and before the closing `return` of a function with several steps.
+- Pass arguments by keyword in calls to our own functions, methods and classes with two
+  or more arguments, for example `worker.decide(state=state, budget_s=1.0)` and
+  `Move(piece_type=..., source_coord=None, target_coord=(0, 0))`. Positional is fine for
+  single-argument calls, the standard library, builtins, third-party APIs (`isinstance`,
+  logging format arguments, `pytest.mark.parametrize`) and `*args` parameters. Apply it
+  consistently.
 - `uv.lock` is committed; do not delete or gitignore it.
 
 ## Type checking
