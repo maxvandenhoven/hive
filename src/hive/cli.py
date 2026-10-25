@@ -405,6 +405,75 @@ def write_board_svgs(result: MatchResult, directory: Path) -> list[Path]:
     return paths
 
 
+def require_api_extra() -> None:
+    """Check that the `api` extra is installed.
+
+    Raises:
+        typer.Exit: With code 1 and a hint if it is not.
+    """
+    try:
+        import fastapi  # noqa: F401
+    except ImportError as e:
+        logger.error("This command needs the `api` extra: `uv sync --extra api`.")
+        raise typer.Exit(code=1) from e
+
+
+@app.command("serve")
+def serve(
+    host: Annotated[str, typer.Option(help="The address to listen on.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(min=1, max=65535, help="The port.")] = 8000,
+    reload: Annotated[
+        bool, typer.Option("--reload", help="Restart the server when the code changes.")
+    ] = False,
+) -> None:
+    """Serve the API, configured by `HIVE_` environment variables."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    require_api_extra()
+
+    import uvicorn
+
+    from hive.api.observability import logging_config
+    from hive.api.settings import ApiSettings
+
+    uvicorn.run(
+        "hive.api.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+        log_config=logging_config(ApiSettings().log_level),
+        access_log=False,
+    )
+
+
+db_app = typer.Typer(no_args_is_help=True, help="Database schema migrations.")
+app.add_typer(db_app, name="db")
+
+
+@db_app.command("upgrade")
+def db_upgrade(
+    revision: Annotated[
+        str, typer.Option(help="The Alembic revision to migrate to.")
+    ] = "head",
+) -> None:
+    """Migrate the database at `HIVE_DATABASE_URL` up to a revision."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
+    require_api_extra()
+
+    from hive.api.db.session import Database
+    from hive.api.settings import ApiSettings
+
+    database = Database.from_url(ApiSettings().database_url)
+
+    try:
+        database.upgrade(revision)
+    finally:
+        database.dispose()
+
+    logger.info("Migrated the database to `%s`.", revision)
+
+
 bench_app = typer.Typer(no_args_is_help=True, help="Benchmarks and correctness checks.")
 app.add_typer(bench_app, name="bench")
 

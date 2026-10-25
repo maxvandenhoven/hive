@@ -4,12 +4,14 @@ import logging
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
 
 from hive import __version__
 from hive.agents.factory import AgentSpec
+from hive.api.db.session import Database
 from hive.cli import app, describe_match_result, log_decision
 from hive.engine.rules import Rules
 from hive.engine.state import Player
@@ -474,3 +476,50 @@ class TestReplay:
         )
 
         assert result.exit_code == 2
+
+
+class TestServe:
+    def test_runs_app_factory_with_json_logs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+        monkeypatch.setattr(
+            "uvicorn.run", lambda app, **kwargs: calls.append((app, kwargs))
+        )
+        monkeypatch.setenv("HIVE_LOG_LEVEL", "DEBUG")
+        result = CliRunner().invoke(app, ["serve", "--port", "9000", "--reload"])
+
+        [(target, kwargs)] = calls
+        assert result.exit_code == 0
+        assert target == "hive.api.app:create_app"
+        assert kwargs["factory"] is True
+        assert (kwargs["host"], kwargs["port"], kwargs["reload"]) == (
+            "127.0.0.1",
+            9000,
+            True,
+        )
+        assert kwargs["log_config"]["root"]["level"] == "DEBUG"
+        assert kwargs["access_log"] is False
+
+    def test_needs_api_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(sys.modules, "fastapi", None)
+        result = CliRunner().invoke(app, ["serve"])
+
+        assert result.exit_code == 1
+
+
+class TestDbUpgrade:
+    def test_upgrades_database_from_settings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        upgrades: list[tuple[str, str]] = []
+        monkeypatch.setattr(
+            Database,
+            "upgrade",
+            lambda self, revision: upgrades.append((str(self.engine.url), revision)),
+        )
+        monkeypatch.setenv("HIVE_DATABASE_URL", "postgresql+psycopg://u@db.invalid/x")
+        result = CliRunner().invoke(app, ["db", "upgrade", "--revision", "0001"])
+
+        assert result.exit_code == 0
+        assert upgrades == [("postgresql+psycopg://u@db.invalid/x", "0001")]
