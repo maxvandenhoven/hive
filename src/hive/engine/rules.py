@@ -110,6 +110,27 @@ class Rules:
             )
         )
 
+    def __reduce__(self) -> tuple[type["Rules"], tuple[object, ...]]:
+        """Pickle the rules by their fields, so they can be sent to worker processes.
+
+        A read-only mapping cannot be pickled, so `piece_counts` is pickled as a dict and
+        frozen again when the rules are unpickled.
+
+        Returns:
+            The class and the constructor arguments that recreate the rules.
+        """
+        return (
+            Rules,
+            (
+                dict(self.piece_counts),
+                self.starting_player,
+                self.queen_by_turn,
+                self.allow_queen_first_turn,
+                self.move_before_queen,
+                self.max_turns,
+            ),
+        )
+
     def create_initial_state(self) -> GameState:
         """Create the initial game state with an empty board and full hands.
 

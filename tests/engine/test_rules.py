@@ -1,4 +1,5 @@
 import dataclasses
+import pickle
 import random
 
 import pytest
@@ -100,6 +101,12 @@ class TestConfiguration:
         assert Rules() == Rules(piece_counts=reversed_counts)
         assert hash(Rules()) == hash(Rules(piece_counts=reversed_counts))
         assert len({Rules(), Rules(), Rules(piece_counts=reversed_counts)}) == 1
+
+    def test_picklable(self) -> None:
+        """Test that rules survive pickling, as when they are sent to a worker process."""
+        rules = Rules(piece_counts={PieceType.QUEEN: 1, PieceType.ANT: 2}, max_turns=10)
+
+        assert pickle.loads(pickle.dumps(rules)) == rules
 
     @pytest.mark.parametrize(
         "changes",
