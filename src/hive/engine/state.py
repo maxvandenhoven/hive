@@ -3,9 +3,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Annotated
 
-from pydantic import Field
+from pydantic import Field, PlainSerializer, PlainValidator
 
-from hive.engine.codec import JsonCodec, NamedIntEnum
+from hive.engine.codec import JsonCodec, NamedIntEnum, json_adapter
 from hive.engine.grid import Coordinate, get_flanking_coords, get_neighbors
 
 
@@ -73,12 +73,66 @@ class Move(JsonCodec):
     target_coord: Annotated[Coordinate, Field(alias="to")]
 
 
-type GameBoard = dict[Coordinate, list[Piece]]
+@dataclass(frozen=True, slots=True)
+class BoardCell(JsonCodec):
+    """One occupied cell of a board in the JSON form of `GameBoard`.
+
+    Attributes:
+        coord: The coordinate of the cell.
+        stack: The pieces on the cell, ordered bottom to top.
+    """
+
+    coord: Coordinate
+    stack: list[Piece]
+
+    @classmethod
+    def split_board(cls, board: "GameBoard") -> list["BoardCell"]:
+        """Split a board into its occupied cells.
+
+        Args:
+            board: The board.
+
+        Returns:
+            One cell per occupied coordinate, ordered by coordinate.
+        """
+        return [cls(coord=coord, stack=board[coord]) for coord in sorted(board)]
+
+    @classmethod
+    def join_board(cls, data: object) -> "GameBoard":
+        """Read a board from the JSON form of its cells.
+
+        Args:
+            data: A list of `{"coord": [q, r], "stack": [...]}` objects.
+
+        Returns:
+            The board.
+
+        Raises:
+            ValueError: If `data` is not a list of cells, or a coordinate appears more
+                than once.
+        """
+        cells: list[BoardCell] = json_adapter(list[BoardCell]).validate_python(data)
+        board = {cell.coord: cell.stack for cell in cells}
+
+        if len(board) != len(cells):
+            msg = "The board has more than one cell at the same coordinate."
+            raise ValueError(msg)
+
+        return board
+
+
+type GameBoard = Annotated[
+    dict[Coordinate, list[Piece]],
+    PlainValidator(BoardCell.join_board, json_schema_input_type=list[BoardCell]),
+    PlainSerializer(BoardCell.split_board, return_type=list[BoardCell]),
+]
 """A mapping from axial coordinates to stacks of pieces on the game board.
 
-Each key is an occupied coordinate and the corresponding value is the list of pieces 
-stacked on that coordinate, ordered from bottom to top. An empty stack is never stored. 
-When the last piece is removed from a coordinate, the entry should be deleted.
+Each key is an occupied coordinate and the corresponding value is the list of pieces
+stacked on that coordinate, ordered from bottom to top. An empty stack is never stored.
+When the last piece is removed from a coordinate, the entry should be deleted. The JSON
+form is a list of `BoardCell`s ordered by coordinate, since JSON keys cannot be
+coordinates; the annotations only affect conversion.
 """
 
 

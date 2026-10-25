@@ -4,8 +4,8 @@ A record is enough to replay a game, and like every engine value it converts to 
 JSON through `JsonCodec`:
 
 - Board setup: `{"board": [{"coord": [q, r], "stack": [piece, ...]}, ...],
-  "current_player": "white", "current_ply": 3 | null}`, with the stacks ordered by
-  coordinate.
+  "current_player": "white", "current_ply": 3 | null}`, with the cells ordered by
+  coordinate (see `BoardCell`).
 - Game record: `{"rules": ..., "setup": setup | null, "moves": [move | null, ...]}`, where
   a `null` setup is the initial state and a `null` move is a pass.
 
@@ -15,70 +15,12 @@ is checked when a record is replayed.
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Annotated
 
-from pydantic import PlainSerializer, PlainValidator, StrictInt
+from pydantic import StrictInt
 
-from hive.engine.codec import JsonCodec, json_adapter
-from hive.engine.grid import Coordinate
+from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
-from hive.engine.state import GameBoard, GameState, Move, Piece, Player
-
-
-@dataclass(frozen=True, slots=True)
-class BoardStack(JsonCodec):
-    """The JSON form of one occupied coordinate of a board.
-
-    Attributes:
-        coord: The coordinate.
-        stack: The pieces on the coordinate, ordered bottom to top.
-    """
-
-    coord: Coordinate
-    stack: list[Piece]
-
-    @classmethod
-    def from_board(cls, board: GameBoard) -> list["BoardStack"]:
-        """Split a board into its stacks.
-
-        Args:
-            board: The board.
-
-        Returns:
-            One stack per occupied coordinate, ordered by coordinate.
-        """
-        return [cls(coord=coord, stack=board[coord]) for coord in sorted(board)]
-
-    @classmethod
-    def to_board(cls, data: object) -> GameBoard:
-        """Read a board from the JSON form of its stacks.
-
-        Args:
-            data: A list of `{"coord": [q, r], "stack": [...]}` objects.
-
-        Returns:
-            The board.
-
-        Raises:
-            ValueError: If `data` is not a list of stacks, or a coordinate appears more
-                than once.
-        """
-        stacks: list[BoardStack] = json_adapter(list[BoardStack]).validate_python(data)
-        board = {stack.coord: stack.stack for stack in stacks}
-
-        if len(board) != len(stacks):
-            msg = "The board has more than one stack at the same coordinate."
-            raise ValueError(msg)
-
-        return board
-
-
-type JsonBoard = Annotated[
-    GameBoard,
-    PlainValidator(BoardStack.to_board, json_schema_input_type=list[BoardStack]),
-    PlainSerializer(BoardStack.from_board, return_type=list[BoardStack]),
-]
-"""A board whose JSON form is a list of stacks, since JSON keys cannot be coordinates."""
+from hive.engine.state import GameBoard, GameState, Move, Player
 
 
 @dataclass(slots=True)
@@ -92,11 +34,11 @@ class BoardSetup(JsonCodec):
             consistent ply (see `Rules.from_board`).
     """
 
-    board: JsonBoard
+    board: GameBoard
     current_player: Player
     current_ply: StrictInt | None = None
 
-    def state(self, rules: Rules) -> GameState:
+    def create_state(self, rules: Rules) -> GameState:
         """Create the validated game state of the setup.
 
         Args:
@@ -142,7 +84,7 @@ class GameRecord(JsonCodec):
         if self.setup is None:
             return self.rules.create_initial_state()
 
-        return self.setup.state(self.rules)
+        return self.setup.create_state(self.rules)
 
     def replay(self) -> GameState:
         """Replay every move, checking that each one is legal.

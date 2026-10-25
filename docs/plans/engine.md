@@ -155,7 +155,7 @@ rounds as long as the JSON mapping keeps working.
 | `Piece` | `{"piece": "ant", "owner": "white"}` |
 | `Move \| None` | `{"piece": "ant", "from": [q, r] \| null, "to": [q, r]}`; pass is `null` |
 | `Rules` | object with every field, `piece_counts` keyed by piece type name; missing fields take their default when reading |
-| `GameBoard` (`JsonBoard`) | list of `{"coord": [q, r], "stack": [piece, ...]}`, ordered by coordinate (object keys cannot be coordinates) |
+| `GameBoard` | list of `BoardCell`s `{"coord": [q, r], "stack": [piece, ...]}`, ordered by coordinate (object keys cannot be coordinates) |
 | `BoardSetup \| None` | `null` for the initial state, or `{"board": ..., "current_player": ..., "current_ply": int \| null}` |
 | `GameRecord` | `{"rules": ..., "setup": ..., "moves": [...]}` |
 

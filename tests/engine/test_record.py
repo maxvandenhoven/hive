@@ -9,7 +9,7 @@ from pydantic import JsonValue, ValidationError
 from hive.engine.codec import json_adapter
 from hive.engine.errors import IllegalMoveError, InvalidBoardError
 from hive.engine.grid import Coordinate
-from hive.engine.record import BoardSetup, GameRecord, JsonBoard
+from hive.engine.record import BoardSetup, GameRecord
 from hive.engine.rules import Rules
 from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
 
@@ -132,7 +132,7 @@ class TestRoundTrip:
 
     @given(board_strategy)
     def test_board(self, board: GameBoard) -> None:
-        assert round_trip(kind=JsonBoard, value=board) == board
+        assert round_trip(kind=GameBoard, value=board) == board
 
     @given(setup_strategy)
     def test_setup(self, setup: BoardSetup | None) -> None:
@@ -180,7 +180,7 @@ class TestFormat:
             ],
         }
 
-        assert to_json(kind=JsonBoard, value=board) == [
+        assert to_json(kind=GameBoard, value=board) == [
             {
                 "coord": [0, 0],
                 "stack": [
