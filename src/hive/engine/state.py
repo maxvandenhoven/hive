@@ -129,7 +129,7 @@ class GameState:
 
         return state
 
-    def _calculate_boundary_coords(self) -> set[Coordinate]:
+    def calculate_boundary_coords(self) -> set[Coordinate]:
         """Determine which unoccupied coordinates have at least one occupied neighbor.
 
         This method is only used for internal testing purposes and is not optimized for

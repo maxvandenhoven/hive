@@ -3,7 +3,7 @@ import pytest
 from hive.engine.state import GameState, Move, PieceType, Player
 
 
-def _apply_placements(
+def apply_placements(
     state: GameState, placements: list[tuple[PieceType, tuple[int, int]]]
 ) -> None:
     """Apply a sequence of placement moves to the game state."""
@@ -44,7 +44,7 @@ def line_3_state(default_state: GameState) -> GameState:
 
     The middle coordinate `(0, 0)` is an articulation point.
     """
-    _apply_placements(
+    apply_placements(
         default_state,
         [(PieceType.ANT, (-1, 0)), (PieceType.ANT, (0, 0)), (PieceType.ANT, (1, 0))],
     )
@@ -66,7 +66,7 @@ def ring_6_state(default_state: GameState) -> GameState:
     
     There are no articulation points.
     """
-    _apply_placements(
+    apply_placements(
         default_state,
         [
             (PieceType.ANT, (1, 0)),
@@ -93,7 +93,7 @@ def t_shape_state(default_state: GameState) -> GameState:
 
     The middle coordinate `(0, 0)` is an articulation point.
     """
-    _apply_placements(
+    apply_placements(
         default_state,
         [
             (PieceType.ANT, (-1, 0)),
@@ -118,7 +118,7 @@ def l_shape_state(default_state: GameState) -> GameState:
 
     The middle coordinates `(0, 0)` and `(1, 0)` are articulation points.
     """
-    _apply_placements(
+    apply_placements(
         default_state,
         [
             (PieceType.ANT, (-1, 0)),
@@ -141,7 +141,7 @@ def long_chain_state(default_state: GameState) -> GameState:
 
     The middle coordinates `(-1, 0)`, `(0, 0)`, and `(1, 0)` are articulation points.
     """
-    _apply_placements(
+    apply_placements(
         default_state,
         [
             (PieceType.ANT, (-2, 0)),
@@ -168,7 +168,7 @@ def east_gate_state(default_state: GameState) -> GameState:
 
     The gate prevents sliding from `(0, 0)` to `(1, 0)`.
     """
-    _apply_placements(
+    apply_placements(
         default_state,
         [(PieceType.ANT, (0, 0)), (PieceType.ANT, (1, -1)), (PieceType.ANT, (0, 1))],
     )

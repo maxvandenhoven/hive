@@ -10,7 +10,7 @@ from hive.engine.rules import Rules
 from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
 
 
-def _snapshot(state: GameState) -> tuple[Any, ...]:
+def snapshot(state: GameState) -> tuple[Any, ...]:
     """Capture every field of a state for comparison."""
     return (
         {coord: list(stack) for coord, stack in state.board.items()},
@@ -21,7 +21,7 @@ def _snapshot(state: GameState) -> tuple[Any, ...]:
     )
 
 
-def _write_suite(path: Path, positions: list[dict[str, Any]], **rules: Any) -> Path:
+def write_suite(path: Path, positions: list[dict[str, Any]], **rules: Any) -> Path:
     """Write a perft suite file with the given positions and rules."""
     path.write_text(json.dumps({"rules": rules, "positions": positions}))
     return path
@@ -56,11 +56,11 @@ class TestPerft:
 
     def test_restores_state(self, rules: Rules) -> None:
         state = rules.create_initial_state()
-        before = _snapshot(state)
+        before = snapshot(state)
 
         perft(state, rules, 3)
 
-        assert _snapshot(state) == before
+        assert snapshot(state) == before
 
     def test_finished_game_has_no_moves(
         self, rules: Rules, finished_state: GameState
@@ -105,7 +105,7 @@ class TestPerftSuite:
             {"piece": "ant", "from": None, "to": [1, 0]},
         ]
         legal_moves = [None, {"piece": "beetle", "from": [0, 0], "to": [1, 0]}]
-        path = _write_suite(
+        path = write_suite(
             tmp_path / "suite.json",
             [
                 {
@@ -137,7 +137,7 @@ class TestPerftSuite:
 
     def test_position_state(self, tmp_path: Path) -> None:
         moves = [{"piece": "spider", "from": None, "to": [0, 0]}]
-        path = _write_suite(
+        path = write_suite(
             tmp_path / "suite.json", [{"name": "p", "moves": moves, "counts": {}}]
         )
 
@@ -148,14 +148,14 @@ class TestPerftSuite:
         assert PerftSuite.load(path).position("p").legal_moves is None
 
     def test_unknown_position(self, tmp_path: Path) -> None:
-        suite = PerftSuite.load(_write_suite(tmp_path / "suite.json", []))
+        suite = PerftSuite.load(write_suite(tmp_path / "suite.json", []))
 
         with pytest.raises(KeyError, match="Unknown perft position `missing`"):
             suite.position("missing")
 
     def test_unknown_piece(self, tmp_path: Path) -> None:
         moves = [{"piece": "ladybug", "from": None, "to": [0, 0]}]
-        path = _write_suite(
+        path = write_suite(
             tmp_path / "suite.json", [{"name": "p", "moves": moves, "counts": {}}]
         )
 
@@ -163,7 +163,7 @@ class TestPerftSuite:
             PerftSuite.load(path)
 
     def test_unknown_player(self, tmp_path: Path) -> None:
-        path = _write_suite(tmp_path / "suite.json", [], starting_player="red")
+        path = write_suite(tmp_path / "suite.json", [], starting_player="red")
 
         with pytest.raises(ValueError, match="Unknown player `red`"):
             PerftSuite.load(path)

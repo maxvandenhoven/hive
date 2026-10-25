@@ -151,7 +151,7 @@ def deserialize_player(data: object) -> Player:
     Raises:
         ValueError: If `data` is not the name of a player.
     """
-    return _deserialize_enum(data, Player, "player")
+    return deserialize_enum(data, Player, "player")
 
 
 def serialize_piece_type(piece_type: PieceType) -> str:
@@ -178,7 +178,7 @@ def deserialize_piece_type(data: object) -> PieceType:
     Raises:
         ValueError: If `data` is not the name of a piece type.
     """
-    return _deserialize_enum(data, PieceType, "piece type")
+    return deserialize_enum(data, PieceType, "piece type")
 
 
 def serialize_coordinate(coord: Coordinate) -> list[JsonValue]:
@@ -208,7 +208,7 @@ def deserialize_coordinate(data: object) -> Coordinate:
     if (
         not isinstance(data, list | tuple)
         or len(data) != 2
-        or not all(_is_int(value) for value in data)
+        or not all(is_json_int(value) for value in data)
     ):
         msg = f"Expected a coordinate as a list of two integers, but got `{data!r}`."
         raise ValueError(msg)
@@ -253,7 +253,7 @@ def deserialize_move(data: object) -> Move | None:
     if data is None:
         return None
 
-    fields = _expect_object(data, "move", required={"piece", "from", "to"})
+    fields = expect_object(data, "move", required={"piece", "from", "to"})
     source = fields["from"]
 
     return Move(
@@ -299,20 +299,20 @@ def deserialize_rules(data: object) -> Rules:
             type, or describes an invalid configuration.
     """
     defaults = serialize_rules(Rules())
-    fields = defaults | _expect_object(data, "rules", optional=defaults.keys())
+    fields = defaults | expect_object(data, "rules", optional=defaults.keys())
 
     try:
         return Rules(
-            piece_counts=_deserialize_piece_counts(fields["piece_counts"]),
+            piece_counts=deserialize_piece_counts(fields["piece_counts"]),
             starting_player=deserialize_player(fields["starting_player"]),
-            queen_by_turn=_expect_optional_int(fields["queen_by_turn"], "queen_by_turn"),
-            allow_queen_first_turn=_expect_bool(
+            queen_by_turn=expect_optional_int(fields["queen_by_turn"], "queen_by_turn"),
+            allow_queen_first_turn=expect_bool(
                 fields["allow_queen_first_turn"], "allow_queen_first_turn"
             ),
-            move_before_queen=_expect_bool(
+            move_before_queen=expect_bool(
                 fields["move_before_queen"], "move_before_queen"
             ),
-            max_turns=_expect_optional_int(fields["max_turns"], "max_turns"),
+            max_turns=expect_optional_int(fields["max_turns"], "max_turns"),
         )
     except ValueError as e:
         msg = f"Invalid rules: {e}"
@@ -332,7 +332,7 @@ def serialize_board(board: GameBoard) -> list[JsonValue]:
     return [
         {
             "coord": serialize_coordinate(coord),
-            "stack": [_serialize_piece(piece) for piece in board[coord]],
+            "stack": [serialize_piece(piece) for piece in board[coord]],
         }
         for coord in sorted(board)
     ]
@@ -360,7 +360,7 @@ def deserialize_board(data: object) -> GameBoard:
     board: GameBoard = {}
 
     for entry in data:
-        fields = _expect_object(entry, "stack", required={"coord", "stack"})
+        fields = expect_object(entry, "stack", required={"coord", "stack"})
         coord = deserialize_coordinate(fields["coord"])
 
         if coord in board:
@@ -373,7 +373,7 @@ def deserialize_board(data: object) -> GameBoard:
             msg = f"Expected the stack at `{coord}` to be a list, but got `{pieces!r}`."
             raise ValueError(msg)
 
-        board[coord] = [_deserialize_piece(piece) for piece in pieces]
+        board[coord] = [deserialize_piece(piece) for piece in pieces]
 
     return board
 
@@ -412,14 +412,14 @@ def deserialize_setup(data: object) -> BoardSetup | None:
     if data == INITIAL_SETUP:
         return None
 
-    fields = _expect_object(
+    fields = expect_object(
         data, "setup", required={"board", "current_player"}, optional={"current_ply"}
     )
 
     return BoardSetup(
         board=deserialize_board(fields["board"]),
         current_player=deserialize_player(fields["current_player"]),
-        current_ply=_expect_optional_int(fields.get("current_ply"), "current_ply"),
+        current_ply=expect_optional_int(fields.get("current_ply"), "current_ply"),
     )
 
 
@@ -453,7 +453,7 @@ def deserialize_record(data: object) -> GameRecord:
     Raises:
         ValueError: If `data` is not a valid game record object.
     """
-    fields = _expect_object(data, "game record", required={"rules", "setup", "moves"})
+    fields = expect_object(data, "game record", required={"rules", "setup", "moves"})
     moves = fields["moves"]
 
     if not isinstance(moves, list):
@@ -476,7 +476,7 @@ def deserialize_record(data: object) -> GameRecord:
     )
 
 
-def _serialize_piece(piece: Piece) -> JsonValue:
+def serialize_piece(piece: Piece) -> JsonValue:
     """Serialize a piece as an object with its `piece` type and `owner`.
 
     Args:
@@ -491,7 +491,7 @@ def _serialize_piece(piece: Piece) -> JsonValue:
     }
 
 
-def _deserialize_piece(data: object) -> Piece:
+def deserialize_piece(data: object) -> Piece:
     """Deserialize a piece from an object with its `piece` type and `owner`.
 
     Args:
@@ -503,14 +503,14 @@ def _deserialize_piece(data: object) -> Piece:
     Raises:
         ValueError: If `data` is not a valid piece object.
     """
-    fields = _expect_object(data, "piece", required={"piece", "owner"})
+    fields = expect_object(data, "piece", required={"piece", "owner"})
     return Piece(
         type=deserialize_piece_type(fields["piece"]),
         owner=deserialize_player(fields["owner"]),
     )
 
 
-def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
+def deserialize_piece_counts(data: object) -> dict[PieceType, int]:
     """Deserialize piece counts from an object keyed by piece type name.
 
     Args:
@@ -530,7 +530,7 @@ def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
     piece_counts: dict[PieceType, int] = {}
 
     for name, count in data.items():
-        if not _is_int(count) or count < 0:
+        if not is_json_int(count) or count < 0:
             msg = (
                 f"Expected the count of `{name}` to be a non-negative integer, but got "
                 f"`{count!r}`."
@@ -542,7 +542,7 @@ def _deserialize_piece_counts(data: object) -> dict[PieceType, int]:
     return piece_counts
 
 
-def _deserialize_enum[E: IntEnum](data: object, enum: type[E], kind: str) -> E:
+def deserialize_enum[E: IntEnum](data: object, enum: type[E], kind: str) -> E:
     """Deserialize an enum member from its lower case name.
 
     Args:
@@ -567,7 +567,7 @@ def _deserialize_enum[E: IntEnum](data: object, enum: type[E], kind: str) -> E:
     return enum[data.upper()]
 
 
-def _expect_object(
+def expect_object(
     data: object,
     kind: str,
     required: Set[str] = frozenset(),
@@ -607,7 +607,7 @@ def _expect_object(
     return data
 
 
-def _expect_optional_int(value: object, name: str) -> int | None:
+def expect_optional_int(value: object, name: str) -> int | None:
     """Check that a field value is an integer or `None`.
 
     Args:
@@ -620,14 +620,14 @@ def _expect_optional_int(value: object, name: str) -> int | None:
     Raises:
         ValueError: If `value` is neither an integer nor `None`.
     """
-    if value is not None and not _is_int(value):
+    if value is not None and not is_json_int(value):
         msg = f"Expected `{name}` to be an integer or null, but got `{value!r}`."
         raise ValueError(msg)
 
     return value
 
 
-def _expect_bool(value: object, name: str) -> bool:
+def expect_bool(value: object, name: str) -> bool:
     """Check that a field value is a boolean.
 
     Args:
@@ -647,7 +647,7 @@ def _expect_bool(value: object, name: str) -> bool:
     return value
 
 
-def _is_int(value: object) -> TypeIs[int]:
+def is_json_int(value: object) -> TypeIs[int]:
     """Check that a value is an integer, excluding booleans.
 
     `bool` is a subclass of `int`, so `isinstance(True, int)` alone would accept `true`
