@@ -121,7 +121,7 @@ class LocalTurnContext(TurnContext):
         Raises:
             LookupError: If the agent submitted nothing.
         """
-        agent.think(state.copy(), self)
+        agent.think(state=state.copy(), turn=self)
         return self.move
 
     def stop(self) -> None:
@@ -136,7 +136,9 @@ class LocalTurnContext(TurnContext):
             move: The proposed move, or `None` to pass.
             final: Whether the agent is done, which closes the turn.
         """
-        self.submissions.append(TurnSubmission(move, final, after_stop=self.stop_seen))
+        self.submissions.append(
+            TurnSubmission(move=move, final=final, after_stop=self.stop_seen)
+        )
 
     @override
     def remaining_seconds(self) -> float:

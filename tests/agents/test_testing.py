@@ -3,7 +3,7 @@ import pytest
 from hive.agents.testing import FakeClock, LocalTurnContext, TurnSubmission
 from hive.engine.state import Move, PieceType
 
-MOVE = Move(PieceType.QUEEN, None, (0, 0))
+MOVE = Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
 
 
 class TestFakeClock:
@@ -42,7 +42,7 @@ class TestLocalTurnContext:
         assert not turn.closed
         assert not turn.should_stop()
 
-        turn.submit(MOVE, final=True)
+        turn.submit(move=MOVE, final=True)
         assert turn.closed
         assert turn.should_stop()
         assert turn.move == MOVE
@@ -56,9 +56,9 @@ class TestLocalTurnContext:
         turn.submit(MOVE)
 
         assert turn.submissions == [
-            TurnSubmission(None, final=False, after_stop=False),
-            TurnSubmission(MOVE, final=False, after_stop=False),
-            TurnSubmission(MOVE, final=False, after_stop=True),
+            TurnSubmission(move=None, final=False, after_stop=False),
+            TurnSubmission(move=MOVE, final=False, after_stop=False),
+            TurnSubmission(move=MOVE, final=False, after_stop=True),
         ]
 
     def test_records_infos(self) -> None:

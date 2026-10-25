@@ -28,7 +28,7 @@ class NegamaxAgent(SearchAgent):
             The score of the root from the perspective of the player to move, and the
             principal variation starting with the best move.
         """
-        return self.negamax(state, depth, 0)
+        return self.negamax(state=state, depth=depth, ply=0)
 
     def negamax(
         self, state: GameState, depth: int, ply: int
@@ -48,14 +48,16 @@ class NegamaxAgent(SearchAgent):
             principal variation from this node, which is empty at leaves.
         """
         self.visit_node()
-        terminal_score = self.terminal_score(state, state.current_player, ply)
+        terminal_score = self.terminal_score(
+            state=state, player=state.current_player, ply=ply
+        )
 
         if terminal_score is not None:
             return terminal_score, []
 
         if depth == 0:
             self.cutoff = True
-            return self.evaluate(state, state.current_player), []
+            return self.evaluate(state=state, player=state.current_player), []
 
         best_score = -math.inf
         best_pv: list[Move | None] = []
@@ -64,7 +66,7 @@ class NegamaxAgent(SearchAgent):
             state.apply_move(move)
 
             try:
-                child_score, pv = self.negamax(state, depth - 1, ply + 1)
+                child_score, pv = self.negamax(state=state, depth=depth - 1, ply=ply + 1)
             finally:
                 state.undo_move(move)
 

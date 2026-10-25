@@ -27,7 +27,9 @@ class MinimaxAgent(SearchAgent):
             The score of the root from the perspective of the player to move, and the
             principal variation starting with the best move.
         """
-        return self.minimax(state, depth, 0, state.current_player)
+        return self.minimax(
+            state=state, depth=depth, ply=0, root_player=state.current_player
+        )
 
     def minimax(
         self, state: GameState, depth: int, ply: int, root_player: Player
@@ -45,14 +47,14 @@ class MinimaxAgent(SearchAgent):
             principal variation from this node, which is empty at leaves.
         """
         self.visit_node()
-        terminal_score = self.terminal_score(state, root_player, ply)
+        terminal_score = self.terminal_score(state=state, player=root_player, ply=ply)
 
         if terminal_score is not None:
             return terminal_score, []
 
         if depth == 0:
             self.cutoff = True
-            return self.evaluate(state, root_player), []
+            return self.evaluate(state=state, player=root_player), []
 
         # If the player to move at the node is the player to move at the root, maximize
         # the score of the child nodes, otherwise minimize it.
@@ -64,7 +66,9 @@ class MinimaxAgent(SearchAgent):
             state.apply_move(move)
 
             try:
-                score, pv = self.minimax(state, depth - 1, ply + 1, root_player)
+                score, pv = self.minimax(
+                    state=state, depth=depth - 1, ply=ply + 1, root_player=root_player
+                )
             finally:
                 state.undo_move(move)
 

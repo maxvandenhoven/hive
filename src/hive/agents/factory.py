@@ -110,7 +110,7 @@ class AgentRegistration:
             **fields,
         )
 
-        return cls(kind, agent_class, params_model)
+        return cls(kind=kind, agent_class=agent_class, params_model=params_model)
 
     @property
     def description(self) -> str:
@@ -180,9 +180,11 @@ class AgentSpec:
         try:
             document = AgentSpecDocument.model_validate(data)
         except ValidationError as e:
-            raise InvalidAgentSpecError(format_spec_errors(source, e.errors())) from e
+            raise InvalidAgentSpecError(
+                format_spec_errors(source=source, errors=e.errors())
+            ) from e
 
-        spec = cls(document.kind, document.params, document.label)
+        spec = cls(kind=document.kind, params=document.params, label=document.label)
         spec.validate_params(source=source)
 
         return spec
@@ -213,7 +215,7 @@ class AgentSpec:
         if isinstance(data, str):
             data = {"kind": data}
 
-        return cls.from_dict(data, source=source)
+        return cls.from_dict(data=data, source=source)
 
     @classmethod
     def load(cls, path: Path) -> "AgentSpec":
@@ -229,7 +231,7 @@ class AgentSpec:
             InvalidAgentSpecError: If the file is not valid YAML or not a valid spec.
             OSError: If the file cannot be read.
         """
-        return cls.from_yaml(path.read_text(), source=f"`{path}`")
+        return cls.from_yaml(text=path.read_text(), source=f"`{path}`")
 
     @classmethod
     def from_preset(cls, name: str) -> "AgentSpec":
@@ -251,7 +253,7 @@ class AgentSpec:
             raise InvalidAgentSpecError(msg)
 
         text = files(AGENT_PRESET_PACKAGE).joinpath(f"{name}.yaml").read_text()
-        spec = cls.from_yaml(text, source=f"preset `{name}`")
+        spec = cls.from_yaml(text=text, source=f"preset `{name}`")
 
         return spec if spec.label is not None else replace(spec, label=name)
 
@@ -331,7 +333,7 @@ class AgentSpec:
         except ValidationError as e:
             errors = [{**error, "loc": ("params", *error["loc"])} for error in e.errors()]
             raise InvalidAgentSpecError(
-                format_spec_errors(source, errors, kind=self.kind)
+                format_spec_errors(source=source, errors=errors, kind=self.kind)
             ) from e
 
 
@@ -357,7 +359,9 @@ def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:
             msg = f"Agent kind `{kind}` is already registered."
             raise ValueError(msg)
 
-        AGENT_REGISTRY[kind] = AgentRegistration.from_class(kind, agent_class)
+        AGENT_REGISTRY[kind] = AgentRegistration.from_class(
+            kind=kind, agent_class=agent_class
+        )
 
         return agent_class
 
@@ -381,7 +385,7 @@ def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent:
     params = spec.validate_params()
     agent_class = AGENT_REGISTRY[spec.kind].agent_class
 
-    return agent_class(rules, seed=seed, **dict(params))
+    return agent_class(rules=rules, seed=seed, **dict(params))
 
 
 def list_agents() -> list[AgentRegistration]:

@@ -98,7 +98,7 @@ class SearchAgent(Agent):
             material_in_hand: The weight of the value of the player's pieces in hand
                 minus the opponent's.
         """
-        super().__init__(rules, seed=seed)
+        super().__init__(rules=rules, seed=seed)
         self.depth = depth
         self.queen_safety = queen_safety
         self.mobility = mobility
@@ -133,7 +133,7 @@ class SearchAgent(Agent):
         legal_moves = self.rules.legal_moves(state)
 
         if len(legal_moves) == 1:
-            turn.submit(legal_moves[0], final=True)
+            turn.submit(move=legal_moves[0], final=True)
             return
 
         turn.submit(legal_moves[self.rng.randrange(len(legal_moves))])
@@ -149,7 +149,7 @@ class SearchAgent(Agent):
             self.cutoff = False
 
             try:
-                score, pv = self._search(state, depth)
+                score, pv = self._search(state=state, depth=depth)
             except SearchStoppedError:
                 return
 
@@ -166,7 +166,7 @@ class SearchAgent(Agent):
                 or not self.cutoff
                 or abs(score) >= SEARCH_WIN_SCORE - depth
             )
-            turn.submit(pv[0], final=final)
+            turn.submit(move=pv[0], final=final)
 
             if final:
                 return
@@ -253,8 +253,8 @@ class SearchAgent(Agent):
             queen, in the range [-6, 6].
         """
         return self.occupied_queen_neighbors(
-            state, player.opponent
-        ) - self.occupied_queen_neighbors(state, player)
+            state=state, owner=player.opponent
+        ) - self.occupied_queen_neighbors(state=state, owner=player)
 
     def occupied_queen_neighbors(self, state: GameState, owner: Player) -> float:
         """Count the occupied neighbours of a player's queen.
@@ -285,8 +285,8 @@ class SearchAgent(Agent):
             pass counts as zero moves.
         """
         return float(
-            self.count_legal_moves(state, player)
-            - self.count_legal_moves(state, player.opponent)
+            self.count_legal_moves(state=state, player=player)
+            - self.count_legal_moves(state=state, player=player.opponent)
         )
 
     def count_legal_moves(self, state: GameState, player: Player) -> int:
@@ -320,8 +320,8 @@ class SearchAgent(Agent):
             The player's pieces next to the opponent's queen minus the opponent's pieces
             next to the player's queen, counting only the top piece of each stack.
         """
-        return self.queen_pressure(state, player) - self.queen_pressure(
-            state, player.opponent
+        return self.queen_pressure(state=state, attacker=player) - self.queen_pressure(
+            state=state, attacker=player.opponent
         )
 
     def queen_pressure(self, state: GameState, attacker: Player) -> float:
