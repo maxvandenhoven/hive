@@ -10,8 +10,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
-from hive.engine.serialization import deserialize_move, deserialize_rules
 from hive.engine.state import GameState, Move
 
 
@@ -126,7 +126,7 @@ def timed_perft(state: GameState, rules: Rules, depth: int) -> PerftResult:
 
 
 @dataclass(frozen=True, slots=True)
-class PerftPosition:
+class PerftPosition(JsonCodec):
     """A named perft position with reference counts.
 
     Attributes:
@@ -163,7 +163,7 @@ class PerftPosition:
 
 
 @dataclass(frozen=True, slots=True)
-class PerftSuite:
+class PerftSuite(JsonCodec):
     """A set of perft positions with the rules their reference counts were made with.
 
     Attributes:
@@ -178,9 +178,10 @@ class PerftSuite:
     def load(cls, path: Path) -> "PerftSuite":
         """Load a perft suite from a JSON file.
 
-        The file holds serialized `rules` (see `hive.engine.serialization`, missing
-        fields keep their default) and a list of `positions`, each with a `name`, a list
-        of serialized `moves`, `counts` keyed by depth and optionally `legal_moves`.
+        The file holds the JSON form of the suite: the `rules` (missing fields keep their
+        default) and a list of `positions`, each with a `name`, a list of `moves`,
+        `counts` keyed by depth and optionally `legal_moves`. Other keys, such as the
+        `source` of the reference counts, are ignored.
 
         Args:
             path: The path of the JSON file.
@@ -189,27 +190,9 @@ class PerftSuite:
             The suite described by the file.
 
         Raises:
-            ValueError: If the rules or a move cannot be deserialized.
+            pydantic.ValidationError: If the file does not describe a valid suite.
         """
-        data = json.loads(path.read_text())
-
-        rules = deserialize_rules(data["rules"])
-
-        positions = [
-            PerftPosition(
-                name=position["name"],
-                moves=[deserialize_move(move) for move in position["moves"]],
-                counts={int(depth): count for depth, count in position["counts"].items()},
-                legal_moves=(
-                    [deserialize_move(move) for move in position["legal_moves"]]
-                    if "legal_moves" in position
-                    else None
-                ),
-            )
-            for position in data["positions"]
-        ]
-
-        return cls(rules=rules, positions=positions)
+        return cls.from_json(json.loads(path.read_text()))
 
     def position(self, name: str) -> PerftPosition:
         """Get a position by name.

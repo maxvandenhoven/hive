@@ -4,31 +4,13 @@ import random
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+from pydantic import JsonValue, ValidationError
 
+from hive.engine.codec import json_adapter
 from hive.engine.errors import IllegalMoveError, InvalidBoardError
 from hive.engine.grid import Coordinate
+from hive.engine.record import BoardSetup, GameRecord, JsonBoard
 from hive.engine.rules import Rules
-from hive.engine.serialization import (
-    BoardSetup,
-    GameRecord,
-    JsonValue,
-    deserialize_board,
-    deserialize_coordinate,
-    deserialize_move,
-    deserialize_piece_type,
-    deserialize_player,
-    deserialize_record,
-    deserialize_rules,
-    deserialize_setup,
-    serialize_board,
-    serialize_coordinate,
-    serialize_move,
-    serialize_piece_type,
-    serialize_player,
-    serialize_record,
-    serialize_rules,
-    serialize_setup,
-)
 from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
 
 coord_strategy = st.tuples(st.integers(-50, 50), st.integers(-50, 50))
@@ -82,9 +64,24 @@ record_strategy = st.builds(
 )
 
 
-def through_json(data: JsonValue) -> object:
-    """Write and read a serialized value as JSON, which turns tuples into lists."""
-    return json.loads(json.dumps(data))
+def round_trip(kind: object, value: object) -> object:
+    """Write a value of a type as JSON text and read it back."""
+    adapter = json_adapter(kind)
+
+    return adapter.validate_json(adapter.dump_json(value, by_alias=True))
+
+
+def to_json(kind: object, value: object) -> JsonValue:
+    """Serialize a value of a type."""
+    return json_adapter(kind).dump_python(value, mode="json", by_alias=True)
+
+
+def error_locations(kind: object, data: object) -> list[str]:
+    """Validate invalid data and return the dotted location of every error."""
+    with pytest.raises(ValidationError) as info:
+        json_adapter(kind).validate_python(data)
+
+    return [".".join(str(part) for part in error["loc"]) for error in info.value.errors()]
 
 
 def snapshot(state: GameState) -> tuple[object, ...]:
@@ -115,53 +112,51 @@ def random_game(rules: Rules, plies: int, seed: int) -> list[Move | None]:
 class TestRoundTrip:
     @given(st.sampled_from(Player))
     def test_player(self, player: Player) -> None:
-        assert deserialize_player(through_json(serialize_player(player))) is player
+        assert round_trip(kind=Player, value=player) is player
 
     @given(st.sampled_from(PieceType))
     def test_piece_type(self, piece_type: PieceType) -> None:
-        data = through_json(serialize_piece_type(piece_type))
-
-        assert deserialize_piece_type(data) is piece_type
+        assert round_trip(kind=PieceType, value=piece_type) is piece_type
 
     @given(coord_strategy)
     def test_coordinate(self, coord: Coordinate) -> None:
-        assert deserialize_coordinate(through_json(serialize_coordinate(coord))) == coord
+        assert round_trip(kind=Coordinate, value=coord) == coord
 
     @given(move_strategy)
     def test_move(self, move: Move | None) -> None:
-        assert deserialize_move(through_json(serialize_move(move))) == move
+        assert round_trip(kind=Move | None, value=move) == move
 
     @given(rules_strategy())
     def test_rules(self, rules: Rules) -> None:
-        assert deserialize_rules(through_json(serialize_rules(rules))) == rules
+        assert round_trip(kind=Rules, value=rules) == rules
 
     @given(board_strategy)
     def test_board(self, board: GameBoard) -> None:
-        assert deserialize_board(through_json(serialize_board(board))) == board
+        assert round_trip(kind=JsonBoard, value=board) == board
 
     @given(setup_strategy)
     def test_setup(self, setup: BoardSetup | None) -> None:
-        assert deserialize_setup(through_json(serialize_setup(setup))) == setup
+        assert round_trip(kind=BoardSetup | None, value=setup) == setup
 
     @given(record_strategy)
     def test_record(self, record: GameRecord) -> None:
-        assert deserialize_record(through_json(serialize_record(record))) == record
+        assert GameRecord.from_json(json.loads(json.dumps(record.to_json()))) == record
 
 
 class TestFormat:
     def test_move(self) -> None:
         move = Move(piece_type=PieceType.ANT, source_coord=(0, -1), target_coord=(1, 0))
 
-        assert serialize_move(move) == {"piece": "ant", "from": [0, -1], "to": [1, 0]}
-        assert serialize_move(None) is None
+        assert move.to_json() == {"piece": "ant", "from": [0, -1], "to": [1, 0]}
+        assert to_json(kind=Move | None, value=None) is None
 
     def test_placement(self) -> None:
         move = Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
 
-        assert serialize_move(move) == {"piece": "queen", "from": None, "to": [0, 0]}
+        assert move.to_json() == {"piece": "queen", "from": None, "to": [0, 0]}
 
     def test_rules(self) -> None:
-        assert serialize_rules(Rules()) == {
+        assert Rules().to_json() == {
             "piece_counts": {
                 "queen": 1,
                 "beetle": 2,
@@ -185,7 +180,7 @@ class TestFormat:
             ],
         }
 
-        assert serialize_board(board) == [
+        assert to_json(kind=JsonBoard, value=board) == [
             {
                 "coord": [0, 0],
                 "stack": [
@@ -197,74 +192,71 @@ class TestFormat:
         ]
 
     def test_initial_setup(self) -> None:
-        assert serialize_setup(None) == "initial"
+        assert GameRecord(rules=Rules()).to_json() == {
+            "rules": Rules().to_json(),
+            "setup": None,
+            "moves": [],
+        }
 
     def test_rules_missing_fields_use_defaults(self) -> None:
-        assert deserialize_rules({}) == Rules()
-        assert deserialize_rules({"starting_player": "black"}) == Rules(
+        assert Rules.from_json({}) == Rules()
+        assert Rules.from_json({"starting_player": "black"}) == Rules(
             starting_player=Player.BLACK
         )
 
     def test_setup_without_ply(self) -> None:
-        setup = deserialize_setup({"board": [], "current_player": "white"})
+        setup = BoardSetup.from_json({"board": [], "current_player": "white"})
 
         assert setup == BoardSetup(board={}, current_player=Player.WHITE)
 
 
 class TestMalformed:
-    @pytest.mark.parametrize(
-        ("data", "match"),
-        [
-            ("White", "Unknown player `White`"),
-            ("red", "Unknown player `red`"),
-            (0, "Unknown player `0`"),
-        ],
-    )
-    def test_player(self, data: object, match: str) -> None:
-        with pytest.raises(ValueError, match=match):
-            deserialize_player(data)
+    @pytest.mark.parametrize("data", ["White", "red", 0, "ANT", None])
+    def test_player(self, data: object) -> None:
+        assert error_locations(kind=Player, data=data)
 
-    @pytest.mark.parametrize("data", ["ladybug", "ANT", None])
+    @pytest.mark.parametrize("data", ["ladybug", "ANT", None, 4])
     def test_piece_type(self, data: object) -> None:
-        with pytest.raises(ValueError, match="Unknown piece type"):
-            deserialize_piece_type(data)
+        assert error_locations(kind=PieceType, data=data)
 
     @pytest.mark.parametrize(
         "data", [[0], [0, 0, 0], [0, "1"], [0, 1.5], [True, 0], "0,0"]
     )
     def test_coordinate(self, data: object) -> None:
-        with pytest.raises(ValueError, match="list of two integers"):
-            deserialize_coordinate(data)
+        assert error_locations(kind=Coordinate, data=data)
 
     @pytest.mark.parametrize(
-        ("data", "match"),
+        ("data", "location"),
         [
-            ("pass", "Expected a move object"),
-            ({"piece": "ant", "to": [0, 0]}, r"missing the keys `\['from'\]`"),
-            (
-                {"piece": "ant", "from": None, "to": [0, 0], "by": "white"},
-                r"unknown keys `\['by'\]`",
-            ),
-            ({"piece": "ladybug", "from": None, "to": [0, 0]}, "Unknown piece type"),
-            ({"piece": "ant", "from": None, "to": None}, "list of two integers"),
+            ("pass", ""),
+            ({"piece": "ant", "to": [0, 0]}, "from"),
+            ({"piece": "ant", "from": None, "to": [0, 0], "by": "white"}, "by"),
+            ({"piece": "ladybug", "from": None, "to": [0, 0]}, "piece"),
+            ({"piece": "ant", "from": None, "to": None}, "to"),
         ],
     )
-    def test_move(self, data: object, match: str) -> None:
-        with pytest.raises(ValueError, match=match):
-            deserialize_move(data)
+    def test_move(self, data: object, location: str) -> None:
+        assert location in error_locations(kind=Move, data=data)[0]
+
+    @pytest.mark.parametrize(
+        ("data", "location"),
+        [
+            ({"max_turn": 10}, "max_turn"),
+            ({"queen_by_turn": "4"}, "queen_by_turn"),
+            ({"max_turns": True}, "max_turns"),
+            ({"move_before_queen": 1}, "move_before_queen"),
+            ({"starting_player": "red"}, "starting_player"),
+            ({"piece_counts": [1]}, "piece_counts"),
+            ({"piece_counts": {"queen": 1, "ant": -1}}, "piece_counts.ant"),
+            ({"piece_counts": {"queen": 1, "mosquito": 1}}, "piece_counts.mosquito"),
+        ],
+    )
+    def test_rules_shape(self, data: object, location: str) -> None:
+        assert location in error_locations(kind=Rules, data=data)[0]
 
     @pytest.mark.parametrize(
         ("data", "match"),
         [
-            ([], "Expected a rules object"),
-            ({"max_turn": 10}, r"unknown keys `\['max_turn'\]`"),
-            ({"queen_by_turn": "4"}, "`queen_by_turn` to be an integer or null"),
-            ({"max_turns": True}, "`max_turns` to be an integer or null"),
-            ({"move_before_queen": 1}, "`move_before_queen` to be a boolean"),
-            ({"starting_player": "red"}, "Unknown player `red`"),
-            ({"piece_counts": [1]}, "`piece_counts` to be an object"),
-            ({"piece_counts": {"queen": 1, "ant": -1}}, "count of `ant`"),
-            ({"piece_counts": {"queen": 1, "mosquito": 1}}, "Unknown piece type"),
             ({"piece_counts": {"ant": 3}}, "exactly one queen"),
             (
                 {"queen_by_turn": 1, "allow_queen_first_turn": False},
@@ -272,60 +264,48 @@ class TestMalformed:
             ),
         ],
     )
-    def test_rules(self, data: object, match: str) -> None:
-        with pytest.raises(ValueError, match=match):
-            deserialize_rules(data)
+    def test_rules_configuration(self, data: object, match: str) -> None:
+        with pytest.raises(ValidationError, match=match):
+            Rules.from_json(data)
 
     @pytest.mark.parametrize(
-        ("data", "match"),
+        ("data", "location"),
         [
-            ({}, "Expected a board as a list"),
-            ([[0, 0]], "Expected a stack object"),
-            ([{"coord": [0, 0], "stack": "ant"}], "stack at `\\(0, 0\\)` to be a list"),
-            (
-                [{"coord": [0, 0], "stack": [{"piece": "ant"}]}],
-                r"piece object is missing the keys `\['owner'\]`",
-            ),
-            (
-                [{"coord": [0, 0], "stack": []}, {"coord": [0, 0], "stack": []}],
-                "more than one stack at coordinate",
-            ),
+            ({}, "board"),
+            ([[0, 0]], "board.0"),
+            ([{"coord": [0, 0], "stack": "ant"}], "board.0.stack"),
+            ([{"coord": [0, 0], "stack": [{"piece": "ant"}]}], "board.0.stack.0.owner"),
+            ([{"coord": [0, 0], "stack": []}, {"coord": [0, 0], "stack": []}], "board"),
         ],
     )
-    def test_board(self, data: object, match: str) -> None:
-        with pytest.raises(ValueError, match=match):
-            deserialize_board(data)
+    def test_board(self, data: object, location: str) -> None:
+        setup = {"board": data, "current_player": "white"}
+
+        assert error_locations(kind=BoardSetup, data=setup) == [location]
 
     @pytest.mark.parametrize(
-        ("data", "match"),
+        ("data", "location"),
         [
-            ("start", "Expected a setup object"),
-            ({"board": []}, r"missing the keys `\['current_player'\]`"),
-            (
-                {"board": [], "current_player": "white", "current_ply": "3"},
-                "`current_ply` to be an integer or null",
-            ),
+            ("start", ""),
+            ({"board": []}, "current_player"),
+            ({"board": [], "current_player": "white", "current_ply": "3"}, "current_ply"),
         ],
     )
-    def test_setup(self, data: object, match: str) -> None:
-        with pytest.raises(ValueError, match=match):
-            deserialize_setup(data)
+    def test_setup(self, data: object, location: str) -> None:
+        assert location in error_locations(kind=BoardSetup, data=data)[0]
 
     @pytest.mark.parametrize(
-        ("data", "match"),
+        ("data", "location"),
         [
-            (None, "Expected a game record object"),
-            ({"rules": {}, "moves": []}, r"missing the keys `\['setup'\]`"),
-            ({"rules": {}, "setup": "initial", "moves": {}}, "`moves` to be a list"),
-            (
-                {"rules": {}, "setup": "initial", "moves": [None, {"piece": "ant"}]},
-                "Invalid move at index `1`",
-            ),
+            (None, ""),
+            ({"setup": None, "moves": []}, "rules"),
+            ({"rules": {}, "setup": "initial", "moves": []}, "setup"),
+            ({"rules": {}, "moves": {}}, "moves"),
+            ({"rules": {}, "moves": [None, {"piece": "ant"}]}, "moves.1"),
         ],
     )
-    def test_record(self, data: object, match: str) -> None:
-        with pytest.raises(ValueError, match=match):
-            deserialize_record(data)
+    def test_record(self, data: object, location: str) -> None:
+        assert location in error_locations(kind=GameRecord, data=data)[0]
 
 
 class TestGameRecord:
@@ -338,8 +318,8 @@ class TestGameRecord:
         for move in moves:
             state.apply_move(move)
 
-        record = deserialize_record(
-            through_json(serialize_record(GameRecord(rules=rules, moves=moves)))
+        record = GameRecord.from_json(
+            json.loads(json.dumps(GameRecord(rules=rules, moves=moves).to_json()))
         )
 
         assert snapshot(record.replay()) == snapshot(state)

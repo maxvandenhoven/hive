@@ -5,7 +5,6 @@ import pytest
 from hive.agents.factory import AgentSpec, build_agent, list_agents
 from hive.agents.testing import FakeClock, LocalTurnContext
 from hive.engine.rules import Rules
-from hive.engine.serialization import serialize_board
 from hive.engine.state import GameState
 
 AGENT_KINDS = [agent.kind for agent in list_agents()]
@@ -14,7 +13,7 @@ AGENT_KINDS = [agent.kind for agent in list_agents()]
 def snapshot(state: GameState) -> object:
     """Capture everything that defines a state, to check that it is unchanged."""
     return (
-        serialize_board(state.board),
+        {coord: list(stack) for coord, stack in state.board.items()},
         state.current_player,
         state.current_ply,
         state.hand,

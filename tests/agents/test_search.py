@@ -8,7 +8,6 @@ from hive.agents.negamax import NegamaxAgent
 from hive.agents.search import SEARCH_WIN_SCORE, SearchAgent
 from hive.agents.testing import LocalTurnContext
 from hive.engine.rules import Rules
-from hive.engine.serialization import serialize_move
 from hive.engine.state import GameState, Move, Piece, PieceType, Player
 
 SEARCH_AGENTS: list[type[SearchAgent]] = [MinimaxAgent, NegamaxAgent]
@@ -65,7 +64,8 @@ def test_stops_at_depth_limit(
     assert [s.final for s in turn.submissions] == [False, False, True]
     pv = turn.infos[-1]["pv"]
     assert isinstance(pv, list)
-    assert pv[0] == serialize_move(turn.move)
+    assert turn.move is not None
+    assert pv[0] == turn.move.to_json()
 
 
 @pytest.mark.parametrize("depth", [1, 2])

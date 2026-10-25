@@ -110,7 +110,7 @@ def play(
     logger.info("%s", describe_match_result(result))
 
     if out is not None:
-        out.write_text(json.dumps(result.to_dict(), indent=2))
+        out.write_text(json.dumps(result.to_json(), indent=2))
         logger.info("Wrote the match result to `%s`.", out)
 
 
@@ -312,7 +312,7 @@ def gauntlet(
         out = Path("reports") / f"gauntlet-{datetime.now():%Y%m%d-%H%M%S}.json"
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(report.to_dict(), indent=2))
+    out.write_text(json.dumps(report.to_json(), indent=2))
     logger.info("\n%s\n", report.summary_table())
 
     flagged = [r.label for r in report.participants if r.decision_stats.flagged]
@@ -348,7 +348,7 @@ def replay(
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     try:
-        result = GauntletReport.from_dict(json.loads(report.read_text())).replay(match)
+        result = GauntletReport.from_json(json.loads(report.read_text())).replay(match)
     except (OSError, ValueError) as e:
         raise typer.BadParameter(str(e), param_hint="REPORT") from e
 

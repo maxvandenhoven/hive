@@ -8,6 +8,7 @@ from pydantic import Field
 from hive.agents import factory
 from hive.agents.base import Agent, TurnContext
 from hive.agents.factory import (
+    AgentRegistration,
     AgentSpec,
     InvalidAgentSpecError,
     build_agent,
@@ -18,6 +19,7 @@ from hive.agents.factory import (
 from hive.agents.minimax import MinimaxAgent
 from hive.agents.negamax import NegamaxAgent
 from hive.agents.random import RandomAgent
+from hive.engine.codec import json_adapter
 from hive.engine.rules import Rules
 from hive.engine.state import GameState
 
@@ -158,10 +160,31 @@ class TestAgentSpecFile:
         ],
     )
     def test_round_trips(self, spec: AgentSpec) -> None:
-        assert AgentSpec.from_dict(spec.to_dict()) == spec
+        assert AgentSpec.parse(spec.to_json()) == spec
 
-    def test_serializes_without_label(self) -> None:
-        assert AgentSpec("random").to_dict() == {"kind": "random", "params": {}}
+    def test_json_form(self) -> None:
+        assert AgentSpec("random").to_json() == {
+            "kind": "random",
+            "params": {},
+            "label": None,
+        }
+
+    def test_from_json_checks_only_the_shape(self) -> None:
+        assert AgentSpec.from_json({"kind": "unregistered"}).kind == "unregistered"
+
+        with pytest.raises(ValueError, match="kind"):
+            AgentSpec.from_json({"params": {}})
+
+    def test_registration_json_form(self) -> None:
+        registration = {agent.kind: agent for agent in list_agents()}["negamax"]
+        adapter = json_adapter(AgentRegistration)
+        data = adapter.dump_python(registration, mode="json")
+        schema = adapter.json_schema(mode="serialization")
+
+        assert isinstance(data, dict)
+        assert sorted(data) == ["description", "kind", "params_schema"]
+        assert data["params_schema"] == registration.params_model.model_json_schema()
+        assert sorted(schema["properties"]) == ["description", "kind", "params_schema"]
 
     def test_display_label(self) -> None:
         assert AgentSpec("random").display_label == "random"
@@ -350,14 +373,14 @@ class TestRegisterAgent:
         }
 
         with pytest.raises(InvalidAgentSpecError, match="temperature: Input should be"):
-            AgentSpec.from_dict(
+            AgentSpec.parse(
                 {"kind": "neural", "params": {"weights": "w", "temperature": 0}}
             )
 
         with pytest.raises(
             InvalidAgentSpecError, match=r"params\.weights: Field required"
         ):
-            AgentSpec.from_dict({"kind": "neural"})
+            AgentSpec.parse({"kind": "neural"})
 
     def test_rejects_duplicate_kind(self) -> None:
         with pytest.raises(ValueError, match="`random` is already registered"):

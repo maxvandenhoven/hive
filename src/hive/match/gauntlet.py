@@ -14,29 +14,21 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from typing import Final, Literal
+
+from pydantic import computed_field
 
 from hive.agents.factory import AgentSpec
+from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
-from hive.engine.serialization import (
-    JsonValue,
-    deserialize_player,
-    deserialize_rules,
-    serialize_player,
-    serialize_rules,
-)
 from hive.engine.state import Player
-from hive.match.records import (
-    DecisionRecord,
-    MatchOutcome,
-    MatchResult,
-    TurnCloseReason,
-    expect_mapping,
-)
+from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
 from hive.match.runner import MatchRunner, derive_seed
 from hive.match.worker import DEFAULT_GRACE_S
 
-GAUNTLET_REPORT_VERSION = 1
-"""The version of the report schema, raised on every incompatible change."""
+GAUNTLET_REPORT_VERSION: Final = 2
+"""The version of the report schema, raised on every incompatible change. Version 2 writes
+the initial setup of a replayed game as `null` instead of `"initial"`."""
 
 GAUNTLET_CONFIDENCE_Z = 1.959963984540054
 """The standard normal quantile of the 95% confidence interval of the win rate."""
@@ -176,7 +168,7 @@ class ScheduledMatch:
 
 
 @dataclass(frozen=True, slots=True)
-class GauntletConfig:
+class GauntletConfig(JsonCodec):
     """The participants and settings of a gauntlet, which reproduce it from its seed.
 
     Attributes:
@@ -335,61 +327,9 @@ class GauntletConfig:
             duration_s=time.monotonic() - start,
         )
 
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the config.
-
-        Returns:
-            An object with every field, where the participants are serialized specs.
-        """
-        return {
-            "participants": [spec.to_dict() for spec in self.participants],
-            "games_per_pair": self.games_per_pair,
-            "budget_s": self.budget_s,
-            "max_turns": self.max_turns,
-            "seed": self.seed,
-            "jobs": self.jobs,
-            "grace_s": self.grace_s,
-            "rules": serialize_rules(self.rules),
-            "replays": self.replays,
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "GauntletConfig":
-        """Deserialize a config.
-
-        Args:
-            data: The serialized config.
-
-        Returns:
-            The config.
-
-        Raises:
-            ValueError: If `data` is not a valid serialized config.
-        """
-        fields = expect_mapping(data=data, kind="gauntlet config")
-
-        try:
-            max_turns = fields["max_turns"]
-            return cls(
-                participants=tuple(
-                    AgentSpec.from_dict(spec) for spec in fields["participants"]
-                ),
-                games_per_pair=int(fields["games_per_pair"]),
-                budget_s=float(fields["budget_s"]),
-                max_turns=None if max_turns is None else int(max_turns),
-                seed=int(fields["seed"]),
-                jobs=int(fields["jobs"]),
-                grace_s=float(fields["grace_s"]),
-                rules=deserialize_rules(fields["rules"]),
-                replays=bool(fields["replays"]),
-            )
-        except (KeyError, TypeError) as e:
-            msg = f"Invalid gauntlet config: {e!r}."
-            raise ValueError(msg) from e
-
 
 @dataclass(frozen=True, slots=True)
-class DecisionTimeSummary:
+class DecisionTimeSummary(JsonCodec):
     """Summary statistics of a sample of non-negative values, such as overruns.
 
     Attributes:
@@ -429,46 +369,9 @@ class DecisionTimeSummary:
             max=ordered[-1],
         )
 
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the summary.
-
-        Returns:
-            An object with every field.
-        """
-        return {
-            "count": self.count,
-            "mean": self.mean,
-            "p50": self.p50,
-            "p90": self.p90,
-            "max": self.max,
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "DecisionTimeSummary":
-        """Deserialize a summary.
-
-        Args:
-            data: The serialized summary.
-
-        Returns:
-            The summary.
-
-        Raises:
-            KeyError: If a field is missing.
-            ValueError: If `data` is not an object.
-        """
-        fields = expect_mapping(data=data, kind="distribution summary")
-        return cls(
-            count=int(fields["count"]),
-            mean=float(fields["mean"]),
-            p50=float(fields["p50"]),
-            p90=float(fields["p90"]),
-            max=float(fields["max"]),
-        )
-
 
 @dataclass(frozen=True, slots=True)
-class DecisionStats:
+class DecisionStats(JsonCodec):
     """Aggregated decision records of one participant, the observability of a gauntlet.
 
     Attributes:
@@ -536,6 +439,7 @@ class DecisionStats:
             illegal_submissions=sum(d.illegal_submissions for d in decisions),
         )
 
+    @computed_field
     @property
     def mean_depth(self) -> float | None:
         """The mean reported search depth, or `None` if no depth was reported."""
@@ -548,16 +452,19 @@ class DecisionStats:
             sum(depth * count for depth, count in self.depth_reached.items()) / reported
         )
 
+    @computed_field
     @property
     def timeout_rate(self) -> float:
         """The fraction of decisions closed by the deadline rather than by the agent."""
         return self.rate(self.close_reasons[TurnCloseReason.DEADLINE])
 
+    @computed_field
     @property
     def overrun_rate(self) -> float:
         """The fraction of decisions that overran the deadline beyond the tolerance."""
         return self.rate(self.overruns)
 
+    @computed_field
     @property
     def flagged(self) -> bool:
         """Whether the agent failed, overran, needed a restart or never submitted."""
@@ -579,69 +486,9 @@ class DecisionStats:
         """
         return count / self.decisions if self.decisions else 0.0
 
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the statistics.
-
-        Returns:
-            An object with every field and the derived rates, mean depth and flag.
-        """
-        return {
-            "decisions": self.decisions,
-            "depth_reached": {str(depth): n for depth, n in self.depth_reached.items()},
-            "mean_depth": self.mean_depth,
-            "nodes_per_s": self.nodes_per_s,
-            "close_reasons": {
-                reason.value: count for reason, count in self.close_reasons.items()
-            },
-            "timeout_rate": self.timeout_rate,
-            "elapsed_s": self.elapsed_s.to_dict(),
-            "overrun_s": self.overrun_s.to_dict(),
-            "overruns": self.overruns,
-            "overrun_rate": self.overrun_rate,
-            "failures": self.failures,
-            "worker_restarts": self.worker_restarts,
-            "illegal_submissions": self.illegal_submissions,
-            "flagged": self.flagged,
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "DecisionStats":
-        """Deserialize statistics, ignoring the derived values.
-
-        Args:
-            data: The serialized statistics.
-
-        Returns:
-            The statistics.
-
-        Raises:
-            KeyError: If a field is missing.
-            ValueError: If `data` is not an object or a close reason is unknown.
-        """
-        fields = expect_mapping(data=data, kind="decision stats")
-        nodes_per_s = fields["nodes_per_s"]
-
-        return cls(
-            decisions=int(fields["decisions"]),
-            depth_reached={
-                int(depth): int(count) for depth, count in fields["depth_reached"].items()
-            },
-            nodes_per_s=None if nodes_per_s is None else float(nodes_per_s),
-            close_reasons={
-                TurnCloseReason(reason): int(count)
-                for reason, count in fields["close_reasons"].items()
-            },
-            elapsed_s=DecisionTimeSummary.from_dict(fields["elapsed_s"]),
-            overrun_s=DecisionTimeSummary.from_dict(fields["overrun_s"]),
-            overruns=int(fields["overruns"]),
-            failures=int(fields["failures"]),
-            worker_restarts=int(fields["worker_restarts"]),
-            illegal_submissions=int(fields["illegal_submissions"]),
-        )
-
 
 @dataclass(frozen=True, slots=True)
-class ParticipantResult:
+class ParticipantResult(JsonCodec):
     """The results and decision statistics of one participant of a gauntlet.
 
     Attributes:
@@ -665,16 +512,19 @@ class ParticipantResult:
     elo: float
     decision_stats: DecisionStats
 
+    @computed_field
     @property
     def games(self) -> int:
         """The number of games played."""
         return self.wins + self.draws + self.losses
 
+    @computed_field
     @property
     def win_rate(self) -> float:
         """The score per game, counting a draw as half a win, or 0 without games."""
         return (self.wins + self.draws / 2) / self.games if self.games else 0.0
 
+    @computed_field
     @property
     def win_rate_interval(self) -> tuple[float, float]:
         """The 95% Wilson score interval of the win rate."""
@@ -682,56 +532,9 @@ class ParticipantResult:
             proportion=self.win_rate, count=self.games, z=GAUNTLET_CONFIDENCE_Z
         )
 
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the result.
-
-        Returns:
-            An object with every field and the derived games, win rate and interval.
-        """
-        low, high = self.win_rate_interval
-        return {
-            "label": self.label,
-            "spec": self.spec.to_dict(),
-            "games": self.games,
-            "wins": self.wins,
-            "draws": self.draws,
-            "losses": self.losses,
-            "turn_caps": self.turn_caps,
-            "win_rate": self.win_rate,
-            "win_rate_interval": [low, high],
-            "elo": self.elo,
-            "decision_stats": self.decision_stats.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "ParticipantResult":
-        """Deserialize a result, ignoring the derived values.
-
-        Args:
-            data: The serialized result.
-
-        Returns:
-            The result.
-
-        Raises:
-            KeyError: If a field is missing.
-            ValueError: If `data` is not a valid serialized result.
-        """
-        fields = expect_mapping(data=data, kind="participant result")
-        return cls(
-            label=str(fields["label"]),
-            spec=AgentSpec.from_dict(fields["spec"]),
-            wins=int(fields["wins"]),
-            draws=int(fields["draws"]),
-            losses=int(fields["losses"]),
-            turn_caps=int(fields["turn_caps"]),
-            elo=float(fields["elo"]),
-            decision_stats=DecisionStats.from_dict(fields["decision_stats"]),
-        )
-
 
 @dataclass(frozen=True, slots=True)
-class MatchSummary:
+class MatchSummary(JsonCodec):
     """The outcome of one match of a gauntlet, without its moves and decisions.
 
     Attributes:
@@ -776,54 +579,9 @@ class MatchSummary:
             duration_s=result.duration_s,
         )
 
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the summary.
-
-        Returns:
-            An object with every field.
-        """
-        return {
-            "index": self.index,
-            "white": self.white,
-            "black": self.black,
-            "seed": self.seed,
-            "outcome": self.outcome.value,
-            "winner": None if self.winner is None else serialize_player(self.winner),
-            "plies": self.plies,
-            "duration_s": self.duration_s,
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "MatchSummary":
-        """Deserialize a summary.
-
-        Args:
-            data: The serialized summary.
-
-        Returns:
-            The summary.
-
-        Raises:
-            KeyError: If a field is missing.
-            ValueError: If `data` is not a valid serialized summary.
-        """
-        fields = expect_mapping(data=data, kind="match summary")
-        winner = fields["winner"]
-
-        return cls(
-            index=int(fields["index"]),
-            white=str(fields["white"]),
-            black=str(fields["black"]),
-            seed=int(fields["seed"]),
-            outcome=MatchOutcome(fields["outcome"]),
-            winner=None if winner is None else deserialize_player(winner),
-            plies=int(fields["plies"]),
-            duration_s=float(fields["duration_s"]),
-        )
-
 
 @dataclass(frozen=True, slots=True)
-class GauntletReport:
+class GauntletReport(JsonCodec):
     """The report of a played gauntlet, serialized as a versioned JSON document.
 
     Attributes:
@@ -833,6 +591,8 @@ class GauntletReport:
         replays: The full result of every match in schedule order, or `None` unless the
             config asks for replays.
         duration_s: The wall clock seconds of the whole gauntlet.
+        version: The version of the report schema, which must be
+            `GAUNTLET_REPORT_VERSION` when reading a report.
     """
 
     config: GauntletConfig
@@ -840,6 +600,7 @@ class GauntletReport:
     matches: list[MatchSummary]
     replays: list[MatchResult] | None
     duration_s: float
+    version: Literal[2] = GAUNTLET_REPORT_VERSION
 
     @classmethod
     def from_results(
@@ -961,63 +722,3 @@ class GauntletReport:
             )
 
         return "\n".join(lines)
-
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the report.
-
-        Returns:
-            An object with the schema version, the config, the participant results, the
-            match summaries, the replays (or `None`) and the duration.
-        """
-        return {
-            "version": GAUNTLET_REPORT_VERSION,
-            "config": self.config.to_dict(),
-            "participants": [result.to_dict() for result in self.participants],
-            "matches": [match.to_dict() for match in self.matches],
-            "replays": None
-            if self.replays is None
-            else [result.to_dict() for result in self.replays],
-            "duration_s": self.duration_s,
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "GauntletReport":
-        """Deserialize a report.
-
-        Args:
-            data: The serialized report.
-
-        Returns:
-            The report.
-
-        Raises:
-            ValueError: If `data` is not a valid serialized report or has another schema
-                version.
-        """
-        fields = expect_mapping(data=data, kind="gauntlet report")
-        version = fields.get("version")
-
-        if version != GAUNTLET_REPORT_VERSION:
-            msg = (
-                f"Unsupported gauntlet report version `{version}`, expected "
-                f"{GAUNTLET_REPORT_VERSION}."
-            )
-            raise ValueError(msg)
-
-        try:
-            replays = fields["replays"]
-            return cls(
-                config=GauntletConfig.from_dict(fields["config"]),
-                participants=[
-                    ParticipantResult.from_dict(result)
-                    for result in fields["participants"]
-                ],
-                matches=[MatchSummary.from_dict(match) for match in fields["matches"]],
-                replays=None
-                if replays is None
-                else [MatchResult.from_dict(result) for result in replays],
-                duration_s=float(fields["duration_s"]),
-            )
-        except (KeyError, TypeError, AttributeError) as e:
-            msg = f"Invalid gauntlet report: {e!r}."
-            raise ValueError(msg) from e

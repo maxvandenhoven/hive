@@ -12,20 +12,35 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from importlib.resources import files
 from pathlib import Path
-from typing import Any, get_type_hints
+from typing import Annotated, Any, ClassVar, get_type_hints
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    ValidationError,
+    computed_field,
+    create_model,
+)
+from pydantic.json_schema import SkipJsonSchema
 
 from hive.agents.base import Agent
+from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
-from hive.engine.serialization import JsonValue
 
 INJECTED_AGENT_PARAMS = ("rules", "seed")
 """The constructor parameters the factory passes itself, which are not agent params."""
 
 AGENT_PRESET_PACKAGE = "hive.agents.presets"
 """The package holding the preset spec files, one `<name>.yaml` per preset."""
+
+ERROR_TYPE_ALIASES = {
+    "unexpected_keyword_argument": "extra_forbidden",
+    "missing_argument": "missing",
+}
+"""The pydantic error types of dataclasses, by the matching error type of models."""
 
 DOCSTRING_ARG_PATTERN = re.compile(r"^    (\w+)(?: \(.*\))?: (.*)$")
 """A line starting an argument description in a cleaned Google-style docstring."""
@@ -39,6 +54,9 @@ class InvalidAgentSpecError(ValueError):
 class AgentRegistration:
     """A registered agent kind: the agent class and the model that validates its params.
 
+    Its JSON form, which the API lists for the agent picker, has the `kind`, the
+    `description` and the `params_schema`; the class and the model are left out.
+
     Attributes:
         kind: The kind name used in `AgentSpec.kind`.
         agent_class: The agent class, called with the rules, a keyword `seed` and the
@@ -48,8 +66,8 @@ class AgentRegistration:
     """
 
     kind: str
-    agent_class: type[Agent]
-    params_model: type[BaseModel]
+    agent_class: Annotated[SkipJsonSchema[type[Agent]], Field(exclude=True)]
+    params_model: Annotated[SkipJsonSchema[type[BaseModel]], Field(exclude=True)]
 
     @classmethod
     def from_class(cls, kind: str, agent_class: type[Agent]) -> "AgentRegistration":
@@ -112,11 +130,13 @@ class AgentRegistration:
 
         return cls(kind=kind, agent_class=agent_class, params_model=params_model)
 
+    @computed_field
     @property
     def description(self) -> str:
         """The summary line of the agent class docstring."""
         return (inspect.getdoc(self.agent_class) or "").partition("\n")[0]
 
+    @computed_field
     @property
     def params_schema(self) -> dict[str, JsonValue]:
         """The JSON schema of the params, for rendering parameter forms."""
@@ -127,22 +147,12 @@ AGENT_REGISTRY: dict[str, AgentRegistration] = {}
 """The registered agent kinds by kind name, filled by `register_agent`."""
 
 
-class AgentSpecDocument(BaseModel):
-    """The serialized form of an `AgentSpec`, checking its shape but not its params."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    kind: str
-    label: str | None = None
-    params: dict[str, Any] = Field(default_factory=dict)
-
-
 @dataclass(frozen=True, slots=True)
-class AgentSpec:
+class AgentSpec(JsonCodec):
     """A named, configured agent, as chosen in the app, a config file or the CLI.
 
-    The serialized form is a mapping with `kind`, an optional `label` and optional
-    `params`, for example in YAML:
+    The JSON form is a mapping with `kind`, an optional `label` and optional `params`,
+    for example in YAML:
 
     ```yaml
     kind: negamax
@@ -158,13 +168,18 @@ class AgentSpec:
         label: The display name in reports and the UI, or `None` for none.
     """
 
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
     kind: str
     params: Mapping[str, JsonValue] = field(default_factory=dict)
     label: str | None = None
 
     @classmethod
-    def from_dict(cls, data: object, *, source: str | None = None) -> "AgentSpec":
-        """Read and validate a spec from its serialized form.
+    def parse(cls, data: object, *, source: str | None = None) -> "AgentSpec":
+        """Read a spec from user input and check its params against its kind.
+
+        `from_json` only checks the shape, which is enough for stored records; this also
+        checks that the kind is registered and the params are valid, with readable errors.
 
         Args:
             data: The decoded spec, a mapping with `kind`, `label` and `params`.
@@ -178,13 +193,12 @@ class AgentSpec:
                 the params are invalid. All problems are listed in the message.
         """
         try:
-            document = AgentSpecDocument.model_validate(data)
+            spec = cls.from_json(data)
         except ValidationError as e:
             raise InvalidAgentSpecError(
                 format_spec_errors(source=source, errors=e.errors())
             ) from e
 
-        spec = cls(kind=document.kind, params=document.params, label=document.label)
         spec.validate_params(source=source)
 
         return spec
@@ -215,7 +229,7 @@ class AgentSpec:
         if isinstance(data, str):
             data = {"kind": data}
 
-        return cls.from_dict(data=data, source=source)
+        return cls.parse(data=data, source=source)
 
     @classmethod
     def load(cls, path: Path) -> "AgentSpec":
@@ -290,21 +304,6 @@ class AgentSpec:
     def display_label(self) -> str:
         """The label of the agent, or its kind if it has no label."""
         return self.label or self.kind
-
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the spec.
-
-        Returns:
-            A mapping with `kind`, `label` if set, and `params`.
-        """
-        data: dict[str, JsonValue] = {"kind": self.kind}
-
-        if self.label is not None:
-            data["label"] = self.label
-
-        data["params"] = dict(self.params)
-
-        return data
 
     def validate_params(self, *, source: str | None = None) -> BaseModel:
         """Check that the kind is registered and the params are valid for it.
@@ -455,12 +454,14 @@ def format_spec_errors(
     for error in errors:
         location = ".".join(str(part) for part in error["loc"]) or "spec"
 
-        if error["type"] == "extra_forbidden" and kind is not None:
+        error_type = ERROR_TYPE_ALIASES.get(error["type"], error["type"])
+
+        if error_type == "extra_forbidden" and kind is not None:
             known = ", ".join(AGENT_REGISTRY[kind].params_model.model_fields) or "none"
             lines.append(f"  {location}: Unknown param, expected one of: {known}.")
-        elif error["type"] == "missing":
+        elif error_type == "missing":
             lines.append(f"  {location}: Field required.")
-        elif error["type"] == "extra_forbidden":
+        elif error_type == "extra_forbidden":
             lines.append(f"  {location}: Unknown key, expected kind, label or params.")
         else:
             lines.append(f"  {location}: {error['msg']} (got {error['input']!r}).")

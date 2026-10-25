@@ -1,25 +1,20 @@
-"""Records of timed decisions and matches, serializable to JSON-compatible values."""
+"""Records of timed decisions and matches, serializable to JSON-compatible values.
 
-from collections.abc import Mapping
+Both records convert to and from JSON through `JsonCodec`; engine values inside them use
+their own JSON forms, and the agents of a match are written under `white` and `black`.
+"""
+
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, ClassVar
+
+from pydantic import ConfigDict, Field
 
 from hive.agents.base import SearchInfoValue
 from hive.agents.factory import AgentSpec
+from hive.engine.codec import JsonCodec
+from hive.engine.record import GameRecord
 from hive.engine.rules import Rules
-from hive.engine.serialization import (
-    GameRecord,
-    JsonValue,
-    deserialize_move,
-    deserialize_player,
-    deserialize_record,
-    deserialize_rules,
-    serialize_move,
-    serialize_player,
-    serialize_record,
-    serialize_rules,
-)
 from hive.engine.state import Move, Player
 
 
@@ -53,7 +48,7 @@ class MatchOutcome(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class DecisionRecord:
+class DecisionRecord(JsonCodec):
     """Everything that happened in one timed decision of an agent.
 
     Attributes:
@@ -88,69 +83,9 @@ class DecisionRecord:
     worker_restarted: bool = False
     failure: str | None = None
 
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the record.
-
-        Returns:
-            An object with every field, where the player, close reason and move are
-            serialized like the engine values.
-        """
-        return {
-            "ply": self.ply,
-            "player": serialize_player(self.player),
-            "agent_label": self.agent_label,
-            "seed": self.seed,
-            "budget_s": self.budget_s,
-            "elapsed_s": self.elapsed_s,
-            "overrun_s": self.overrun_s,
-            "close_reason": self.close_reason.value,
-            "candidates": self.candidates,
-            "illegal_submissions": self.illegal_submissions,
-            "move": serialize_move(self.move),
-            "last_info": self.last_info,
-            "worker_restarted": self.worker_restarted,
-            "failure": self.failure,
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "DecisionRecord":
-        """Deserialize a record.
-
-        Args:
-            data: The serialized record.
-
-        Returns:
-            The record.
-
-        Raises:
-            ValueError: If `data` is not a valid serialized record.
-        """
-        fields = expect_mapping(data=data, kind="decision record")
-
-        try:
-            return cls(
-                ply=int(fields["ply"]),
-                player=deserialize_player(fields["player"]),
-                agent_label=str(fields["agent_label"]),
-                seed=int(fields["seed"]),
-                budget_s=float(fields["budget_s"]),
-                elapsed_s=float(fields["elapsed_s"]),
-                overrun_s=float(fields["overrun_s"]),
-                close_reason=TurnCloseReason(fields["close_reason"]),
-                candidates=int(fields["candidates"]),
-                illegal_submissions=int(fields["illegal_submissions"]),
-                move=deserialize_move(fields["move"]),
-                last_info=fields["last_info"],
-                worker_restarted=bool(fields["worker_restarted"]),
-                failure=fields["failure"],
-            )
-        except (KeyError, TypeError) as e:
-            msg = f"Invalid decision record: {e!r}."
-            raise ValueError(msg) from e
-
 
 @dataclass(slots=True)
-class MatchResult:
+class MatchResult(JsonCodec):
     """A played match: its configuration, the game, every decision and the result.
 
     Attributes:
@@ -166,9 +101,11 @@ class MatchResult:
         duration_s: The wall clock seconds of the whole match, including worker startup.
     """
 
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(serialize_by_alias=True)
+
     rules: Rules
-    white_spec: AgentSpec
-    black_spec: AgentSpec
+    white_spec: Annotated[AgentSpec, Field(alias="white")]
+    black_spec: Annotated[AgentSpec, Field(alias="black")]
     seed: int
     budget_s: float
     record: GameRecord
@@ -209,79 +146,3 @@ class MatchResult:
         return sum(
             decision.elapsed_s for decision in self.decisions if decision.player is player
         )
-
-    def to_dict(self) -> dict[str, JsonValue]:
-        """Serialize the result.
-
-        Returns:
-            An object with every field, where the game record and decisions are
-            serialized objects.
-        """
-        return {
-            "rules": serialize_rules(self.rules),
-            "white": self.white_spec.to_dict(),
-            "black": self.black_spec.to_dict(),
-            "seed": self.seed,
-            "budget_s": self.budget_s,
-            "record": serialize_record(self.record),
-            "decisions": [decision.to_dict() for decision in self.decisions],
-            "outcome": self.outcome.value,
-            "winner": None if self.winner is None else serialize_player(self.winner),
-            "duration_s": self.duration_s,
-        }
-
-    @classmethod
-    def from_dict(cls, data: object) -> "MatchResult":
-        """Deserialize a result.
-
-        Args:
-            data: The serialized result.
-
-        Returns:
-            The result.
-
-        Raises:
-            ValueError: If `data` is not a valid serialized result, including specs of
-                agent kinds that are not registered.
-        """
-        fields = expect_mapping(data=data, kind="match result")
-
-        try:
-            winner = fields["winner"]
-            return cls(
-                rules=deserialize_rules(fields["rules"]),
-                white_spec=AgentSpec.from_dict(fields["white"]),
-                black_spec=AgentSpec.from_dict(fields["black"]),
-                seed=int(fields["seed"]),
-                budget_s=float(fields["budget_s"]),
-                record=deserialize_record(fields["record"]),
-                decisions=[
-                    DecisionRecord.from_dict(decision) for decision in fields["decisions"]
-                ],
-                outcome=MatchOutcome(fields["outcome"]),
-                winner=None if winner is None else deserialize_player(winner),
-                duration_s=float(fields["duration_s"]),
-            )
-        except (KeyError, TypeError) as e:
-            msg = f"Invalid match result: {e!r}."
-            raise ValueError(msg) from e
-
-
-def expect_mapping(data: object, kind: str) -> Mapping[str, Any]:
-    """Check that a serialized value is an object.
-
-    Args:
-        data: The value to check.
-        kind: The name of the object in error messages, for example `match result`.
-
-    Returns:
-        The value as a mapping.
-
-    Raises:
-        ValueError: If `data` is not a mapping.
-    """
-    if not isinstance(data, Mapping):
-        msg = f"Expected a {kind} object, but got `{data!r}`."
-        raise ValueError(msg)
-
-    return data

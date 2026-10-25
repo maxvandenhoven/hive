@@ -3,8 +3,8 @@ import json
 import pytest
 
 from hive.agents.factory import AgentSpec
+from hive.engine.record import GameRecord
 from hive.engine.rules import Rules
-from hive.engine.serialization import GameRecord
 from hive.engine.state import Move, PieceType, Player
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
 
@@ -61,23 +61,24 @@ class TestDecisionRecord:
     def test_round_trip(self, move: Move | None) -> None:
         decision = make_decision(player=Player.WHITE, elapsed_s=0.5, move=move)
 
-        data = json.loads(json.dumps(decision.to_dict()))
+        data = json.loads(json.dumps(decision.to_json()))
 
-        assert DecisionRecord.from_dict(data) == decision
+        assert DecisionRecord.from_json(data) == decision
         assert data["close_reason"] == "deadline"
         assert data["player"] == "white"
 
     @pytest.mark.parametrize("data", [[], {"ply": 0}])
     def test_rejects_invalid(self, data: object) -> None:
-        with pytest.raises(ValueError, match="decision record"):
-            DecisionRecord.from_dict(data)
+        with pytest.raises(ValueError, match="DecisionRecord"):
+            DecisionRecord.from_json(data)
 
 
 class TestMatchResult:
     def test_round_trip(self, result: MatchResult) -> None:
-        data = json.loads(json.dumps(result.to_dict()))
+        data = json.loads(json.dumps(result.to_json()))
 
-        assert MatchResult.from_dict(data) == result
+        assert MatchResult.from_json(data) == result
+        assert data["white"]["label"] == "nm2"
 
     def test_add_decision(self, result: MatchResult) -> None:
         move = Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(-1, 0))
@@ -96,5 +97,5 @@ class TestMatchResult:
 
     @pytest.mark.parametrize("data", [None, {"seed": 1}])
     def test_rejects_invalid(self, data: object) -> None:
-        with pytest.raises(ValueError, match="match result"):
-            MatchResult.from_dict(data)
+        with pytest.raises(ValueError, match="MatchResult"):
+            MatchResult.from_json(data)

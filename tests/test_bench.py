@@ -165,7 +165,7 @@ class TestPerftSuite:
             positions=[{"name": "p", "moves": moves, "counts": {}}],
         )
 
-        with pytest.raises(ValueError, match="Unknown piece type `ladybug`"):
+        with pytest.raises(ValueError, match=r"positions\.0\.moves\.0\.piece"):
             PerftSuite.load(path)
 
     def test_unknown_player(self, tmp_path: Path) -> None:
@@ -173,5 +173,5 @@ class TestPerftSuite:
             path=tmp_path / "suite.json", positions=[], starting_player="red"
         )
 
-        with pytest.raises(ValueError, match="Unknown player `red`"):
+        with pytest.raises(ValueError, match=r"rules\.starting_player"):
             PerftSuite.load(path)

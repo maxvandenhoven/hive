@@ -1,8 +1,11 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
+from pydantic import ConfigDict, Field, PlainSerializer, StrictBool, StrictInt
+
+from hive.engine.codec import JsonCodec
 from hive.engine.errors import IllegalMoveError, InvalidBoardError
 from hive.engine.grid import (
     HEX_DIRECTIONS,
@@ -11,7 +14,7 @@ from hive.engine.grid import (
     get_flanking_coords,
     get_neighbors,
 )
-from hive.engine.state import GameBoard, GameState, Move, PieceType, Player
+from hive.engine.state import JSON_CONFIG, GameBoard, GameState, Move, PieceType, Player
 
 BASE_PIECE_COUNTS: Mapping[PieceType, int] = MappingProxyType(
     {
@@ -26,12 +29,14 @@ BASE_PIECE_COUNTS: Mapping[PieceType, int] = MappingProxyType(
 
 
 @dataclass(frozen=True, slots=True)
-class Rules:
+class Rules(JsonCodec):
     """The rules of a Hive game, holding both the configuration and the rule behaviour.
 
     `Rules` is an immutable value: it is hashable, equal for equal fields, and cheap to
     pass to worker processes or to store. Every method reads the configuration and a
-    `GameState`, and never modifies the state permanently.
+    `GameState`, and never modifies the state permanently. The JSON form is an object with
+    every field and `piece_counts` keyed by piece type name; missing fields take their
+    default when reading.
 
     Attributes:
         piece_counts: The number of copies of each piece type a player receives. Any
@@ -45,14 +50,17 @@ class Rules:
             `None` for no limit.
     """
 
-    piece_counts: Mapping[PieceType, int] = field(
-        default_factory=lambda: BASE_PIECE_COUNTS
-    )
+    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
+
+    piece_counts: Annotated[
+        Mapping[PieceType, Annotated[StrictInt, Field(ge=0)]],
+        PlainSerializer(dict, return_type=dict[PieceType, int]),
+    ] = field(default_factory=lambda: BASE_PIECE_COUNTS)
     starting_player: Player = Player.WHITE
-    queen_by_turn: int | None = 4
-    allow_queen_first_turn: bool = True
-    move_before_queen: bool = False
-    max_turns: int | None = None
+    queen_by_turn: StrictInt | None = 4
+    allow_queen_first_turn: StrictBool = True
+    move_before_queen: StrictBool = False
+    max_turns: StrictInt | None = None
 
     def __post_init__(self) -> None:
         """Freeze `piece_counts` and validate the configuration.

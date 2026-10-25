@@ -7,8 +7,8 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 
 from hive.agents.factory import AgentSpec
+from hive.engine.record import GameRecord
 from hive.engine.rules import Rules
-from hive.engine.serialization import GameRecord
 from hive.engine.state import Player
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult
 from hive.match.worker import DEFAULT_GRACE_S, AgentWorker

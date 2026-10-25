@@ -1,12 +1,19 @@
 from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from enum import IntEnum
+from typing import Annotated, ClassVar
 
+from pydantic import ConfigDict, Field
+
+from hive.engine.codec import JsonCodec, NamedIntEnum
 from hive.engine.grid import Coordinate, get_flanking_coords, get_neighbors
 
+JSON_CONFIG = ConfigDict(extra="forbid", serialize_by_alias=True)
+"""The pydantic config of the engine values: unknown JSON keys are errors, and fields are
+written under their aliases."""
 
-class Player(IntEnum):
+
+class Player(NamedIntEnum):
     """An enumeration of the two players in a Hive game."""
 
     WHITE = 0
@@ -23,7 +30,7 @@ class Player(IntEnum):
         return Player.BLACK if self is Player.WHITE else Player.WHITE
 
 
-class PieceType(IntEnum):
+class PieceType(NamedIntEnum):
     """An enumeration of the available piece types."""
 
     QUEEN = 0
@@ -34,28 +41,31 @@ class PieceType(IntEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class Piece:
+class Piece(JsonCodec):
     """A game piece with a type and an owner.
 
     Pieces are immutable, so boards can share them and copying a board only needs to copy
-    its stacks.
+    its stacks. The JSON form is `{"piece": "ant", "owner": "white"}`.
 
     Attributes:
         type: The type of the piece.
         owner: The player that owns the piece.
     """
 
-    type: PieceType
+    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
+
+    type: Annotated[PieceType, Field(alias="piece")]
     owner: Player
 
 
 @dataclass(slots=True)
-class Move:
+class Move(JsonCodec):
     """A game move that places or moves a piece on the board.
 
     A move with `source_coord` set to `None` represents a placement from the player's
     hand. A move with a `source_coord` represents a movement of an existing piece on the
-    board.
+    board. The JSON form is `{"piece": "ant", "from": [q, r] | null, "to": [q, r]}`, and a
+    pass (`None` where a move is expected) is `null`.
 
     Attributes:
         piece_type: The type of piece being placed or moved.
@@ -64,9 +74,11 @@ class Move:
         target_coord: The axial coordinate `(q', r')` the piece moves or is placed to.
     """
 
-    piece_type: PieceType
-    source_coord: Coordinate | None
-    target_coord: Coordinate
+    __pydantic_config__: ClassVar[ConfigDict] = JSON_CONFIG
+
+    piece_type: Annotated[PieceType, Field(alias="piece")]
+    source_coord: Annotated[Coordinate | None, Field(alias="from")]
+    target_coord: Annotated[Coordinate, Field(alias="to")]
 
 
 type GameBoard = dict[Coordinate, list[Piece]]

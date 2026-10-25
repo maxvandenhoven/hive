@@ -11,8 +11,8 @@ from typer.testing import CliRunner
 from hive import __version__
 from hive.agents.factory import AgentSpec
 from hive.cli import app, describe_match_result, log_decision
+from hive.engine.record import GameRecord
 from hive.engine.rules import Rules
-from hive.engine.serialization import GameRecord
 from hive.engine.state import Player
 from hive.match.gauntlet import GauntletConfig, GauntletReport
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
@@ -133,7 +133,7 @@ class TestPlay:
         )
 
         assert result.exit_code == 0, result.output
-        match_result = MatchResult.from_dict(json.loads(out.read_text()))
+        match_result = MatchResult.from_json(json.loads(out.read_text()))
         assert len(match_result.decisions) == 6
         assert match_result.white_spec.label == "nm1"
         messages = [record.getMessage() for record in caplog.records]
@@ -263,7 +263,7 @@ class TestGauntlet:
         )
 
         assert result.exit_code == 0, result.output
-        report = GauntletReport.from_dict(json.loads(out.read_text()))
+        report = GauntletReport.from_json(json.loads(out.read_text()))
         assert report.config.labels == ["random", "nm1"]
         assert report.config.seed == 4
         assert report.replays is not None
@@ -395,7 +395,7 @@ class TestGauntlet:
 
 class TestReplay:
     def write_report(self, path: Path, report: GauntletReport) -> Path:
-        path.write_text(json.dumps(report.to_dict()))
+        path.write_text(json.dumps(report.to_json()))
         return path
 
     def test_logs_match(

@@ -8,7 +8,6 @@ from pydantic import Field
 from hive.agents.base import Agent, TurnContext
 from hive.engine.grid import get_neighbors
 from hive.engine.rules import Rules
-from hive.engine.serialization import serialize_move
 from hive.engine.state import GameState, Move, PieceType, Player
 
 SEARCH_WIN_SCORE = 1_000_000.0
@@ -158,7 +157,7 @@ class SearchAgent(Agent):
                 depth=depth,
                 nodes=self.nodes,
                 score=score,
-                pv=[serialize_move(move) for move in pv],
+                pv=[None if move is None else move.to_json() for move in pv],
                 nps=round(self.nodes / elapsed) if elapsed > 0 else None,
             )
             final = (
