@@ -322,8 +322,9 @@ hive gauntlet \
 - Schedule: round robin, each pairing played with both colours equally often.
 - Seeds: derived deterministically from the experiment seed per match and seat (as in
   `shed.gauntlet.derive_seed`), so any match can be reproduced.
-- Fairness: concurrent matches are capped at `cpu_count // 2` by default (two timed workers
-  per match), and the CLI refuses higher `--jobs` unless `--allow-oversubscribe` is given.
+- Fairness: concurrent matches default to and are capped at `cpu_count` (a match has two
+  workers, but only the seat to move thinks), and the CLI refuses higher `--jobs` unless
+  `--allow-oversubscribe` is given.
 - Output: a versioned JSON document with config, per-participant results (wins, draws,
   losses, win rate with confidence interval, Elo estimate), per-participant decision stats
   (depth reached distribution, nodes/s, timeout rate, overrun distribution, failures,
@@ -343,8 +344,8 @@ Implementation notes (WP 09):
   derives the seat seeds from it, so a report reproduces any match from its config.
 - Matches run in a `ThreadPoolExecutor` with `jobs` threads, each driving the two worker
   processes of its match; the parent only waits on pipes and checks moves. A worker that
-  fails to start cancels the matches that have not started. Only one seat of a match
-  thinks at a time, so the `cpu_count // 2` cap is conservative.
+  fails to start cancels the matches that have not started. The cap was `cpu_count // 2`
+  in the first plan; it is `cpu_count` because only one seat of a match thinks at a time.
 - `GauntletReport` (schema `version` 1) holds the config, one `ParticipantResult` per
   participant, one `MatchSummary` per match and, with `--replays`, every `MatchResult`.
   Draws include games stopped at the turn cap, also counted separately as `turn_caps`.
@@ -357,7 +358,7 @@ Implementation notes (WP 09):
   failures, worker restarts and illegal submissions. A participant is flagged if it has
   failures, overruns, restarts or `no_candidate` decisions. Derived values (rates, mean
   depth, win rate, interval, flag) are written to the JSON and recomputed when loading.
-- `hive gauntlet` defaults to two games per pair, `jobs = cpu_count // 2` and
+- `hive gauntlet` defaults to two games per pair, `jobs = cpu_count` and
   `reports/gauntlet-<timestamp>.json` (git-ignored). `hive replay` needs a report written
   with `--replays`; `--plot-dir DIR` writes one SVG per ply with `hive.plotting.svg`.
 - Presets: `AgentSpec.from_preset(name)`, `list_presets()` and `AgentSpec.resolve(value)`

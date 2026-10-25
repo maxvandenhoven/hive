@@ -213,7 +213,7 @@ def gauntlet(
         int | None,
         typer.Option(
             min=1,
-            help="The number of matches played at the same time. Defaults to half the "
+            help="The number of matches played at the same time. Defaults to the "
             "number of CPUs, the most allowed without `--allow-oversubscribe`.",
             show_default=False,
         ),
@@ -222,7 +222,7 @@ def gauntlet(
         bool,
         typer.Option(
             "--allow-oversubscribe",
-            help="Allow more jobs than half the number of CPUs, which makes timed "
+            help="Allow more jobs than the number of CPUs, which makes timed "
             "decisions unfair.",
         ),
     ] = False,
@@ -258,7 +258,7 @@ def gauntlet(
 
     if jobs is not None and jobs > max_jobs and not allow_oversubscribe:
         msg = (
-            f"At most {max_jobs} matches fit half the CPUs, which keeps timed decisions "
+            f"At most {max_jobs} matches fit the CPUs, which keeps timed decisions "
             "fair. Pass `--allow-oversubscribe` to run more."
         )
         raise typer.BadParameter(msg, param_hint="--jobs")

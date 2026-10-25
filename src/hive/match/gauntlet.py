@@ -49,12 +49,15 @@ GAUNTLET_ELO_PRIOR_GAMES = 1.0
 
 
 def default_gauntlet_jobs() -> int:
-    """Get the default number of concurrent matches, two timed workers per match.
+    """Get the default and largest fair number of concurrent matches.
+
+    A match has two worker processes, but only the seat to move thinks, so every match
+    keeps about one CPU busy.
 
     Returns:
-        Half the number of CPUs, and at least one.
+        The number of CPUs, and at least one.
     """
-    return max(1, (os.cpu_count() or 2) // 2)
+    return os.cpu_count() or 1
 
 
 def wilson_interval(proportion: float, count: int, z: float) -> tuple[float, float]:
