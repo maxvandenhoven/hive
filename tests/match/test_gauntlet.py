@@ -9,7 +9,6 @@ import pytest
 
 from hive.agents.factory import AgentSpec
 from hive.engine.rules import Rules
-from hive.engine.serialization import GameRecord
 from hive.engine.state import Player
 from hive.match.gauntlet import (
     GAUNTLET_REPORT_VERSION,
@@ -86,7 +85,6 @@ def make_result(
         black_spec=config.participants[match.black],
         seed=match.seed,
         budget_s=config.budget_s,
-        record=GameRecord(config.rules),
         decisions=decisions or [],
         outcome=outcome,
         winner=winner,
@@ -141,15 +139,16 @@ class TestGauntletConfig:
         )
 
         assert (
-            GauntletConfig.from_dict(json.loads(json.dumps(config.to_dict()))) == config
+            GauntletConfig.from_json(json.loads(json.dumps(config.to_json()))) == config
         )
 
-    def test_from_dict_rejects_missing_field(self) -> None:
-        data = make_config().to_dict()
+    def test_from_json_rejects_missing_field(self) -> None:
+        data = make_config().to_json()
+        assert isinstance(data, dict)
         del data["seed"]
 
-        with pytest.raises(ValueError, match="Invalid gauntlet config"):
-            GauntletConfig.from_dict(data)
+        with pytest.raises(ValueError, match="seed"):
+            GauntletConfig.from_json(data)
 
 
 class TestStatistics:
@@ -288,11 +287,11 @@ class TestGauntletReport:
         assert table[2].startswith("random ")
 
     def test_round_trip_with_replays(self, tiny_report: GauntletReport) -> None:
-        data = json.loads(json.dumps(tiny_report.to_dict()))
+        data = json.loads(json.dumps(tiny_report.to_json()))
 
         assert data["version"] == GAUNTLET_REPORT_VERSION
         assert data["participants"][0]["decision_stats"]["close_reasons"]["final"] > 0
-        assert GauntletReport.from_dict(data) == tiny_report
+        assert GauntletReport.from_json(data) == tiny_report
 
     def test_round_trip_without_replays(self) -> None:
         config = make_config()
@@ -303,23 +302,24 @@ class TestGauntletReport:
         report = GauntletReport.from_results(config=config, results=results, duration_s=1)
 
         assert (
-            GauntletReport.from_dict(json.loads(json.dumps(report.to_dict()))) == report
+            GauntletReport.from_json(json.loads(json.dumps(report.to_json()))) == report
         )
 
     @pytest.mark.parametrize(
         ("change", "message"),
         [
-            ({"version": 0}, "Unsupported gauntlet report version `0`"),
-            ({"matches": None}, "Invalid gauntlet report"),
+            ({"version": 1}, r"version\n  Input should be 2"),
+            ({"matches": None}, r"matches\n  Input should be a valid list"),
         ],
     )
-    def test_from_dict_rejects_invalid(
+    def test_from_json_rejects_invalid(
         self, tiny_report: GauntletReport, change: dict[str, object], message: str
     ) -> None:
-        data = {**tiny_report.to_dict(), **change}
+        data = tiny_report.to_json()
+        assert isinstance(data, dict)
 
         with pytest.raises(ValueError, match=message):
-            GauntletReport.from_dict(data)
+            GauntletReport.from_json({**data, **change})
 
     def test_replay(self, tiny_report: GauntletReport) -> None:
         assert tiny_report.replays is not None

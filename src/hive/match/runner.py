@@ -8,7 +8,6 @@ from dataclasses import dataclass
 
 from hive.agents.factory import AgentSpec
 from hive.engine.rules import Rules
-from hive.engine.serialization import GameRecord
 from hive.engine.state import Player
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult
 from hive.match.worker import DEFAULT_GRACE_S, AgentWorker
@@ -81,7 +80,7 @@ class MatchRunner:
             decision_callback: Called with every decision after its move is applied.
 
         Returns:
-            The result, with the game record and every decision.
+            The result, with every decision.
 
         Raises:
             AgentWorkerError: If a worker fails to start, for example because its agent
@@ -95,7 +94,6 @@ class MatchRunner:
             black_spec=self.black_spec,
             seed=self.seed,
             budget_s=self.budget_s,
-            record=GameRecord(self.rules),
         )
 
         with ExitStack() as stack:
@@ -120,7 +118,7 @@ class MatchRunner:
                     state=state, budget_s=self.budget_s
                 )
                 self.rules.apply_checked_move(state=state, move=decision.move)
-                result.add_decision(decision)
+                result.decisions.append(decision)
 
                 if decision_callback is not None:
                     decision_callback(decision)

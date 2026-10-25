@@ -1,11 +1,14 @@
 from functools import cache
 
-type Coordinate = tuple[int, int]
+from pydantic import StrictInt
+
+type Coordinate = tuple[StrictInt, StrictInt]
 """An axial coordinate `(q, r)` representing a position on the hex grid.
 
 The first element `q` represents the column and the second element `r` represents the row
 in the axial coordinate system. Together they uniquely identify a hexagonal cell in the
-"pointy top" orientation.
+"pointy top" orientation. The JSON form is a `[q, r]` list of integers; `StrictInt` only
+affects reading JSON, where it rejects strings and booleans.
 """
 
 type Direction = tuple[int, int]

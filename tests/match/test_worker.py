@@ -3,10 +3,10 @@
 from pathlib import Path
 
 import pytest
+from pydantic import JsonValue
 
 from hive.agents.factory import AgentSpec
 from hive.engine.rules import Rules
-from hive.engine.serialization import JsonValue
 from hive.engine.state import GameState
 from hive.match.records import DecisionRecord, TurnCloseReason
 from hive.match.turn import InfoMessage, SubmissionMessage, WorkerMessage

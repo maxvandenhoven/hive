@@ -4,7 +4,6 @@ import pytest
 
 from hive.agents.factory import AgentSpec
 from hive.engine.rules import Rules
-from hive.engine.serialization import GameRecord
 from hive.engine.state import Move, PieceType, Player
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
 
@@ -42,7 +41,6 @@ def result() -> MatchResult:
         black_spec=AgentSpec("random"),
         seed=42,
         budget_s=1.0,
-        record=GameRecord(rules=Rules(max_turns=50), moves=moves),
         decisions=[
             make_decision(player=Player.WHITE, elapsed_s=0.5, move=moves[0]),
             make_decision(player=Player.BLACK, elapsed_s=0.25, move=moves[1]),
@@ -61,33 +59,35 @@ class TestDecisionRecord:
     def test_round_trip(self, move: Move | None) -> None:
         decision = make_decision(player=Player.WHITE, elapsed_s=0.5, move=move)
 
-        data = json.loads(json.dumps(decision.to_dict()))
+        data = json.loads(json.dumps(decision.to_json()))
 
-        assert DecisionRecord.from_dict(data) == decision
+        assert DecisionRecord.from_json(data) == decision
         assert data["close_reason"] == "deadline"
         assert data["player"] == "white"
 
     @pytest.mark.parametrize("data", [[], {"ply": 0}])
     def test_rejects_invalid(self, data: object) -> None:
-        with pytest.raises(ValueError, match="decision record"):
-            DecisionRecord.from_dict(data)
+        with pytest.raises(ValueError, match="DecisionRecord"):
+            DecisionRecord.from_json(data)
 
 
 class TestMatchResult:
     def test_round_trip(self, result: MatchResult) -> None:
-        data = json.loads(json.dumps(result.to_dict()))
+        data = json.loads(json.dumps(result.to_json()))
 
-        assert MatchResult.from_dict(data) == result
+        assert MatchResult.from_json(data) == result
+        assert data["white"]["label"] == "nm2"
 
-    def test_add_decision(self, result: MatchResult) -> None:
-        move = Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(-1, 0))
-        decision = make_decision(player=Player.WHITE, elapsed_s=0.1, move=move)
+    def test_record_is_built_from_decisions(self, result: MatchResult) -> None:
+        assert result.record.rules == result.rules
+        assert result.record.setup is None
+        assert result.record.moves == [decision.move for decision in result.decisions]
 
-        result.add_decision(decision)
+    def test_json_stores_the_moves_once(self, result: MatchResult) -> None:
+        data = result.to_json()
 
-        assert result.decisions[-1] == decision
-        assert result.record.moves[-1] == move
-        assert len(result.decisions) == len(result.record.moves) == 3
+        assert isinstance(data, dict)
+        assert "record" not in data
 
     def test_thinking_time_per_seat(self, result: MatchResult) -> None:
         assert result.thinking_s(Player.WHITE) == 0.5
@@ -96,5 +96,5 @@ class TestMatchResult:
 
     @pytest.mark.parametrize("data", [None, {"seed": 1}])
     def test_rejects_invalid(self, data: object) -> None:
-        with pytest.raises(ValueError, match="match result"):
-            MatchResult.from_dict(data)
+        with pytest.raises(ValueError, match="MatchResult"):
+            MatchResult.from_json(data)

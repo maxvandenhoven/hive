@@ -18,7 +18,6 @@ TESTING_MODULE = "hive.match.testing"
 def check_consistent(result: MatchResult, rules: Rules) -> None:
     """Check that the decisions, the record and the outcome of a result agree."""
     state = result.record.replay()
-    assert [decision.move for decision in result.decisions] == result.record.moves
     assert [decision.ply for decision in result.decisions] == list(
         range(len(result.decisions))
     )

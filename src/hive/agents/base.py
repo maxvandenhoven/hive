@@ -2,8 +2,9 @@ import random
 from abc import ABC, abstractmethod
 from typing import Protocol
 
+from pydantic import JsonValue
+
 from hive.engine.rules import Rules
-from hive.engine.serialization import JsonValue
 from hive.engine.state import GameState, Move
 
 type SearchInfoValue = JsonValue
