@@ -245,6 +245,44 @@ per turn:                                          loop:
   `shed.match.select_candidate`.
 - An in-process `TurnContext` implementation exists for unit tests of agents.
 
+Implementation notes (WP 08):
+
+- Modules: `match/turn.py` (messages, `PipeTurnContext`, the selection policy
+  `CandidateSelection.collect(turn_id, legal_moves, deadline, messages, clock)`),
+  `match/worker.py` (`Worker` with `start`, `decide`, `restart`, `close`, usable as a
+  context manager), `match/records.py`, `match/runner.py`.
+- Messages: the parent sends `Think(turn_id, state, deadline)` and `None` to close; the
+  worker answers with `Submission`, `Info`, `Idle` and `Failed`. Every message carries the
+  turn id, so a late message of an earlier turn is dropped. Turn id 0 is the startup
+  handshake: `start()` waits for `Idle(0)` (agent built) or `Failed(0)` (raises
+  `WorkerError`), so model loading never counts against the first decision.
+- `Rules` pickles by its fields (`__reduce__`), since its read-only `piece_counts` mapping
+  cannot be pickled.
+- `deadline` is a `time.monotonic` value, which is shared by the processes of one
+  machine. `PipeTurnContext.should_stop()` reads only the stop event and final flag, not
+  the local clock: the parent sets the event when it closes the turn, so an `Idle` before
+  that really means the agent returned on its own, and close reasons stay accurate.
+- `info` is rate-limited to one message per 0.1 s; a held-back report is sent before the
+  next submission and when the agent returns, so the last report is never lost.
+- A `Failed` message (the agent raised) keeps the worker; only a missed grace period or
+  a dead process (pipe EOF) restarts it. Workers ignore `SIGINT`; the parent closes them.
+- The fork server preloads `hive.match.worker`, so a worker starts in about 0.1 s.
+- `Worker(preload=[...])` imports modules in the worker before the agent is built, for
+  agent kinds registered outside `hive.agents`. Specs still cannot name modules.
+  `hive.match.testing` holds the misbehaving test agents (`test-never-submits`,
+  `test-illegal`, `test-lingers`, `test-crashes`, `test-counting`); it is only imported
+  in workers, so its kinds stay out of `list_agents()` in the test process.
+- `MatchRunner(rules, white_spec, black_spec, budget_s, max_turns, seed, grace_s=1.0)`:
+  `max_turns` counts turns per player like `Rules.max_turns` (`None` plays to the end).
+  Seat seeds are `derive_seed(seed, "white")` and `derive_seed(seed, "black")`, a
+  blake2b hash that WP 09 reuses for per-match seeds. `run(on_decision=...)` streams
+  decisions.
+- `hive play --white SPEC --black SPEC --budget 1.0 [--max-turns 100] [--seed 0]
+  [--grace 1.0] [--out result.json]` takes a YAML spec file or inline YAML per seat
+  (presets come with WP 09) and logs one line per decision and the result.
+- Coverage measures worker processes (`concurrency = ["multiprocessing", "thread"]`),
+  except for workers that are killed.
+
 ### Decision records
 
 Every decision produces a `DecisionRecord`:
@@ -253,14 +291,16 @@ Every decision produces a `DecisionRecord`:
 |---|---|
 | `ply`, `player`, `agent_label`, `seed` | who decided what, reproducibly |
 | `budget_s`, `elapsed_s`, `overrun_s` | time accounting (`overrun_s` = time past deadline until Idle) |
-| `close_reason` | `final`, `deadline`, `worker_failed`, `no_candidate` |
+| `close_reason` | `final` (final submission, or the agent returned with a candidate), `deadline`, `worker_failed` (agent raised or worker died, latest candidate taken), `no_candidate` (seeded random fallback move, takes precedence) |
 | `candidates`, `illegal_submissions` | counts |
 | `move` | the applied move (serialized) |
 | `last_info` | the last `info` payload (depth, nodes, score, pv) |
 | `worker_restarted`, `failure` | safety-net events with a truncated message |
 
-A `MatchResult` holds the rules, both specs, the game record (serialized), decision records, the
-result (winner, draw, turn cap) and timing totals.
+A `MatchResult` holds the rules, both specs, the seed, the budget, the game record,
+decision records, the outcome (`win` with a `winner`, `draw`, `turn_cap`) and the match
+duration; `thinking_s(player)` sums a seat's decision times. Both records serialize with
+`to_dict` / `from_dict` using the engine codec for moves, players, rules and the record.
 
 ## Gauntlets (WP 09)
 
