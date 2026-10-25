@@ -121,6 +121,8 @@ Each decision has a short rationale. Topic files go into detail.
 | D19 | Deploy: GitHub Actions → GHCR → Argo CD (pull) → homelab cluster; Tailscale operator for HTTPS ingress; CloudNativePG; SOPS secrets; Prometheus/Grafana/Loki. App manifests live in this repo (`deploy/`), CI commits image tag bumps. Cluster platform lives in a separate homelab repo. | GitOps with audit trail and `git revert` rollbacks; no cluster credentials in CI. |
 | D20 | Offline compute (gauntlets, rendering, training) runs locally on the workstation GPU; artifacts go to Garage. | Keeps the deploy milestone focused on the app. |
 | D21 | Google-style docstrings, types everywhere (tests included), 90 character lines, automatic formatting including docstring prose and comments, Claude Code hook formats after every edit. | See `tooling.md`. |
+| D22 | No evaluator abstraction: evaluation weights (`queen_safety`, `mobility`, ...) are flat agent params next to `depth`, and the heuristics are methods of the search agent base. | Same reasoning as D2: one weighted sum with no other implementation. Flat params keep specs one level deep for the CLI, the API forms and weight tuning. |
+| D23 | Agent classes register a kind with `@register_agent`; the param schema is derived from the constructor signature (`Annotated` constraints, docstring descriptions). Specs are `{kind, label, params}` as YAML or JSON, limited to registered kinds; tuned agents are YAML presets shipped in the package. | One source of truth for params, readable validation errors, nested config for future neural agents, and no arbitrary imports from stored or user-supplied specs. |
 
 ## 5. Target repo structure
 
@@ -137,7 +139,7 @@ hive/
 ├─ docs/plans/                 # this folder
 ├─ src/hive/
 │  ├─ engine/                  # grid.py, state.py, rules.py, serialization.py, errors.py
-│  ├─ agents/                  # base.py, factory.py, random.py, minimax.py, negamax.py, evaluators/
+│  ├─ agents/                  # base.py, factory.py, random.py, search.py, minimax.py, negamax.py, testing.py
 │  ├─ match/                   # turn.py, worker.py, runner.py, records.py, gauntlet.py
 │  ├─ vision/                  # [vision] reader.py, classical/, yolo/, grid_fit.py, matcher.py, eval/
 │  ├─ data/                    # scenes.py (scene JSON), datasets.py (manifests, export)

@@ -55,13 +55,85 @@ Strategies ported in WP 07:
 | Kind | Params | Behaviour |
 |---|---|---|
 | `random` | – | Submits a random legal move with `final=True`. |
-| `minimax` | `depth: int \| None`, `evaluator: EvaluatorSpec` | Iterative deepening up to `depth` (or until stopped), submitting the best move after each completed depth. |
+| `minimax` | `depth: int \| None` plus the evaluation weights below | Iterative deepening up to `depth` (or until stopped), submitting the best move after each completed depth. |
 | `negamax` | same as minimax | Same, negamax formulation. |
 
-Evaluators (`material`, `mobility`, `positioning`, `queen_safety`, weighted composite) stay
-as they are; they are configured through `EvaluatorSpec` (kind, params, weights).
+`minimax` and `negamax` share `SearchAgent` (`src/hive/agents/search.py`), which runs the
+iterative deepening loop:
+
+- Submit a random legal move first (or the only legal move, with `final=True`).
+- Search depth 1, 2, 3, and so on. Every node is counted and `should_stop()` is checked
+  every `STOP_CHECK_INTERVAL` (32) nodes. A stop discards the unfinished depth, and the
+  state is restored on the way out.
+- After each completed depth: `info(depth, nodes, score, pv, nps)`, then submit the best
+  move. The submission is `final=True` when the depth limit is reached, the game is
+  decided (a forced win or loss within the horizon), or the whole tree was searched (no
+  line was cut off at the depth limit).
+- Finished games score `WIN_SCORE - ply` for a win (so faster wins rank higher), the
+  negation for a loss and 0 for a draw.
+
+The alpha-beta variants were removed with the old `choose_move` agents. They come back in
+WP 28 on top of this loop.
+
+#### Evaluation weights (no evaluator abstraction)
+
+The old `Evaluator` ABC, with one class per heuristic and a `WeightedCompositeEvaluator`,
+is gone for the same reason `Ruleset` became `Rules` (D2, D22): every agent used one
+weighted sum, and the only real variation was the weights. The heuristics are private
+methods of `SearchAgent`, and each weight is a flat agent parameter next to `depth`:
+
+| Param | Default | Term (from the evaluated player's perspective) |
+|---|---|---|
+| `queen_safety` | 1.0 | Occupied neighbours of the opponent's queen minus those of the own queen |
+| `mobility` | 0.0 | Own legal moves minus the opponent's (slow: generates moves at every leaf) |
+| `positioning` | 0.0 | Own top pieces next to the opponent's queen minus the reverse |
+| `material_on_board` | 0.0 | Value of own pieces on the board minus the opponent's (`PIECE_VALUES`) |
+| `material_in_hand` | 0.0 | Value of own pieces in hand minus the opponent's |
+
+Terms with weight 0 are skipped, so an unused expensive term costs nothing. Flat weights
+keep the params of a spec plain numbers next to `depth`, which keeps the API parameter
+forms and the weight tuning in WP 28 simple. An agent
+with a different kind of evaluation (for example a neural network) is a new agent kind
+with its own params, not a new evaluator. Piece values are a module constant; they can
+become params if tuning needs them.
 
 ### Factory (WP 07)
+
+Agents are made available to configs with a decorator. The parameters of a kind are its
+constructor's keyword-only parameters after `seed`, so the signature is the schema:
+
+```python
+@register_agent("negamax")
+class NegamaxAgent(SearchAgent): ...
+
+class SearchAgent(Agent):
+    def __init__(
+        self,
+        rules: Rules,                                    # injected by the factory
+        *,
+        seed: int,                                       # injected by the factory
+        depth: Annotated[int | None, Field(ge=1)] = None,
+        queen_safety: float = 1.0,
+        ...
+    ) -> None:
+        """...
+
+        Args:
+            depth: The maximum search depth in plies, or `None` to search until stopped.
+            ...
+        """
+```
+
+- `register_agent` builds a frozen pydantic model from the annotations (constraints go in
+  `Annotated[..., Field(...)]`) and defaults, and takes each field description from the
+  `Args:` section of the constructor docstring. Required params (no default) and nested
+  dataclass params (for example a network shape) work as well. A constructor that does
+  not take `rules` first, or has a positional or unannotated agent param, is rejected
+  when the class is registered.
+- `hive/agents/__init__.py` imports the built-in agent modules, so their decorators run
+  whenever anything from `hive.agents` is imported.
+- Only registered kinds can be built. There are no import paths in specs, so stored specs
+  survive refactors and the API cannot be made to import arbitrary code.
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -70,15 +142,71 @@ class AgentSpec:
     params: Mapping[str, JsonValue] = field(default_factory=dict)
     label: str | None = None   # display name in reports and UI
 
+    @classmethod
+    def from_dict(cls, data: object, *, source: str | None = None) -> AgentSpec: ...
+    @classmethod
+    def from_yaml(cls, text: str, *, source: str | None = None) -> AgentSpec: ...
+    @classmethod
+    def load(cls, path: Path) -> AgentSpec: ...
+    def to_dict(self) -> dict[str, JsonValue]: ...
+    def validate_params(self, *, source: str | None = None) -> BaseModel: ...
+
 def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent: ...
-def agent_kinds() -> list[AgentKindInfo]: ...   # name, description, param schema
+def list_agents() -> list[AgentRegistration]: ...   # kind, description, params schema
 ```
 
-- A registry maps kind names to classes and a parameter schema (a small pydantic model per
-  kind is fine), so the API can list agents and render parameter forms, and the CLI can
-  parse `negamax:depth=4,evaluator=default`.
-- Params are free-form JSON, so a future neural agent can take `weights: "s3://..."` or
-  `hidden_size: 256` without interface changes.
+- The serialized form is a mapping with `kind`, an optional `label` and optional
+  `params`, stored as JSON in records and reports and written as YAML by hand:
+
+  ```yaml
+  kind: negamax
+  label: nm3
+  params:
+    depth: 3
+    mobility: 0.5
+  ```
+
+  `from_yaml` also accepts a bare kind (`random`), so one string works on the command line
+  and in a file. `rules` and `seed` are never part of a spec: the runner supplies them, so
+  one spec can be replayed with any seed.
+- Loading validates the shape, the kind and the params, and raises
+  `InvalidAgentSpecError` (a `ValueError`) listing every problem with its path, and the
+  file when loaded from one. For example:
+
+  ```
+  Invalid agent spec in `configs/nm3.yaml`:
+    params.depth: Input should be greater than or equal to 1 (got 0).
+    params.depht: Unknown param, expected one of: depth, queen_safety, mobility, ...
+  ```
+
+  YAML syntax errors report the line and column. `build_agent` validates again, so a
+  spec constructed in code gets the same errors.
+- `register_agent` stores an `AgentRegistration` (kind, agent class, params model) in
+  `AGENT_REGISTRY`. `list_agents()` returns the registrations, whose `description` is the
+  summary line of the class docstring and whose `params_schema` is the JSON schema of the
+  params, so the API can list agents and render parameter forms.
+- pydantic and PyYAML are core dependencies (not extras), since workers, the CLI and the
+  API all build agents.
+
+#### Presets (WP 09 and WP 12)
+
+Tuned agents are stored as spec files in `src/hive/agents/presets/<name>.yaml`, inside the
+package so they ship with the wheel and the Docker image (loaded with
+`importlib.resources`). The file name is the preset name and the default label. The
+gauntlet CLI resolves `--agent VALUE` as a path to a YAML file, then a preset name, then
+inline YAML (`random` or `{kind: negamax, params: {depth: 2}}`). The API lists presets
+next to `list_agents()`, so the agent picker offers "nm3 (preset)" as well as a custom
+form per kind. Weight tuning in WP 28 writes its winners as new presets.
+
+### Testing agents (WP 07)
+
+`src/hive/agents/testing.py` holds `LocalTurnContext`, an in-process `TurnContext` that
+records submissions and `info` payloads, and `FakeClock`, which can advance by a fixed
+step on every read so deadlines depend on how often an agent checks the time rather than
+on machine speed. `tests/agents/test_contract.py` runs every registered kind through the
+shared contract: a legal move is submitted even with no time left, thinking returns at
+the deadline without submitting after `should_stop()` turned true, the given state is
+left unchanged, and a fixed seed gives the same submissions.
 
 ## Persistent workers and the runner (WP 08)
 
@@ -140,9 +268,9 @@ result (winner, draw, turn cap) and timing totals.
 
 ```
 hive gauntlet \
-  --agent "negamax:depth=3,label=nm3" \
-  --agent "minimax:depth=3,label=mm3" \
-  --agent "random" \
+  --agent configs/nm3.yaml \
+  --agent "{kind: minimax, label: mm3, params: {depth: 3}}" \
+  --agent random \
   --games-per-pair 20 --budget 2.0 --max-turns 100 \
   --seed 42 --jobs 4 --out reports/gauntlet-2026-10-24.json [--replays]
 ```

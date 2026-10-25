@@ -1,9 +1,9 @@
 import pytest
 
 from hive.agents.base import Agent
-from hive.agents.baseline.random import RandomAgent
-from hive.agents.evaluators.queen_safety import QueenSafetyEvaluator
-from hive.agents.search.negamax import NegamaxAgent
+from hive.agents.factory import AgentSpec, build_agent
+from hive.agents.random import RandomAgent
+from hive.agents.testing import LocalTurnContext
 from hive.engine.rules import Rules
 from hive.engine.state import Move, Player
 
@@ -20,13 +20,15 @@ def test_random_vs_negamax_completes(seed: int) -> None:
     """Test that random and negamax depth 1 play a game to completion."""
     rules = Rules(max_turns=_MAX_TURNS)
     agents: dict[Player, Agent] = {
-        Player.WHITE: RandomAgent(rules, random_seed=seed),
-        Player.BLACK: NegamaxAgent(rules, QueenSafetyEvaluator(), depth=1),
+        Player.WHITE: build_agent(AgentSpec("random"), rules, seed=seed),
+        Player.BLACK: build_agent(AgentSpec("negamax", {"depth": 1}), rules, seed=seed),
     }
     state = rules.create_initial_state()
 
     while not rules.is_finished(state) and state.current_ply < _MAX_PLIES:
-        move = agents[state.current_player].choose_move(state)
+        turn = LocalTurnContext()
+        move = turn.run(agents[state.current_player], state)
+        assert turn.closed
         assert move in rules.legal_moves(state)
         state.apply_move(move)
 
@@ -37,14 +39,14 @@ def test_random_vs_negamax_completes(seed: int) -> None:
 def _random_game(seed: int, extra_calls: int) -> list[Move | None]:
     """Play a seeded random game, calling `legal_moves` extra times before every move."""
     rules = Rules(max_turns=_MAX_TURNS)
-    agent = RandomAgent(rules, random_seed=seed)
+    agent = RandomAgent(rules, seed=seed)
     state = rules.create_initial_state()
 
     moves: list[Move | None] = []
     while not rules.is_finished(state):
         for _ in range(extra_calls):
             rules.legal_moves(state)
-        move = agent.choose_move(state)
+        move = LocalTurnContext().run(agent, state)
         state.apply_move(move)
         moves.append(move)
     return moves
