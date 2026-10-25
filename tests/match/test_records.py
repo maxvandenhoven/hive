@@ -3,7 +3,6 @@ import json
 import pytest
 
 from hive.agents.factory import AgentSpec
-from hive.engine.record import GameRecord
 from hive.engine.rules import Rules
 from hive.engine.state import Move, PieceType, Player
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
@@ -42,7 +41,6 @@ def result() -> MatchResult:
         black_spec=AgentSpec("random"),
         seed=42,
         budget_s=1.0,
-        record=GameRecord(rules=Rules(max_turns=50), moves=moves),
         decisions=[
             make_decision(player=Player.WHITE, elapsed_s=0.5, move=moves[0]),
             make_decision(player=Player.BLACK, elapsed_s=0.25, move=moves[1]),
@@ -80,15 +78,16 @@ class TestMatchResult:
         assert MatchResult.from_json(data) == result
         assert data["white"]["label"] == "nm2"
 
-    def test_add_decision(self, result: MatchResult) -> None:
-        move = Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(-1, 0))
-        decision = make_decision(player=Player.WHITE, elapsed_s=0.1, move=move)
+    def test_record_is_built_from_decisions(self, result: MatchResult) -> None:
+        assert result.record.rules == result.rules
+        assert result.record.setup is None
+        assert result.record.moves == [decision.move for decision in result.decisions]
 
-        result.add_decision(decision)
+    def test_json_stores_the_moves_once(self, result: MatchResult) -> None:
+        data = result.to_json()
 
-        assert result.decisions[-1] == decision
-        assert result.record.moves[-1] == move
-        assert len(result.decisions) == len(result.record.moves) == 3
+        assert isinstance(data, dict)
+        assert "record" not in data
 
     def test_thinking_time_per_seat(self, result: MatchResult) -> None:
         assert result.thinking_s(Player.WHITE) == 0.5

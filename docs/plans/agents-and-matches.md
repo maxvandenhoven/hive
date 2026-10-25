@@ -282,7 +282,7 @@ Implementation notes (WP 08):
   `max_turns` counts turns per player like `Rules.max_turns` (`None` plays to the end).
   Seat seeds are `derive_seed(seed, "white")` and `derive_seed(seed, "black")`, a
   blake2b hash that WP 09 reuses for per-match seeds. `run(decision_callback=...)`
-  streams decisions, which `MatchResult.add_decision` records together with their moves.
+  streams decisions, which the runner appends to `MatchResult.decisions`.
   `AgentWorker.decide(message_callback=...)` streams submissions and info for the API.
 - `hive play --white SPEC --black SPEC --budget 1.0 [--max-turns 100] [--seed 0]
   [--grace 1.0] [--out result.json]` takes a YAML spec file, a preset name or inline YAML
@@ -304,9 +304,11 @@ Every decision produces a `DecisionRecord`:
 | `last_info` | the last `info` payload (depth, nodes, score, pv) |
 | `worker_restarted`, `failure` | safety-net events with a truncated message |
 
-A `MatchResult` holds the rules, both specs, the seed, the budget, the game record,
-decision records, the `MatchOutcome` (`win` with a `winner`, `draw`, `turn_cap`) and the
-match duration; `thinking_s(player)` sums a seat's decision times. Both records, and every
+A `MatchResult` holds the rules, both specs, the seed, the budget, the decision records,
+the `MatchOutcome` (`win` with a `winner`, `draw`, `turn_cap`) and the
+match duration. Its `record` property builds the `GameRecord` from the rules and the
+decisions' moves, so the moves are stored once; `thinking_s(player)` sums a seat's
+decision times. Both records, and every
 gauntlet type, convert with `JsonCodec` like the engine values; derived values such as
 rates are written as computed fields and ignored when reading. Reports carry a `version`
 (2 since the initial setup is written as `null`).

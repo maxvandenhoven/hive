@@ -8,7 +8,6 @@ from typing import Any
 import pytest
 
 from hive.agents.factory import AgentSpec
-from hive.engine.record import GameRecord
 from hive.engine.rules import Rules
 from hive.engine.state import Player
 from hive.match.gauntlet import (
@@ -86,7 +85,6 @@ def make_result(
         black_spec=config.participants[match.black],
         seed=match.seed,
         budget_s=config.budget_s,
-        record=GameRecord(config.rules),
         decisions=decisions or [],
         outcome=outcome,
         winner=winner,

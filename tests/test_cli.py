@@ -11,7 +11,6 @@ from typer.testing import CliRunner
 from hive import __version__
 from hive.agents.factory import AgentSpec
 from hive.cli import app, describe_match_result, log_decision
-from hive.engine.record import GameRecord
 from hive.engine.rules import Rules
 from hive.engine.state import Player
 from hive.match.gauntlet import GauntletConfig, GauntletReport
@@ -209,7 +208,6 @@ class TestPlay:
             black_spec=AgentSpec("random"),
             seed=0,
             budget_s=1.0,
-            record=GameRecord(Rules()),
             outcome=outcome,
             winner=winner,
         )

@@ -86,7 +86,9 @@ class DecisionRecord(JsonCodec):
 
 @dataclass(slots=True)
 class MatchResult(JsonCodec):
-    """A played match: its configuration, the game, every decision and the result.
+    """A played match: its configuration, every decision and the result.
+
+    The game record is derived from the decisions, so the moves are stored once.
 
     Attributes:
         rules: The rules the match was played with.
@@ -94,7 +96,6 @@ class MatchResult(JsonCodec):
         black_spec: The agent playing black.
         seed: The match seed, from which the seed of each seat is derived.
         budget_s: The time budget of every decision in seconds.
-        record: The game, which replays to the final position.
         decisions: The decision behind every move of the game, in order.
         outcome: How the match ended.
         winner: The winning player, or `None` unless the outcome is a win.
@@ -106,7 +107,6 @@ class MatchResult(JsonCodec):
     black_spec: Annotated[AgentSpec, Field(alias="black")]
     seed: int
     budget_s: float
-    record: GameRecord
     decisions: list[DecisionRecord] = field(default_factory=list)
     outcome: MatchOutcome = MatchOutcome.TURN_CAP
     winner: Player | None = None
@@ -123,14 +123,15 @@ class MatchResult(JsonCodec):
         """
         return self.white_spec if player is Player.WHITE else self.black_spec
 
-    def add_decision(self, decision: DecisionRecord) -> None:
-        """Record a decision and its move, keeping the decisions and the game in sync.
+    @property
+    def record(self) -> GameRecord:
+        """The game, built from the rules and the move of every decision.
 
-        Args:
-            decision: The decision whose move was applied to the game.
+        Matches start from the initial state, so the record has no setup.
         """
-        self.decisions.append(decision)
-        self.record.moves.append(decision.move)
+        return GameRecord(
+            rules=self.rules, moves=[decision.move for decision in self.decisions]
+        )
 
     def thinking_s(self, player: Player) -> float:
         """Sum the decision times of one seat.
