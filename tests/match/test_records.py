@@ -42,7 +42,7 @@ def result() -> MatchResult:
         black_spec=AgentSpec("random"),
         seed=42,
         budget_s=1.0,
-        record=GameRecord(Rules(max_turns=50), moves=moves),
+        record=GameRecord(rules=Rules(max_turns=50), moves=moves),
         decisions=[
             make_decision(player=Player.WHITE, elapsed_s=0.5, move=moves[0]),
             make_decision(player=Player.BLACK, elapsed_s=0.25, move=moves[1]),

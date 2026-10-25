@@ -56,7 +56,7 @@ class IllegalAgent(Agent):
             count: The number of illegal moves to submit.
             then_legal: Whether to submit the first legal move after the illegal ones.
         """
-        super().__init__(rules, seed=seed)
+        super().__init__(rules=rules, seed=seed)
         self.count = count
         self.then_legal = then_legal
 
@@ -93,7 +93,7 @@ class LingeringAgent(Agent):
             seed: The seed for the random number generator of the agent.
             linger_s: The number of seconds to keep thinking after the turn asks to stop.
         """
-        super().__init__(rules, seed=seed)
+        super().__init__(rules=rules, seed=seed)
         self.linger_s = linger_s
 
     @override
@@ -124,7 +124,7 @@ class CrashingAgent(Agent):
             seed: The seed for the random number generator of the agent.
             exit_process: Whether to exit the worker process instead of raising.
         """
-        super().__init__(rules, seed=seed)
+        super().__init__(rules=rules, seed=seed)
         self.exit_process = exit_process
 
     @override
@@ -159,7 +159,7 @@ class CountingAgent(RandomAgent):
             seed: The seed for the random number generator of the agent.
             path: The file to append a line to.
         """
-        super().__init__(rules, seed=seed)
+        super().__init__(rules=rules, seed=seed)
 
         with Path(path).open("a") as file:
             file.write(f"{os.getpid()}\n")
