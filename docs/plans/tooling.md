@@ -10,6 +10,7 @@ linting, typing and tests for free.
 | Line length 90 for code, docstrings and comments | `ruff format`, ruff `E501` |
 | Type annotations on every function and method, including private ones and tests | ruff `ANN` (no test exemptions), `ty check` |
 | Google-style docstrings on public modules' classes and functions | ruff `D` with `convention = "google"` |
+| Docstrings in `src/` document every argument in `Args:` (and no others) and the return value in `Returns:` (or `Yields:` for generators) unless the return annotation is `None`; properties and overloads are exempt. Tests keep one-line docstrings | `scripts/tooling/check_docstrings.py` (ruff `D417` only checks an existing `Args:` section, and the ruff `DOC` rules are preview-only and lack a missing-arguments rule) |
 | Single backticks for inline code in docstrings | review (documented in `CLAUDE.md`) |
 | Docstring prose and comments filled up to 90 characters (not wrapped earlier) | manual; ruff `E501` flags overlong lines (see below) |
 | Comments: start with a capital letter and end with a period, unless shorter than 5 words | `scripts/tooling/check_comments.py` |
@@ -74,6 +75,14 @@ Neither is adopted, and writing a custom reflow tool is out of scope. Instead:
    Pragmas (`noqa`, `type:`, `pragma:`, `fmt:`, `ruff:`, `ty:`, `isort:`), shebangs and
    leading or trailing URLs are exempt. Violations are printed as `path:line: message`
    with a non-zero exit code. `make lint` and the PostToolUse hook run it.
+4. `scripts/tooling/check_docstrings.py` (tested in `tests/tooling/`) checks with `ast`
+   that every function in `src/` with a docstring, nested ones included, has an `Args:`
+   section listing exactly its parameters (except `self` and `cls`) and a `Returns:` or,
+   for generators, `Yields:` section unless the return annotation is `None`, `NoReturn`
+   or `Never`. Properties and `overload` stubs are skipped. Public text that comes from a
+   docstring elsewhere is set explicitly instead: `description=` on FastAPI routes and
+   `help=` on typer commands, so the sections stay out of the OpenAPI page and `--help`.
+   `make lint` runs it on `src/`, and the PostToolUse hook on edited files in `src/`.
 
 WP 02 also converted all NumPy-style docstrings to Google style. Return types are no longer
 repeated in `Returns:` because the annotations carry them.
@@ -86,7 +95,7 @@ One root `Makefile`; every command a session needs is a target.
 |---|---|
 | `make sync` | `uv sync --all-groups --all-extras` |
 | `make format` | `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` once it exists |
-| `make lint` | `ruff check --fix`, comment checker; `eslint` in `frontend/` |
+| `make lint` | `ruff check --fix`, comment checker, docstring checker on `src/`; `eslint` in `frontend/` |
 | `make type` | `ty check`; `tsc --noEmit` in `frontend/` |
 | `make test` | `pytest` with coverage (excludes `slow`, `core = "sysmon"` keeps tracing cheap, `concurrency = ["multiprocessing", "thread"]` measures match worker processes); `vitest run` in `frontend/` |
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
@@ -106,7 +115,8 @@ Frontend targets are added by WP 13; dev targets by WP 10.
 
 - **PostToolUse** on `Edit|Write|MultiEdit`: `.claude/hooks/format-file.sh` reads the hook
   JSON from stdin, takes `tool_input.file_path`, and for `*.py` runs `ruff format`,
-  `ruff check --fix` and the comment checker on that file only; for
+  `ruff check --fix`, the comment checker and, under `src/`, the docstring checker on that
+  file only; for
   `frontend/**/*.{ts,tsx,css}` runs `prettier --write` (once the frontend exists). It exits
   0 when the file is not formattable and prints remaining lint and comment errors to stderr
   with exit code 2, so Claude sees and fixes them.

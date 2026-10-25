@@ -31,3 +31,9 @@ if ! output="$(uv run --quiet python scripts/tooling/check_comments.py "$file_pa
     echo "$output" >&2
     exit 2
 fi
+# Docstring sections are only enforced in the package, not in tests or scripts.
+if [[ "$file_path" == "$repo_root"/src/* ]] &&
+    ! output="$(uv run --quiet python scripts/tooling/check_docstrings.py "$file_path" 2>&1)"; then
+    echo "$output" >&2
+    exit 2
+fi
