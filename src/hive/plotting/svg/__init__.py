@@ -19,7 +19,7 @@ from hive.plotting.svg.geometry import (
 HEX_SIZE = 50.0
 
 
-def _hand_panel_natural_size(state: GameState) -> tuple[float, float]:
+def hand_panel_natural_size(state: GameState) -> tuple[float, float]:
     """Compute the natural width and height of the hand panel.
 
     Args:
@@ -126,7 +126,7 @@ def draw_board(
     hand_natural_width = 0.0
 
     if show_hands:
-        hand_natural_width, hand_natural_height = _hand_panel_natural_size(state)
+        hand_natural_width, hand_natural_height = hand_panel_natural_size(state)
         hand_scale = canvas_width / hand_natural_width
         hand_pixel_height = hand_natural_height * hand_scale
 

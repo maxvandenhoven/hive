@@ -11,7 +11,7 @@ from hive.plotting.svg.constants import (
 from hive.plotting.svg.geometry import HexOrientation, axial_to_pixel, get_hex_points
 
 
-def _draw_piece_hex(
+def draw_piece_hex(
     group: dw.Group,
     cx: float,
     cy: float,
@@ -74,7 +74,7 @@ def _draw_piece_hex(
         )
 
 
-def _draw_stack_badge(
+def draw_stack_badge(
     group: dw.Group, cx: float, cy: float, stack_height: int, size: float
 ) -> None:
     """Draw a small badge indicating how many pieces are stacked at a position.
@@ -167,7 +167,7 @@ def draw_pieces(
         cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
         top_piece = state.get_top_piece(coord)
 
-        _draw_piece_hex(
+        draw_piece_hex(
             group=group,
             cx=cx,
             cy=cy,
@@ -178,7 +178,7 @@ def draw_pieces(
             use_sprites=use_sprites,
         )
 
-        _draw_stack_badge(
+        draw_stack_badge(
             group=group,
             cx=cx,
             cy=cy,
@@ -316,7 +316,7 @@ def draw_hand_panel(
             icon_x = icon_x_start + type_idx * icon_spacing
             count = state.hand[player].get(piece_type, 0)
 
-            _draw_piece_hex(
+            draw_piece_hex(
                 group=group,
                 cx=icon_x,
                 cy=icon_y,

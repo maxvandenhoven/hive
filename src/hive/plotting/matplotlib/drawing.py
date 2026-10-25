@@ -16,7 +16,7 @@ from hive.plotting.matplotlib.geometry import (
 )
 
 
-def _draw_piece_hex(
+def draw_piece_hex(
     ax: Axes,
     cx: float,
     cy: float,
@@ -81,7 +81,7 @@ def _draw_piece_hex(
         )
 
 
-def _draw_stack_badge(
+def draw_stack_badge(
     ax: Axes, cx: float, cy: float, stack_height: int, size: float
 ) -> None:
     """Draw a small badge indicating how many pieces are stacked at a position.
@@ -165,7 +165,7 @@ def draw_pieces(
         cx, cy = axial_to_pixel(coord[0], coord[1], orientation=orientation, size=size)
         top_piece = state.get_top_piece(coord)
 
-        _draw_piece_hex(
+        draw_piece_hex(
             ax,
             cx,
             cy,
@@ -177,7 +177,7 @@ def draw_pieces(
             sprite_resolution=sprite_resolution,
         )
 
-        _draw_stack_badge(
+        draw_stack_badge(
             ax=ax, cx=cx, cy=cy, stack_height=state.get_stack_height(coord), size=size
         )
 
@@ -331,7 +331,7 @@ def draw_hand_panel(
             icon_x = icon_x_start + type_idx * icon_spacing
             count = state.hand[player].get(piece_type, 0)
 
-            _draw_piece_hex(
+            draw_piece_hex(
                 ax=ax,
                 cx=icon_x,
                 cy=icon_y,
