@@ -37,60 +37,64 @@ def rules() -> Rules:
 def finished_state(rules: Rules) -> GameState:
     """Build a state where the white queen is surrounded by six black pieces."""
     black_types = [PieceType.ANT] * 3 + [PieceType.SPIDER] * 2 + [PieceType.GRASSHOPPER]
-    board: GameBoard = {(0, 0): [Piece(PieceType.QUEEN, Player.WHITE)]}
+    board: GameBoard = {(0, 0): [Piece(type=PieceType.QUEEN, owner=Player.WHITE)]}
 
     for coord, piece_type in zip(get_neighbors((0, 0)), black_types, strict=True):
-        board[coord] = [Piece(piece_type, Player.BLACK)]
+        board[coord] = [Piece(type=piece_type, owner=Player.BLACK)]
 
-    return rules.from_board(board, current_player=Player.WHITE)
+    return rules.from_board(board=board, current_player=Player.WHITE)
 
 
 class TestPerft:
     def test_depth_zero(self, rules: Rules) -> None:
-        assert perft(rules.create_initial_state(), rules, 0) == 1
+        assert perft(state=rules.create_initial_state(), rules=rules, depth=0) == 1
 
     def test_counts_leaves(self, rules: Rules) -> None:
         state = rules.create_initial_state()
 
-        assert perft(state, rules, 1) == len(rules.legal_moves(state))
+        assert perft(state=state, rules=rules, depth=1) == len(rules.legal_moves(state))
 
     def test_restores_state(self, rules: Rules) -> None:
         state = rules.create_initial_state()
         before = snapshot(state)
 
-        perft(state, rules, 3)
+        perft(state=state, rules=rules, depth=3)
 
         assert snapshot(state) == before
 
     def test_finished_game_has_no_moves(
         self, rules: Rules, finished_state: GameState
     ) -> None:
-        assert perft(finished_state, rules, 0) == 1
-        assert perft(finished_state, rules, 2) == 0
+        assert perft(state=finished_state, rules=rules, depth=0) == 1
+        assert perft(state=finished_state, rules=rules, depth=2) == 0
 
 
 class TestDivide:
     def test_sums_to_perft(self, rules: Rules) -> None:
         state = rules.create_initial_state()
-        counts = divide(state, rules, 3)
+        counts = divide(state=state, rules=rules, depth=3)
 
         assert [move for move, _ in counts] == rules.legal_moves(state)
-        assert sum(count for _, count in counts) == perft(state, rules, 3)
+        assert sum(count for _, count in counts) == perft(
+            state=state, rules=rules, depth=3
+        )
 
     def test_finished_game(self, rules: Rules, finished_state: GameState) -> None:
-        assert divide(finished_state, rules, 1) == []
+        assert divide(state=finished_state, rules=rules, depth=1) == []
 
     def test_depth_below_one(self, rules: Rules) -> None:
         with pytest.raises(ValueError, match="at least `1`"):
-            divide(rules.create_initial_state(), rules, 0)
+            divide(state=rules.create_initial_state(), rules=rules, depth=0)
 
 
 class TestTimedPerft:
     def test_result(self, rules: Rules) -> None:
-        result = timed_perft(rules.create_initial_state(), rules, 2)
+        result = timed_perft(state=rules.create_initial_state(), rules=rules, depth=2)
 
         assert result.depth == 2
-        assert result.nodes == perft(rules.create_initial_state(), rules, 2)
+        assert result.nodes == perft(
+            state=rules.create_initial_state(), rules=rules, depth=2
+        )
         assert result.seconds > 0
         assert result.nodes_per_second == result.nodes / result.seconds
 
@@ -106,8 +110,8 @@ class TestPerftSuite:
         ]
         legal_moves = [None, {"piece": "beetle", "from": [0, 0], "to": [1, 0]}]
         path = write_suite(
-            tmp_path / "suite.json",
-            [
+            path=tmp_path / "suite.json",
+            positions=[
                 {
                     "name": "p",
                     "moves": moves,
@@ -138,7 +142,8 @@ class TestPerftSuite:
     def test_position_state(self, tmp_path: Path) -> None:
         moves = [{"piece": "spider", "from": None, "to": [0, 0]}]
         path = write_suite(
-            tmp_path / "suite.json", [{"name": "p", "moves": moves, "counts": {}}]
+            path=tmp_path / "suite.json",
+            positions=[{"name": "p", "moves": moves, "counts": {}}],
         )
 
         state = PerftSuite.load(path).position("p").state(Rules())
@@ -148,7 +153,7 @@ class TestPerftSuite:
         assert PerftSuite.load(path).position("p").legal_moves is None
 
     def test_unknown_position(self, tmp_path: Path) -> None:
-        suite = PerftSuite.load(write_suite(tmp_path / "suite.json", []))
+        suite = PerftSuite.load(write_suite(path=tmp_path / "suite.json", positions=[]))
 
         with pytest.raises(KeyError, match="Unknown perft position `missing`"):
             suite.position("missing")
@@ -156,14 +161,17 @@ class TestPerftSuite:
     def test_unknown_piece(self, tmp_path: Path) -> None:
         moves = [{"piece": "ladybug", "from": None, "to": [0, 0]}]
         path = write_suite(
-            tmp_path / "suite.json", [{"name": "p", "moves": moves, "counts": {}}]
+            path=tmp_path / "suite.json",
+            positions=[{"name": "p", "moves": moves, "counts": {}}],
         )
 
         with pytest.raises(ValueError, match="Unknown piece type `ladybug`"):
             PerftSuite.load(path)
 
     def test_unknown_player(self, tmp_path: Path) -> None:
-        path = write_suite(tmp_path / "suite.json", [], starting_player="red")
+        path = write_suite(
+            path=tmp_path / "suite.json", positions=[], starting_player="red"
+        )
 
         with pytest.raises(ValueError, match="Unknown player `red`"):
             PerftSuite.load(path)

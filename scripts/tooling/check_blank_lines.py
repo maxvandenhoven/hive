@@ -332,7 +332,9 @@ def main(argv: list[str] | None = None) -> int:
         for file in (path.rglob("*.py") if path.is_dir() else [path])
         if file.suffix == ".py"
     )
-    violations = [violation for file in files for violation in check_file(file, fix=fix)]
+    violations = [
+        violation for file in files for violation in check_file(path=file, fix=fix)
+    ]
 
     for violation in violations:
         sys.stdout.write(f"{violation}\n")

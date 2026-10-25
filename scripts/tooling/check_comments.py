@@ -150,9 +150,9 @@ class CommentBlock:
         if words[0][0].islower() and "://" not in words[0]:
             violations.append(
                 CommentViolation(
-                    path,
-                    self.comments[0].line,
-                    "comment should start with a capital letter",
+                    path=path,
+                    line=self.comments[0].line,
+                    message="comment should start with a capital letter",
                 )
             )
 
@@ -163,10 +163,10 @@ class CommentBlock:
         ):
             violations.append(
                 CommentViolation(
-                    path,
-                    self.comments[-1].line,
-                    f"comment of {MIN_WORDS_FOR_PERIOD} or more words should end with a "
-                    "period",
+                    path=path,
+                    line=self.comments[-1].line,
+                    message=f"comment of {MIN_WORDS_FOR_PERIOD} or more words should end "
+                    "with a period",
                 )
             )
 
@@ -185,7 +185,9 @@ def check_file(path: Path) -> list[CommentViolation]:
     try:
         blocks = CommentBlock.from_source(path.read_text())
     except (tokenize.TokenError, SyntaxError) as error:
-        return [CommentViolation(path, 1, f"could not tokenize: {error}")]
+        return [
+            CommentViolation(path=path, line=1, message=f"could not tokenize: {error}")
+        ]
 
     return [violation for block in blocks for violation in block.violations(path)]
 

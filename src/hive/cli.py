@@ -399,7 +399,7 @@ def write_board_svgs(result: MatchResult, directory: Path) -> list[Path]:
             continue
 
         path = directory / f"ply-{ply:03d}.svg"
-        draw_board(state, title=f"Ply {ply}").save_svg(str(path))
+        draw_board(state=state, title=f"Ply {ply}").save_svg(str(path))
         paths.append(path)
 
     return paths
