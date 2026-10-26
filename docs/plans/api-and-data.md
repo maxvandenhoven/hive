@@ -49,7 +49,8 @@ stateless per request: load the game's moves from Postgres, replay them with
   has a schema.
 - **Dependencies** (`api/dependencies.py`) are `async` (sync ones run in a worker thread).
   `SessionDependency` is scoped to the handler function, so the session is closed before
-  the response is sent.
+  the response is sent. It opens its session through `SessionFactoryDependency`, which
+  streaming routes use directly (see "Streaming pattern").
 - **Async**: database and storage calls never block the event loop, which also carries
   the thinking streams and, in WP 12, the worker pool, so shared state like the pool needs
   only `anyio` primitives, no thread locks.
@@ -113,7 +114,7 @@ the generated frontend client.
 | GET | `/games/{id}/targets?q=&r=` | 11 | Legal targets of the top piece at `(q, r)` in the latest position. 404 `coordinate_empty`; 422 `piece_not_movable` with the reason from `Rules.immobility_reason` (other side's piece, queen not placed, one-hive rule, no target, game over). |
 | POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply, allow_agent_side}`, returning the new `GamePosition` (201). `source` is `manual` or `photo`; `photo_id` is required with `photo` only, must belong to the game, and is marked `confirmed`. Checks in order: 409 `ply_conflict` on an `expected_ply` mismatch, 409 `game_not_active` for finished or abandoned games, 409 `agent_turn` when an agent plays the side to move (any source) unless `allow_agent_side`, 422 `move_not_legal` with the reason from `Rules.illegal_move_reason`. Sets status `finished` and the result when the game ends. |
 | DELETE | `/games/{id}/moves/last` | 11 | Undo the last move, returning the new `GamePosition`. Optional `expected_ply` (409 `ply_conflict`); 409 `no_move_to_undo` without moves. Reopens finished games (status `active`, no result); abandoned games stay abandoned. Unconfirms the move's photo. |
-| POST | `/games/{id}/think` | 12 | SSE stream. Body: `{agent?: AgentSpec, budget_s?, commit: bool}`. Streams `info` and `candidate` events, ends with `decision`. With `commit=true` (only allowed on an agent side, using that side's spec), the final move is stored with `source=agent` and its `DecisionRecord`. |
+| POST | `/games/{id}/think` | 12 | SSE stream about the latest position. Body: `{agent?: AgentSpec, budget_s?, commit: bool}`; `agent` defaults to the side to move's agent and `budget_s` to its budget (5 s for a human side), clamped to `HIVE_MAX_BUDGET_S`. Streams `info` and `candidate` events, ends with `decision` (with the new `GamePosition` when committed), or `error` after a failed commit (for example `ply_conflict` when a move was played meanwhile) or a failed worker. With `commit=true` (only allowed on an agent side, using that side's spec), the final move is stored with `source=agent` and its `DecisionRecord`. Errors before the stream: 404 `game_not_found`, 409 `game_not_active`, 409 `commit_not_allowed`, 422 `agent_required` (human side without `agent`), 503 `pool_busy`, 503 `agent_unavailable`. |
 | POST | `/games/{id}/photos` | 16 | Upload a photo (multipart) for the current ply; stores it. From WP 19 also runs reader + matcher and returns candidates. |
 | GET | `/photos/{id}/image` | 16 | Stream the stored image. |
 | GET | `/healthz`, `/readyz` | 10 | Liveness; readiness checks DB, S3 and (from WP 24) model loaded. |
@@ -136,22 +137,59 @@ to `index.html` for client-side routes.
 - The pool is shut down cleanly on app shutdown (lifespan handler). `hive serve` closes
   open streams after a 5 s graceful shutdown timeout, so `--reload` is never stuck on one.
 
-### Streaming pattern (checked in WP 10)
+Implementation notes (WP 12):
+
+- `api/pool.py`: `AgentPool(capacity, wait_s, grace_s, preload)` with `borrow(spec, rules,
+  game_id)` as an async context manager. The key is the spec and rules as canonical JSON
+  (`agent_pool_key`), since spec params are an unhashable mapping; the label is part of
+  the key. Several workers may share a key, so two games against the same agent think at
+  once. Pool state changes only on the event loop under one `anyio.Condition`; starting,
+  resetting, deciding and closing workers run in threads through `run_blocking`, limited
+  by a `CapacityLimiter` of the pool capacity. Each worker gets a random seed, recorded
+  in its decisions.
+- A worker remembers the game it last decided in; borrowing it for another game calls
+  `AgentWorker.reset()`, which sends a `ResetMessage` and restarts the worker if the agent
+  raises or does not answer within the grace period. A worker that is no longer running
+  when returned is dropped; one that fails to start is a 503 `agent_unavailable`.
+- `close()` closes the idle workers and makes later borrows fail with
+  `agent_unavailable`; busy workers close when they are returned. An injected pool
+  (`create_app(pool=...)`, for tests) is not closed by the lifespan, like the database.
+- Settings: `HIVE_POOL_SIZE` (default 2), `HIVE_POOL_WAIT_S` (10 s) and
+  `HIVE_MAX_BUDGET_S` (30 s).
+
+### Streaming pattern (checked in WP 10, built in WP 12)
 
 - Use FastAPI's built-in SSE: `response_class=EventSourceResponse` on a path operation that
-  `yield`s events (`fastapi.sse`), so no `sse-starlette`. Event models become part of the
-  OpenAPI schema.
-- A streaming route takes `DatabaseDependency`, not `SessionDependency`: function-scoped
-  dependencies are closed while the generator still runs (an `IllegalStateChangeError`).
-  Open short sessions with `database.session_factory()`: one to load the game before
-  streaming, one to commit the decision at the end. No connection is held during the
-  stream.
+  `yield`s events (`fastapi.sse`), so no `sse-starlette`. The events are pydantic models
+  told apart by a `type` field (`ThinkEvent`, a discriminated union of `info`,
+  `candidate`, `decision` and `error`), sent as the `data` of each server-sent event, so
+  the OpenAPI schema types them (`itemSchema.data.contentSchema`). FastAPI only names the
+  SSE `event:` field for untyped `ServerSentEvent` items, so typed events trade it for the
+  schema; clients branch on `type`.
+- FastAPI runs the generator in a task of its own after the response started, so errors
+  raised there cannot become error responses. The checks therefore run in a yield
+  dependency (`start_thinking`, request scoped): it loads the game in a short session,
+  builds the `ThinkingPlan` (checks, spec and clamped budget), borrows the worker and
+  starts the decision in a task group it owns, then yields the running `AgentThinking`.
+  Request-scoped dependencies exit after the response ended, in the request task, so the
+  worker is held for the whole stream.
+- A streaming route takes `SessionFactoryDependency`, not `SessionDependency`:
+  function-scoped dependencies are closed while the generator still runs (an
+  `IllegalStateChangeError`), and a request-scoped dependency cannot depend on them. Short
+  sessions come from the factory: one to load the game before streaming, one to commit
+  the decision at the end. No connection is held during the stream. Tests override
+  `get_session_factory` to join the sessions to the test transaction.
 - `AgentWorker.decide` blocks on pipes, so it runs in `anyio.to_thread.run_sync` with a
   `CapacityLimiter` sized to the pool (not the default limiter shared with other blocking
-  calls). Its `message_callback` forwards messages into an `anyio` memory object stream
-  with `anyio.from_thread.run_sync`, which the route reads and yields as events.
-- A client disconnect cancels the route; the cancellation sets the stop event and the worker
-  returns to the pool after `IdleMessage`.
+  calls). Its `message_callback` forwards messages into an unbounded `anyio` memory object
+  stream with `anyio.from_thread.run_sync`, followed by the `DecisionRecord`; the route
+  reads it and yields events. The receive end stays open until the decision returned, so
+  the worker thread never sends into a closed stream.
+- A client disconnect ends the response; the dependency then calls
+  `AgentWorker.cancel()` (sets the stop event) and waits for the decision task, so the
+  worker returns to the pool after `IdleMessage` and nothing is committed. A cancel that
+  races ahead of `decide` clearing the stop event is repeated on the next forwarded
+  message.
 
 ## Observability (WP 12)
 
@@ -161,3 +199,20 @@ to `index.html` for client-side routes.
   `agents-and-matches.md`, pool gauges, `hive_photo_read_seconds{reader}`,
   `hive_photo_match_total{outcome}` (auto, candidates, failed).
 - A `ServiceMonitor` scrapes `/metrics` in the cluster (WP 26).
+
+Implementation notes (WP 12):
+
+- `api/metrics.py`: `ApiMetrics` holds every metric in a registry of its own per app, so
+  apps in one process (tests) do not share counts. `/metrics` (at the root, next to the
+  probes) renders it in the Prometheus text format.
+- `hive_http_request_seconds{method, route, status}` is recorded by
+  `HttpMetricsMiddleware`, a plain ASGI middleware (no `BaseHTTPMiddleware`, which would
+  buffer streams). `route` is the path template the router stored in the scope, or
+  `unmatched`, so IDs and unknown paths add no labels. The duration lasts until the end
+  of the response body, so a thinking stream counts until its decision.
+- The decision log line (`hive.api.thinking`) has the message, `game_id`, `agent_kind`,
+  `cancelled` and the whole record under `decision`, plus the request ID. A cancelled
+  decision is logged but only its worker restart counts in the metrics, since its time
+  and close reason reflect the disconnect.
+- Pool gauges read the pool when scraped (`Gauge.set_function`). The photo metrics come
+  with the photo flow (WP 16, WP 19).
