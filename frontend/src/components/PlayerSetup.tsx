@@ -20,11 +20,10 @@ import {
   agentDraft,
   HUMAN_DRAFT,
   parsePlayerDraft,
+  SIDE_TITLES,
   type PlayerDraft,
   type PlayerSide,
 } from "@/lib/players";
-
-const SIDE_TITLES: Record<PlayerSide, string> = { white: "White", black: "Black" };
 
 interface PlayerSetupProps {
   side: PlayerSide;

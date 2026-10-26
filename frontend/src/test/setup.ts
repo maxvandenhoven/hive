@@ -13,6 +13,8 @@ globalThis.ResizeObserver = class {
   unobserve() {}
   disconnect() {}
 };
+// jsdom does not lay out SVGs, so the board finds no screen positions.
+SVGSVGElement.prototype.getScreenCTM = () => null;
 // Sonner follows the colour scheme of the system.
 window.matchMedia = (query: string): MediaQueryList => {
   const list = new EventTarget() as MediaQueryList;

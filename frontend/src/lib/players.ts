@@ -19,6 +19,8 @@ export type PlayerSide = "white" | "black";
 
 export const PLAYER_SIDES: PlayerSide[] = ["white", "black"];
 
+export const SIDE_TITLES: Record<PlayerSide, string> = { white: "White", black: "Black" };
+
 /** An agent side as the form edits it, with the text typed into each input. */
 export interface AgentPlayerDraft {
   type: "agent";
