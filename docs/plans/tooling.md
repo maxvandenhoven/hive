@@ -93,21 +93,30 @@ One root `Makefile`; every command a session needs is a target.
 
 | Target | Does |
 |---|---|
-| `make sync` | `uv sync --all-groups --all-extras` |
-| `make format` | `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` once it exists |
-| `make lint` | `ruff check --fix`, comment checker, docstring checker on `src/`; `eslint` in `frontend/` |
-| `make type` | `ty check`; `tsc --noEmit` in `frontend/` |
+| `make sync` | `uv sync --all-groups --all-extras` and `npm ci` in `frontend/` |
+| `make format` | `ruff format`, `ruff check --fix --select I`; `prettier --write` in `frontend/` |
+| `make lint` | `ruff check --fix`, comment checker, docstring checker on `src/`; `eslint --fix` in `frontend/` |
+| `make type` | `ty check`; `tsc -b --noEmit` in `frontend/` |
 | `make test` | `pytest` with coverage (excludes `slow`, `core = "sysmon"` keeps tracing cheap, `concurrency = ["multiprocessing", "thread"]` measures match worker processes); `vitest run` in `frontend/` |
 | `make test-slow` | `pytest -m slow` (deep perft and similar) |
 | `make check` | `format lint type` (no tests) |
 | `make perft` | `hive bench perft --depth 6` on the start position: a speed baseline that also fails on a count mismatch |
 | `make dev-services` | compose up (Postgres, Garage) and wait until healthy, then `hive db upgrade` |
-| `make dev` | `make dev-services`, then `hive serve --reload`; vite dev server from WP 13 |
+| `make dev` | `make dev-services`, then `hive serve --reload` on port 8000 and the vite dev server on port 5173, which proxies `/api` to it (set `HIVE_API_URL` to proxy elsewhere) |
 | `make dev-down` | compose down (volumes are kept) |
-| `make api-client` | regenerate the OpenAPI TypeScript client |
+| `make api-client` | `hive openapi` writes the schema from the app without a server or settings, then `openapi-typescript` generates `frontend/src/api/schema.ts` |
 | `make install-hooks` | install pre-commit hooks (including commit-msg) |
 
+`format`, `lint`, `type` and `test` each run a `-python` and a `-frontend` target (for
+example `make lint-python`), so CI runs the two halves in separate jobs. The frontend targets
+run `npm ci` first when `frontend/node_modules` is missing or older than the lockfile.
 Frontend targets are added by WP 13; dev targets by WP 10.
+
+Frontend tooling (WP 13): ESLint uses `typescript-eslint` `strictTypeChecked` with the React
+hooks and React refresh rules; Prettier uses a print width of 90 and sorts Tailwind classes.
+The shadcn/ui primitives in `src/components/ui/` and the generated `src/api/schema.ts` are
+not linted, and the generated file is not formatted either. TypeScript is pinned to 5.9
+because `openapi-typescript` 7 declares a TypeScript 5 peer dependency.
 
 ## Claude Code hooks
 
@@ -117,7 +126,7 @@ Frontend targets are added by WP 13; dev targets by WP 10.
   JSON from stdin, takes `tool_input.file_path`, and for `*.py` runs `ruff format`,
   `ruff check --fix`, the comment checker and, under `src/`, the docstring checker on that
   file only; for
-  `frontend/**/*.{ts,tsx,css}` runs `prettier --write` (once the frontend exists). It exits
+  `frontend/src/**/*.{ts,tsx,css}` runs `prettier --write` (once `npm ci` has run). It exits
   0 when the file is not formattable and prints remaining lint and comment errors to stderr
   with exit code 2, so Claude sees and fixes them.
 - **Stop**: `make check`, so type errors surface before a session ends. (Replaces the
@@ -132,10 +141,11 @@ commits), and a local hook running `make check` on commit.
 
 On every PR and on `main`:
 
-- Python: `uv sync --locked`, `make check`, `make test` (includes shallow perft; API tests
-  use testcontainers Postgres, available on GitHub-hosted runners), coverage floor.
-- Frontend (from WP 13): `npm ci`, lint, typecheck, test, build, and a check that
-  `make api-client` produces no diff.
+- Python: `uv sync --locked`, `make format-python lint-python type-python`,
+  `make test-python` (includes shallow perft; API tests use testcontainers Postgres,
+  available on GitHub-hosted runners), coverage floor.
+- Frontend (from WP 13): `npm ci`, lint, format check, typecheck, test, build, and a check
+  that `make api-client` produces no diff in `frontend/src/api/schema.ts`.
 - `uv.lock` and `package-lock.json` must be up to date (`--locked` / `npm ci`).
 
 Release workflow (`release.yaml`) is added in WP 25, see `deployment.md`.
