@@ -1,4 +1,4 @@
-"""The game service: creating, finding, changing and deleting stored games.
+"""The game service: creating, finding, changing, playing and deleting stored games.
 
 Route handlers stay thin: they parse the request, call a `GameService` method and build
 the response model. The service is also what background work such as committing an agent
@@ -13,10 +13,40 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from hive.api.db.models import GameRow, GameStatus
-from hive.api.errors import GameNotFoundError
-from hive.api.schemas import GameCreate, GameUpdate
+from hive.api.db.models import (
+    GameResult,
+    GameRow,
+    GameStatus,
+    MoveRow,
+    MoveSource,
+    PhotoRow,
+    utc_now,
+)
+from hive.api.errors import (
+    AgentTurnError,
+    CoordinateEmptyError,
+    GameNotActiveError,
+    GameNotFoundError,
+    MoveNotLegalError,
+    NoMoveToUndoError,
+    PhotoNotFoundError,
+    PieceNotMovableError,
+    PlyConflictError,
+    PlyOutOfRangeError,
+)
+from hive.api.players import AgentPlayer
+from hive.api.schemas import (
+    GameCreate,
+    GamePosition,
+    GameUpdate,
+    MoveCreate,
+    PieceTargets,
+)
 from hive.api.storage import ObjectStore
+from hive.engine.errors import IllegalMoveError
+from hive.engine.grid import Coordinate
+from hive.engine.state import GameState, Move
+from hive.match.records import DecisionRecord
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +98,13 @@ class GameService:
 
         return game
 
-    async def get_game(self, game_id: uuid.UUID) -> GameRow:
+    async def get_game(self, game_id: uuid.UUID, *, lock: bool = False) -> GameRow:
         """Load a game with its moves.
 
         Args:
             game_id: The game ID.
+            lock: Whether to lock the game row until the next commit or rollback, so
+                writes to the game, such as playing and undoing moves, run one at a time.
 
         Returns:
             The game.
@@ -81,7 +113,7 @@ class GameService:
             GameNotFoundError: If there is no game with the ID.
         """
         game = await self.session.get(
-            GameRow, game_id, options=[selectinload(GameRow.moves)]
+            GameRow, game_id, options=[selectinload(GameRow.moves)], with_for_update=lock
         )
 
         if game is None:
@@ -141,6 +173,248 @@ class GameService:
         await self.session.refresh(game, attribute_names=["ply_count"])
 
         return game
+
+    async def get_position(self, game_id: uuid.UUID, ply: int | None) -> GamePosition:
+        """Replay a game to one of its positions.
+
+        Args:
+            game_id: The game ID.
+            ply: The number of moves to replay, or `None` for the latest position.
+
+        Returns:
+            The position after the moves.
+
+        Raises:
+            GameNotFoundError: If there is no game with the ID.
+            PlyOutOfRangeError: If the ply is past the last move.
+        """
+        game = await self.get_game(game_id)
+        ply_count = len(game.moves)
+
+        if ply is None:
+            ply = ply_count
+        elif ply > ply_count:
+            raise PlyOutOfRangeError(ply=ply, ply_count=ply_count)
+
+        return GamePosition.from_state(game=game, state=game.replay(ply), ply=ply)
+
+    async def get_targets(self, game_id: uuid.UUID, coord: Coordinate) -> PieceTargets:
+        """Get the legal targets of a piece in the latest position of a game.
+
+        Args:
+            game_id: The game ID.
+            coord: The coordinate of the piece, which is the top piece of its stack.
+
+        Returns:
+            The piece with the coordinates it may move to.
+
+        Raises:
+            GameNotFoundError: If there is no game with the ID.
+            CoordinateEmptyError: If there is no piece at the coordinate.
+            PieceNotMovableError: If the piece cannot move, for example because it belongs
+                to the other side or the game is over.
+        """
+        game = await self.get_game(game_id)
+        state = game.replay()
+
+        if not state.is_occupied(coord):
+            raise CoordinateEmptyError(coord)
+
+        if game.rules.is_finished(state):
+            reason = "the game is over"
+        else:
+            reason = game.rules.immobility_reason(state=state, coord=coord)
+
+        if reason is not None:
+            raise PieceNotMovableError(coord=coord, reason=reason)
+
+        return PieceTargets(
+            coord=coord,
+            piece=state.get_top_piece(coord).type,
+            targets=sorted(game.rules.target_coords(state=state, coord=coord)),
+        )
+
+    async def play_move(self, game_id: uuid.UUID, body: MoveCreate) -> GamePosition:
+        """Play a move entered by hand or read from a photo.
+
+        Args:
+            game_id: The game ID.
+            body: The move, how it was entered and the ply the client expects.
+
+        Returns:
+            The position after the move.
+
+        Raises:
+            GameNotFoundError: If there is no game with the ID.
+            PlyConflictError: If the game is not at the expected ply.
+            GameNotActiveError: If the game is finished or abandoned.
+            AgentTurnError: If an agent plays the side to move and the request does not
+                allow entering its move.
+            PhotoNotFoundError: If the photo is not a photo of the game.
+            MoveNotLegalError: If the move is not legal.
+        """
+        game = await self.get_game(game_id, lock=True)
+        state = game.replay()
+
+        if body.expected_ply != len(game.moves):
+            raise PlyConflictError(
+                expected_ply=body.expected_ply, ply_count=len(game.moves)
+            )
+
+        self.check_active(game=game, state=state)
+        side = state.current_player
+
+        if isinstance(game.player(side), AgentPlayer) and not body.allow_agent_side:
+            raise AgentTurnError(side)
+
+        if body.photo_id is not None:
+            photo = await self.session.get(PhotoRow, body.photo_id)
+
+            if photo is None or photo.game_id != game.id:
+                raise PhotoNotFoundError(body.photo_id)
+
+            photo.confirmed = True
+
+        return await self.append_move(
+            game=game,
+            state=state,
+            move=body.move,
+            source=body.source,
+            photo_id=body.photo_id,
+        )
+
+    def check_active(self, game: GameRow, state: GameState) -> None:
+        """Check that moves can be played in a game.
+
+        Args:
+            game: The game.
+            state: The latest state of the game.
+
+        Raises:
+            GameNotActiveError: If the game is finished or abandoned, by its status or
+                by its latest state.
+        """
+        if game.status is not GameStatus.ACTIVE:
+            raise GameNotActiveError(game_id=game.id, status=game.status)
+
+        if game.rules.is_finished(state):
+            raise GameNotActiveError(game_id=game.id, status=GameStatus.FINISHED)
+
+    async def append_move(
+        self,
+        game: GameRow,
+        state: GameState,
+        move: Move | None,
+        source: MoveSource,
+        photo_id: uuid.UUID | None = None,
+        decision: DecisionRecord | None = None,
+    ) -> GamePosition:
+        """Check, store and commit a move, finishing the game if the move ends it.
+
+        This is where every way of entering a move ends, including agent decisions.
+
+        Args:
+            game: The game, loaded with `lock` and its moves.
+            state: The latest state of the game, which the move is applied to.
+            move: The move, or `None` for a pass.
+            source: How the move was entered.
+            photo_id: The photo the move was read from, or `None`.
+            decision: The decision behind an agent move, or `None`.
+
+        Returns:
+            The position after the move.
+
+        Raises:
+            GameNotActiveError: If the game is finished or abandoned.
+            MoveNotLegalError: If the move is not legal.
+        """
+        self.check_active(game=game, state=state)
+
+        try:
+            game.rules.apply_checked_move(state=state, move=move)
+        except IllegalMoveError as e:
+            raise MoveNotLegalError(str(e)) from e
+
+        game.moves.append(
+            MoveRow(
+                ply=len(game.moves),
+                move=move,
+                source=source,
+                photo_id=photo_id,
+                decision=decision,
+            )
+        )
+        result = GameResult.from_winners(game.rules.winners(state))
+
+        if result is not None:
+            game.status = GameStatus.FINISHED
+            game.result = result
+
+        game.updated_at = utc_now()
+        await self.session.commit()
+        await self.session.refresh(game, attribute_names=["ply_count"])
+        logger.info(
+            "Played `%s` in game `%s` at ply %d.",
+            "pass" if move is None else move,
+            game.id,
+            len(game.moves) - 1,
+            extra={"game_id": str(game.id)},
+        )
+
+        return GamePosition.from_state(game=game, state=state, ply=len(game.moves))
+
+    async def undo_move(
+        self, game_id: uuid.UUID, expected_ply: int | None
+    ) -> GamePosition:
+        """Undo the last move of a game, reopening it if the move finished it.
+
+        Args:
+            game_id: The game ID.
+            expected_ply: The ply the client expects the game at, or `None` to undo
+                whatever move is last.
+
+        Returns:
+            The position after undoing the move.
+
+        Raises:
+            GameNotFoundError: If there is no game with the ID.
+            PlyConflictError: If the game is not at the expected ply.
+            NoMoveToUndoError: If the game has no moves.
+        """
+        game = await self.get_game(game_id, lock=True)
+
+        if expected_ply is not None and expected_ply != len(game.moves):
+            raise PlyConflictError(expected_ply=expected_ply, ply_count=len(game.moves))
+
+        if not game.moves:
+            raise NoMoveToUndoError(game_id)
+
+        move = game.moves.pop()
+
+        # The photo of the move no longer proposed a committed move.
+        if move.photo_id is not None:
+            photo = await self.session.get(PhotoRow, move.photo_id)
+
+            if photo is not None:
+                photo.confirmed = False
+
+        if game.status is GameStatus.FINISHED:
+            game.status = GameStatus.ACTIVE
+            game.result = None
+
+        game.updated_at = utc_now()
+        await self.session.commit()
+        await self.session.refresh(game, attribute_names=["ply_count"])
+        logger.info(
+            "Undid ply %d of game `%s`.",
+            move.ply,
+            game.id,
+            extra={"game_id": str(game.id)},
+        )
+
+        return GamePosition.from_state(
+            game=game, state=game.replay(), ply=len(game.moves)
+        )
 
     async def delete_game(self, game_id: uuid.UUID) -> None:
         """Delete a game with its moves, its photos and their stored images.

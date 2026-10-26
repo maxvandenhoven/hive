@@ -1,4 +1,4 @@
-"""Routes that create, list, change, delete and export games."""
+"""Routes that create, list, change, delete, export and play games."""
 
 import uuid
 from typing import Annotated
@@ -7,15 +7,31 @@ from fastapi import APIRouter, Query, Response, status
 
 from hive.api.db.models import GameStatus
 from hive.api.dependencies import GameServiceDependency
-from hive.api.errors import GAME_NOT_FOUND_RESPONSES
+from hive.api.errors import (
+    GAME_NOT_FOUND_RESPONSES,
+    AgentTurnError,
+    CoordinateEmptyError,
+    GameNotActiveError,
+    GameNotFoundError,
+    MoveNotLegalError,
+    NoMoveToUndoError,
+    PhotoNotFoundError,
+    PieceNotMovableError,
+    PlyConflictError,
+    PlyOutOfRangeError,
+    error_responses,
+)
 from hive.api.routes import API_PREFIX
 from hive.api.schemas import (
     GAME_PAGE_MAX_LIMIT,
     GameCreate,
     GameDetail,
     GamePage,
+    GamePosition,
     GameSummary,
     GameUpdate,
+    MoveCreate,
+    PieceTargets,
 )
 from hive.engine.record import GameRecord
 
@@ -163,3 +179,141 @@ async def export_game(
     )
 
     return record
+
+
+@router.get(
+    "/{game_id}/state",
+    description="Get the position of a game at a ply, with what the side to move may "
+    "play. Without `ply`, the latest position.",
+    responses=error_responses(GameNotFoundError, PlyOutOfRangeError),
+)
+async def read_game_state(
+    game_id: uuid.UUID,
+    games: GameServiceDependency,
+    ply: Annotated[
+        int | None,
+        Query(ge=0, description="The number of moves to replay; the latest by default."),
+    ] = None,
+) -> GamePosition:
+    """Get the position of a game at a ply, with what the side to move may play.
+
+    Args:
+        game_id: The game ID.
+        games: The game service.
+        ply: The number of moves to replay, or `None` for the latest position.
+
+    Returns:
+        The position.
+
+    Raises:
+        GameNotFoundError: If there is no game with the ID.
+        PlyOutOfRangeError: If the ply is past the last move.
+    """
+    return await games.get_position(game_id=game_id, ply=ply)
+
+
+@router.get(
+    "/{game_id}/targets",
+    description="Get the legal targets of the piece on top of the stack at `(q, r)` in "
+    "the latest position.",
+    responses=error_responses(
+        GameNotFoundError, CoordinateEmptyError, PieceNotMovableError
+    ),
+)
+async def read_piece_targets(
+    game_id: uuid.UUID,
+    games: GameServiceDependency,
+    q: Annotated[int, Query(description="The column of the piece.")],
+    r: Annotated[int, Query(description="The row of the piece.")],
+) -> PieceTargets:
+    """Get the legal targets of the piece on top of the stack at `(q, r)`.
+
+    Args:
+        game_id: The game ID.
+        games: The game service.
+        q: The axial column of the piece.
+        r: The axial row of the piece.
+
+    Returns:
+        The piece with the coordinates it may move to.
+
+    Raises:
+        GameNotFoundError: If there is no game with the ID.
+        CoordinateEmptyError: If there is no piece at the coordinate.
+        PieceNotMovableError: If the piece cannot move.
+    """
+    return await games.get_targets(game_id=game_id, coord=(q, r))
+
+
+@router.post(
+    "/{game_id}/moves",
+    status_code=status.HTTP_201_CREATED,
+    description="Play a move entered by hand or read from a photo, at the expected ply. "
+    "Moves for a side that an agent plays need `allow_agent_side`.",
+    responses=error_responses(
+        GameNotFoundError,
+        PlyConflictError,
+        GameNotActiveError,
+        AgentTurnError,
+        PhotoNotFoundError,
+        MoveNotLegalError,
+    ),
+)
+async def play_move(
+    game_id: uuid.UUID, body: MoveCreate, games: GameServiceDependency
+) -> GamePosition:
+    """Play a move entered by hand or read from a photo, at the expected ply.
+
+    Args:
+        game_id: The game ID.
+        body: The move, how it was entered and the ply the client expects.
+        games: The game service.
+
+    Returns:
+        The position after the move, whose `last_move` is the stored move.
+
+    Raises:
+        GameNotFoundError: If there is no game with the ID.
+        PlyConflictError: If the game is not at the expected ply.
+        GameNotActiveError: If the game is finished or abandoned.
+        AgentTurnError: If an agent plays the side to move without `allow_agent_side`.
+        PhotoNotFoundError: If the photo is not a photo of the game.
+        MoveNotLegalError: If the move is not legal.
+    """
+    return await games.play_move(game_id=game_id, body=body)
+
+
+@router.delete(
+    "/{game_id}/moves/last",
+    description="Undo the last move, reopening the game if the move finished it.",
+    responses=error_responses(GameNotFoundError, PlyConflictError, NoMoveToUndoError),
+)
+async def undo_move(
+    game_id: uuid.UUID,
+    games: GameServiceDependency,
+    expected_ply: Annotated[
+        int | None,
+        Query(
+            ge=0,
+            description="The ply the client expects the game at; the move is only "
+            "undone if it is.",
+        ),
+    ] = None,
+) -> GamePosition:
+    """Undo the last move, reopening the game if the move finished it.
+
+    Args:
+        game_id: The game ID.
+        games: The game service.
+        expected_ply: The ply the client expects the game at, or `None` to undo
+            whatever move is last.
+
+    Returns:
+        The position after undoing the move.
+
+    Raises:
+        GameNotFoundError: If there is no game with the ID.
+        PlyConflictError: If the game is not at the expected ply.
+        NoMoveToUndoError: If the game has no moves.
+    """
+    return await games.undo_move(game_id=game_id, expected_ply=expected_ply)

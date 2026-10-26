@@ -15,9 +15,13 @@ def test_operation_ids_are_handler_names(settings: ApiSettings) -> None:
         "export_game",
         "list_agent_kinds",
         "list_games",
+        "play_move",
         "read_game",
+        "read_game_state",
         "read_liveness",
+        "read_piece_targets",
         "read_readiness",
+        "undo_move",
         "update_game",
     ]
 
@@ -51,3 +55,20 @@ def test_engine_values_are_typed_in_the_schema(settings: ApiSettings) -> None:
         "kind",
         "params_schema",
     ]
+
+
+def test_error_responses_keep_validation_errors(settings: ApiSettings) -> None:
+    schema = create_app(settings=settings).openapi()
+    play_move = schema["paths"]["/api/games/{game_id}/moves"]["post"]
+    unprocessable = play_move["responses"]["422"]["content"]["application/json"]
+
+    assert unprocessable["schema"] == {
+        "anyOf": [
+            {"$ref": "#/components/schemas/ErrorResponse"},
+            {"$ref": "#/components/schemas/HTTPValidationError"},
+        ]
+    }
+    assert {"ErrorResponse", "HTTPValidationError"} <= set(
+        schema["components"]["schemas"]
+    )
+    assert set(play_move["responses"]) == {"201", "404", "409", "422"}

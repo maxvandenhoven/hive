@@ -4,7 +4,14 @@ import uuid
 import pytest
 from fastapi import Request, status
 
-from hive.api.errors import GameNotFoundError, handle_api_error
+from hive.api.errors import (
+    ErrorResponse,
+    GameNotFoundError,
+    PlyConflictError,
+    PlyOutOfRangeError,
+    error_responses,
+    handle_api_error,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -25,3 +32,18 @@ async def test_handler_builds_error_response() -> None:
 async def test_handler_rejects_other_errors() -> None:
     with pytest.raises(TypeError):
         await handle_api_error(request=Request({"type": "http"}), error=ValueError())
+
+
+def test_error_responses_share_status_codes() -> None:
+    responses = error_responses(GameNotFoundError, PlyConflictError, PlyOutOfRangeError)
+
+    assert responses[status.HTTP_404_NOT_FOUND] == {
+        "model": ErrorResponse,
+        "description": "Game not found.",
+    }
+    assert responses[status.HTTP_409_CONFLICT]["description"] == (
+        "The game is not at the expected ply."
+    )
+    assert responses[status.HTTP_422_UNPROCESSABLE_CONTENT]["description"] == (
+        "The ply is past the last move. Or the request is not valid."
+    )
