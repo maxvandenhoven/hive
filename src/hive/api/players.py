@@ -8,6 +8,9 @@ from pydantic import Field
 from hive.agents.factory import AgentSpec
 from hive.engine.codec import JsonCodec
 
+DEFAULT_AGENT_BUDGET_S = 5.0
+"""The time budget of an agent decision in seconds when none is configured."""
+
 
 @dataclass(frozen=True, slots=True)
 class HumanPlayer(JsonCodec):
@@ -32,7 +35,9 @@ class AgentPlayer(JsonCodec):
     """
 
     spec: AgentSpec
-    budget_s: Annotated[float, Field(gt=0.0, allow_inf_nan=False)] = 5.0
+    budget_s: Annotated[float, Field(gt=0.0, allow_inf_nan=False)] = (
+        DEFAULT_AGENT_BUDGET_S
+    )
     type: Literal["agent"] = "agent"
 
 

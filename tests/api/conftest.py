@@ -1,5 +1,5 @@
 import os
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Callable, Generator
 from contextlib import asynccontextmanager
 
 import boto3
@@ -16,7 +16,8 @@ from testcontainers.community.postgres import PostgresContainer
 
 from hive.api.app import create_app
 from hive.api.db.session import Database
-from hive.api.dependencies import get_session
+from hive.api.dependencies import get_session_factory
+from hive.api.pool import AgentPool
 from hive.api.settings import ApiSettings, DatabaseSettings
 from hive.api.storage import S3_CLIENT_CONFIG, ObjectStore
 
@@ -26,6 +27,12 @@ UNREACHABLE_DATABASE_URL = "postgresql+psycopg://hive:hive@127.0.0.1:1/hive"
 """A database URL that refuses connections immediately."""
 
 BUCKET = "hive"
+
+TESTING_MODULE = "hive.match.testing"
+"""The test agents, imported only in workers to keep them out of `list_agents`."""
+
+POOL_WAIT_S = 0.2
+POOL_GRACE_S = 0.3
 
 
 @pytest.fixture(scope="session")
@@ -131,6 +138,16 @@ def store() -> Generator[ObjectStore]:
         yield ObjectStore(client=client, bucket=BUCKET)
 
 
+@pytest.fixture(scope="function")
+async def pool() -> AsyncGenerator[AgentPool]:
+    """Yield a pool of two workers that can run the test agents, closed afterwards."""
+    pool = AgentPool(
+        capacity=2, wait_s=POOL_WAIT_S, grace_s=POOL_GRACE_S, preload=[TESTING_MODULE]
+    )
+    yield pool
+    await pool.close()
+
+
 @asynccontextmanager
 async def serve(app: FastAPI) -> AsyncGenerator[httpx2.AsyncClient]:
     """Run the lifespan of an app and yield a client that calls it in-process."""
@@ -144,25 +161,31 @@ async def serve(app: FastAPI) -> AsyncGenerator[httpx2.AsyncClient]:
 
 
 @pytest.fixture(scope="function")
-async def client(
+def app(
     settings: ApiSettings,
     database: Database,
     connection: AsyncConnection,
     store: ObjectStore,
-) -> AsyncGenerator[httpx2.AsyncClient]:
-    """Yield a client of an app on the test database.
+    pool: AgentPool,
+) -> FastAPI:
+    """Build an app on the test database and the test pool.
 
-    Every request gets its own session, joined to the transaction of the test.
+    Every session a request opens is joined to the transaction of the test.
     """
-    app = create_app(settings=settings, database=database, store=store)
+    app = create_app(settings=settings, database=database, store=store, pool=pool)
 
-    async def get_test_session() -> AsyncGenerator[AsyncSession]:
-        """Open the session of one request in the transaction of the test."""
-        async with join_session(connection) as session:
-            yield session
+    async def get_test_session_factory() -> Callable[[], AsyncSession]:
+        """Open the sessions of a request in the transaction of the test."""
+        return lambda: join_session(connection)
 
-    app.dependency_overrides[get_session] = get_test_session
+    app.dependency_overrides[get_session_factory] = get_test_session_factory
 
+    return app
+
+
+@pytest.fixture(scope="function")
+async def client(app: FastAPI) -> AsyncGenerator[httpx2.AsyncClient]:
+    """Run the lifespan of the test app and yield a client that calls it."""
     async with serve(app) as client:
         yield client
 

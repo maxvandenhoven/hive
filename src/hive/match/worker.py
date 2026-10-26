@@ -30,6 +30,7 @@ from hive.match.turn import (
     FailedMessage,
     IdleMessage,
     PipeTurnContext,
+    ResetMessage,
     ThinkMessage,
     WorkerMessage,
 )
@@ -284,6 +285,55 @@ class AgentWorker:
             failure=None if failure is None else failure[:MAX_FAILURE_LENGTH],
         )
 
+    def reset(self) -> None:
+        """Reset the agent before it plays another game, clearing what it kept.
+
+        An agent that raises or does not answer within the grace period is replaced by
+        restarting the worker, which builds a fresh agent.
+
+        Raises:
+            RuntimeError: If the worker is not started.
+            AgentWorkerError: If the worker has to be restarted and fails to start.
+        """
+        if self.conn is None:
+            msg = f"The worker of `{self.label}` is not started."
+            raise RuntimeError(msg)
+
+        self.turn_id += 1
+        failure = f"The agent did not reset within the grace period of {self.grace_s} s."
+
+        try:
+            self.conn.send(ResetMessage(self.turn_id))
+        except OSError:
+            failure = "The worker exited before the reset."
+        else:
+            grace_deadline = time.monotonic() + self.grace_s
+
+            while (remaining := grace_deadline - time.monotonic()) > 0:
+                message = self.receive(remaining)
+
+                if message is None or message.turn_id != self.turn_id:
+                    continue
+
+                if isinstance(message, IdleMessage):
+                    return
+
+                if isinstance(message, FailedMessage):
+                    failure = message.error
+                    break
+
+        logger.warning("Restarting the worker of `%s` to reset: %s", self.label, failure)
+        self.restart()
+
+    def cancel(self) -> None:
+        """Stop the agent of the running decision, which then closes when it returns.
+
+        Safe to call from another thread than the one running `decide`, and a no-op when
+        the worker is not started. A decision that starts afterwards clears the stop.
+        """
+        if self.stop_event is not None:
+            self.stop_event.set()
+
     def restart(self) -> None:
         """Kill the worker process and start a new one, which builds the agent again.
 
@@ -405,7 +455,7 @@ def run_worker_process(
     """Build the agent and decide moves until the runner closes the pipe.
 
     Runs in the worker process. Errors of the agent are reported as `FailedMessage`, so
-    the worker survives an agent that raises during a turn.
+    the worker survives an agent that raises during a turn or a reset.
 
     Args:
         conn: The worker end of the pipe to the runner.
@@ -431,12 +481,22 @@ def run_worker_process(
 
     while True:
         try:
-            message: ThinkMessage | None = conn.recv()
+            message: ThinkMessage | ResetMessage | None = conn.recv()
         except EOFError:
             return
 
         if message is None:
             return
+
+        if isinstance(message, ResetMessage):
+            try:
+                agent.reset()
+            except Exception as e:
+                conn.send(FailedMessage(turn_id=message.turn_id, error=describe_error(e)))
+            else:
+                conn.send(IdleMessage(message.turn_id))
+
+            continue
 
         turn = PipeTurnContext(
             conn=conn,

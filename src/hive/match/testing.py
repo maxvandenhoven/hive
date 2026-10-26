@@ -149,17 +149,40 @@ class CrashingAgent(Agent):
 
 @register_agent("test-counting")
 class CountingAgent(RandomAgent):
-    """Random agent that appends a line to a file every time it is constructed."""
+    """Random agent that appends a line to a file when it is constructed or reset.
 
-    def __init__(self, rules: Rules, *, seed: int, path: str) -> None:
+    A construction writes the process ID, a reset writes `reset`, and a reset raises
+    instead when `fail_reset` is set.
+    """
+
+    def __init__(
+        self, rules: Rules, *, seed: int, path: str, fail_reset: bool = False
+    ) -> None:
         """Initialize the agent and count the construction.
 
         Args:
             rules: The rules governing the game.
             seed: The seed for the random number generator of the agent.
             path: The file to append a line to.
+            fail_reset: Whether resetting raises instead of writing a line.
         """
         super().__init__(rules=rules, seed=seed)
+        self.path = Path(path)
+        self.fail_reset = fail_reset
 
-        with Path(path).open("a") as file:
+        with self.path.open("a") as file:
             file.write(f"{os.getpid()}\n")
+
+    @override
+    def reset(self) -> None:
+        """Count the reset, or raise if configured to.
+
+        Raises:
+            RuntimeError: If `fail_reset` is set.
+        """
+        if self.fail_reset:
+            msg = "The agent failed to reset on purpose."
+            raise RuntimeError(msg)
+
+        with self.path.open("a") as file:
+            file.write("reset\n")

@@ -256,9 +256,10 @@ Implementation notes (WP 08):
   `CandidateSelection.collect(turn_id, legal_moves, deadline, messages, clock)`),
   `match/worker.py` (`AgentWorker` with `start`, `decide`, `restart`, `close`, usable as a
   context manager), `match/records.py`, `match/runner.py`.
-- Messages: the parent sends `ThinkMessage(turn_id, state, deadline)` and `None` to
-  close; the worker answers with `SubmissionMessage`, `InfoMessage`, `IdleMessage` and
-  `FailedMessage` (together `WorkerMessage`). Every message carries the
+- Messages: the parent sends `ThinkMessage(turn_id, state, deadline)`,
+  `ResetMessage(turn_id)` (WP 12) and `None` to close; the worker answers with
+  `SubmissionMessage`, `InfoMessage`, `IdleMessage` and `FailedMessage` (together
+  `WorkerMessage`). Every message carries the
   turn id, so a late message of an earlier turn is dropped. Turn id 0 is the startup
   handshake: `start()` waits for `IdleMessage(0)` (agent built) or `FailedMessage(0)`
   (raises `AgentWorkerError`), so model loading never counts against the first decision.
@@ -284,6 +285,11 @@ Implementation notes (WP 08):
   blake2b hash that WP 09 reuses for per-match seeds. `run(decision_callback=...)`
   streams decisions, which the runner appends to `MatchResult.decisions`.
   `AgentWorker.decide(message_callback=...)` streams submissions and info for the API.
+- WP 12 adds `AgentWorker.reset()` for pooled workers that move to another game: the
+  worker calls `Agent.reset()` and answers `IdleMessage`, and a failed or unanswered
+  reset restarts the worker. `AgentWorker.cancel()` sets the stop event from another
+  thread, so a running decision closes as soon as the agent returns (`final` with a
+  candidate); the next `decide` clears it.
 - `hive play --white SPEC --black SPEC --budget 1.0 [--max-turns 100] [--seed 0]
   [--grace 1.0] [--out result.json]` takes a YAML spec file, a preset name or inline YAML
   per seat (`AgentSpec.resolve`) and logs one line per decision and the result.
@@ -381,7 +387,7 @@ In the app (implemented in WP 12, see `api-and-data.md`):
 
 - Structured JSON logs per decision (same fields as `DecisionRecord`), with request IDs.
 - Prometheus metrics: `hive_decision_seconds` (histogram, by agent kind),
-  `hive_decision_overrun_seconds`, `hive_decision_close_total{reason}`,
-  `hive_worker_restarts_total`, `hive_worker_pool_size` / `_busy`, and
-  `hive_illegal_submissions_total`.
+  `hive_decision_overrun_seconds` (histogram, by agent kind),
+  `hive_decision_close_total{reason}`, `hive_worker_restarts_total`,
+  `hive_worker_pool_size` / `_busy`, and `hive_illegal_submissions_total`.
 - Search info is streamed to the UI live (SSE), so a person sees depth and score evolve.

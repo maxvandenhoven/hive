@@ -32,6 +32,10 @@ class ApiErrorCode(StrEnum):
     COORDINATE_EMPTY = "coordinate_empty"
     PIECE_NOT_MOVABLE = "piece_not_movable"
     NO_MOVE_TO_UNDO = "no_move_to_undo"
+    AGENT_REQUIRED = "agent_required"
+    COMMIT_NOT_ALLOWED = "commit_not_allowed"
+    POOL_BUSY = "pool_busy"
+    AGENT_UNAVAILABLE = "agent_unavailable"
 
 
 class ErrorResponse(BaseModel):
@@ -280,6 +284,66 @@ class NoMoveToUndoError(ApiError):
         """
         super().__init__(f"Game `{game_id}` has no moves to undo.")
         self.game_id = game_id
+
+
+class AgentRequiredError(ApiError):
+    """A person plays the side to move, so the request has to name an agent to think.
+
+    Attributes:
+        side: The side to move.
+    """
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = ApiErrorCode.AGENT_REQUIRED
+    description = "A person plays the side to move and no agent was given."
+
+    def __init__(self, side: Player) -> None:
+        """Create the error.
+
+        Args:
+            side: The side to move.
+        """
+        super().__init__(
+            f"A person plays `{side.name.lower()}`; name the `agent` that should think."
+        )
+        self.side = side
+
+
+class CommitNotAllowedError(ApiError):
+    """A decision may only be committed by the agent that plays the side to move."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = ApiErrorCode.COMMIT_NOT_ALLOWED
+    description = "Only the agent of the side to move may commit its decision."
+
+
+class PoolBusyError(ApiError):
+    """Every agent worker stayed busy for as long as a request may wait for one.
+
+    Attributes:
+        wait_s: The seconds the request waited.
+    """
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = ApiErrorCode.POOL_BUSY
+    description = "Every agent worker is busy."
+
+    def __init__(self, wait_s: float) -> None:
+        """Create the error.
+
+        Args:
+            wait_s: The seconds the request waited.
+        """
+        super().__init__(f"Every agent worker stayed busy for {wait_s} s; try again.")
+        self.wait_s = wait_s
+
+
+class AgentUnavailableError(ApiError):
+    """The worker process of an agent failed to start."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = ApiErrorCode.AGENT_UNAVAILABLE
+    description = "The agent failed to start."
 
 
 def error_responses(*error_types: type[ApiError]) -> dict[int | str, dict[str, Any]]:
