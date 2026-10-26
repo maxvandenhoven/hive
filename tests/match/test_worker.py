@@ -1,5 +1,6 @@
 """Tests of persistent workers, which start real worker processes."""
 
+import threading
 from pathlib import Path
 
 import pytest
@@ -205,6 +206,70 @@ class TestLifecycle:
             worker.decide(state=state, budget_s=BUDGET_S)
 
         assert len(path.read_text().splitlines()) == 2
+
+    def test_reset_keeps_agent(
+        self, rules: Rules, state: GameState, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "constructions.txt"
+
+        with start_test_worker(
+            kind="test-counting", rules=rules, path=str(path)
+        ) as worker:
+            worker.decide(state=state, budget_s=BUDGET_S)
+            worker.reset()
+            decision = worker.decide(state=state, budget_s=BUDGET_S)
+
+        lines = path.read_text().splitlines()
+        assert lines[1:] == ["reset"]
+        assert worker.restarts == 0
+        assert decision.move in rules.legal_moves(state)
+
+    def test_failed_reset_restarts_worker(
+        self, rules: Rules, state: GameState, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "constructions.txt"
+
+        with start_test_worker(
+            kind="test-counting", rules=rules, path=str(path), fail_reset=True
+        ) as worker:
+            worker.reset()
+            assert worker.restarts == 1
+            decision = worker.decide(state=state, budget_s=BUDGET_S)
+
+        assert len(path.read_text().splitlines()) == 2
+        assert not decision.worker_restarted
+
+    def test_reset_of_dead_worker_restarts_it(self, rules: Rules) -> None:
+        with AgentWorker(spec=AgentSpec("random"), rules=rules, seed=0) as worker:
+            assert worker.process is not None
+            worker.process.kill()
+            worker.process.join()
+            worker.reset()
+
+            assert worker.restarts == 1
+            assert worker.running
+
+    def test_cancel_closes_decision_early(self, rules: Rules, state: GameState) -> None:
+        with AgentWorker(spec=AgentSpec("negamax"), rules=rules, seed=0) as worker:
+            timer = threading.Timer(interval=0.2, function=worker.cancel)
+            timer.start()
+            decision = worker.decide(state=state, budget_s=10.0)
+            timer.join()
+            again = worker.decide(state=state, budget_s=BUDGET_S)
+
+        assert decision.close_reason is TurnCloseReason.FINAL
+        assert decision.elapsed_s < 1.0
+        assert not decision.worker_restarted
+        assert again.close_reason is TurnCloseReason.DEADLINE
+
+    def test_cancel_without_worker_does_nothing(self, rules: Rules) -> None:
+        AgentWorker(spec=AgentSpec("random"), rules=rules, seed=0).cancel()
+
+    def test_reset_requires_start(self, rules: Rules) -> None:
+        worker = AgentWorker(spec=AgentSpec("random"), rules=rules, seed=0)
+
+        with pytest.raises(RuntimeError, match="not started"):
+            worker.reset()
 
     @pytest.mark.parametrize(
         ("spec", "error"),

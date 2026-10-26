@@ -7,11 +7,14 @@ Responses are read from the ORM rows with `from_attributes`.
 
 import uuid
 from datetime import datetime
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from hive.agents.base import SearchInfoValue
+from hive.agents.factory import AgentSpec
 from hive.api.db.models import GameResult, GameRow, GameStatus, MoveSource
+from hive.api.errors import ApiErrorCode
 from hive.api.players import AgentPlayer, HumanPlayer, PlayerConfig
 from hive.engine.errors import InvalidBoardError
 from hive.engine.grid import Coordinate
@@ -311,6 +314,103 @@ class GamePage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ThinkRequest(BaseModel):
+    """The request body that lets an agent think about the latest position of a game.
+
+    Attributes:
+        agent: The agent that thinks, or `None` for the agent playing the side to move.
+        budget_s: The time budget in seconds, or `None` for the budget of the side to
+            move. Budgets above the maximum of the service are shortened to it.
+        commit: Whether to play the decided move in the game. Only the agent playing the
+            side to move may commit, so `agent` must be `None` or its spec.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentSpec | None = None
+    budget_s: float | None = Field(default=None, gt=0.0, allow_inf_nan=False)
+    commit: bool = False
+
+    @model_validator(mode="after")
+    def validate_agent(self) -> Self:
+        """Check the params of the agent against its kind.
+
+        Returns:
+            The request.
+
+        Raises:
+            ValueError: If the kind is not registered or the params are invalid.
+        """
+        if self.agent is not None:
+            self.agent.validate_params()
+
+        return self
+
+
+class ThinkInfoEvent(BaseModel):
+    """A progress report of the thinking agent, such as a completed search depth.
+
+    Attributes:
+        type: Always `info`, which tells the events apart.
+        info: The progress values, such as `depth`, `nodes`, `score` and `pv`.
+    """
+
+    type: Literal["info"] = "info"
+    info: dict[str, SearchInfoValue]
+
+
+class ThinkCandidateEvent(BaseModel):
+    """A legal move the agent proposed as its current answer.
+
+    Attributes:
+        type: Always `candidate`, which tells the events apart.
+        move: The proposed move, or `None` to pass.
+        final: Whether the agent is done, which ends its thinking.
+    """
+
+    type: Literal["candidate"] = "candidate"
+    move: Move | None
+    final: bool
+
+
+class ThinkDecisionEvent(BaseModel):
+    """The decision of the agent, sent once its turn closed.
+
+    Attributes:
+        type: Always `decision`, which tells the events apart.
+        decision: The record of the decision, with the decided move.
+        position: The position after the move if it was committed, otherwise `None`.
+    """
+
+    type: Literal["decision"] = "decision"
+    decision: DecisionRecord
+    position: GamePosition | None
+
+
+class ThinkErrorEvent(BaseModel):
+    """A failure after the stream started, which ends the stream.
+
+    Sent after the decision when committing it failed, for example because another move
+    was played meanwhile, or instead of the decision when the worker failed.
+
+    Attributes:
+        type: Always `error`, which tells the events apart.
+        code: What went wrong, as in error responses.
+        detail: A human-readable description.
+    """
+
+    type: Literal["error"] = "error"
+    code: ApiErrorCode
+    detail: str
+
+
+type ThinkEvent = Annotated[
+    ThinkInfoEvent | ThinkCandidateEvent | ThinkDecisionEvent | ThinkErrorEvent,
+    Field(discriminator="type"),
+]
+"""An event of a thinking stream, told apart by its `type`."""
 
 
 type HealthCheckResult = Literal["ok", "failed"]

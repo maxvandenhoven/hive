@@ -19,8 +19,10 @@ def test_operation_ids_are_handler_names(settings: ApiSettings) -> None:
         "read_game",
         "read_game_state",
         "read_liveness",
+        "read_metrics",
         "read_piece_targets",
         "read_readiness",
+        "think",
         "undo_move",
         "update_game",
     ]
@@ -29,8 +31,10 @@ def test_operation_ids_are_handler_names(settings: ApiSettings) -> None:
 def test_resources_are_under_api(settings: ApiSettings) -> None:
     paths = set(create_app(settings=settings).openapi()["paths"])
 
-    assert {"/healthz", "/readyz", "/api/agents", "/api/games"} <= paths
-    assert all(path.startswith("/api/") for path in paths - {"/healthz", "/readyz"})
+    probes = {"/healthz", "/readyz", "/metrics"}
+
+    assert {*probes, "/api/agents", "/api/games"} <= paths
+    assert all(path.startswith("/api/") for path in paths - probes)
 
 
 def test_error_responses_are_documented(settings: ApiSettings) -> None:
@@ -72,3 +76,29 @@ def test_error_responses_keep_validation_errors(settings: ApiSettings) -> None:
         schema["components"]["schemas"]
     )
     assert set(play_move["responses"]) == {"201", "404", "409", "422"}
+
+
+def test_think_events_are_typed_in_the_schema(settings: ApiSettings) -> None:
+    schema = create_app(settings=settings).openapi()
+    think = schema["paths"]["/api/games/{game_id}/think"]["post"]
+    stream = think["responses"]["200"]["content"]["text/event-stream"]
+    data = stream["itemSchema"]["properties"]["data"]
+
+    assert data["contentMediaType"] == "application/json"
+    assert data["contentSchema"] == {"$ref": "#/components/schemas/ThinkEvent"}
+    assert sorted(
+        schema["components"]["schemas"]["ThinkEvent"]["discriminator"]["mapping"]
+    ) == ["candidate", "decision", "error", "info"]
+    assert think["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ThinkRequest"
+    }
+    assert set(think["responses"]) == {"200", "404", "409", "422", "503"}
+
+
+def test_metrics_response_is_text(settings: ApiSettings) -> None:
+    schema = create_app(settings=settings).openapi()
+    responses = schema["paths"]["/metrics"]["get"]["responses"]
+
+    assert list(responses["200"]["content"]) == [
+        "text/plain; version=1.0.0; charset=utf-8"
+    ]

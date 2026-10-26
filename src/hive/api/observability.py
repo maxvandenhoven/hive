@@ -2,8 +2,8 @@
 
 Request IDs come from `asgi-correlation-id` and JSON lines from `python-json-logger`; the
 access log is uvicorn's, written through the same formatter. Latency and route metrics
-come from Prometheus in WP 12. There is no Starlette `BaseHTTPMiddleware`, which would
-buffer streamed responses such as the agent thinking stream.
+come from Prometheus (see `hive.api.metrics`). There is no Starlette `BaseHTTPMiddleware`,
+which would buffer streamed responses such as the agent thinking stream.
 """
 
 from typing import Any

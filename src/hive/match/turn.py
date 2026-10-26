@@ -4,7 +4,8 @@ A turn is a `ThinkMessage` from the runner, answered by any number of `Submissio
 and `InfoMessage` and closed by `IdleMessage` when the agent returns or `FailedMessage`
 when it raises. Every message carries the id of its turn, so messages from an earlier turn
 are ignored. Turn id 0 is the startup of the worker: `IdleMessage` means the agent was
-built, `FailedMessage` that building it raised.
+built, `FailedMessage` that building it raised. A `ResetMessage` takes a turn id as well
+and is answered the same way.
 """
 
 import logging
@@ -42,6 +43,20 @@ class ThinkMessage:
     turn_id: int
     state: GameState
     deadline: float
+
+
+@dataclass(frozen=True, slots=True)
+class ResetMessage:
+    """Ask the worker to reset its agent before the agent plays another game.
+
+    The worker answers with `IdleMessage` once the agent is reset, or `FailedMessage` if
+    resetting raised.
+
+    Attributes:
+        turn_id: The id of the reset, counted like turns so late messages are dropped.
+    """
+
+    turn_id: int
 
 
 @dataclass(frozen=True, slots=True)

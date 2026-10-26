@@ -363,6 +363,38 @@ class GameService:
 
         return GamePosition.from_state(game=game, state=state, ply=len(game.moves))
 
+    async def commit_decision(
+        self, game_id: uuid.UUID, ply: int, decision: DecisionRecord
+    ) -> GamePosition:
+        """Play the move an agent decided, storing its decision with it.
+
+        Args:
+            game_id: The game ID.
+            ply: The ply the agent decided at, which the game must still be at.
+            decision: The decision of the agent playing the side to move.
+
+        Returns:
+            The position after the move.
+
+        Raises:
+            GameNotFoundError: If there is no game with the ID.
+            PlyConflictError: If another move was played or undone meanwhile.
+            GameNotActiveError: If the game was finished or abandoned meanwhile.
+            MoveNotLegalError: If the move is not legal, which a decision never is.
+        """
+        game = await self.get_game(game_id, lock=True)
+
+        if ply != len(game.moves):
+            raise PlyConflictError(expected_ply=ply, ply_count=len(game.moves))
+
+        return await self.append_move(
+            game=game,
+            state=game.replay(),
+            move=decision.move,
+            source=MoveSource.AGENT,
+            decision=decision,
+        )
+
     async def undo_move(
         self, game_id: uuid.UUID, expected_ply: int | None
     ) -> GamePosition:

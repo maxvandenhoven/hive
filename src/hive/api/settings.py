@@ -1,7 +1,7 @@
 """Settings of the API service, read from `HIVE_` environment variables or `.env`."""
 
 from alembic.config import Config
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIGRATIONS_LOCATION = "hive.api.db:migrations"
@@ -52,6 +52,11 @@ class ApiSettings(DatabaseSettings):
         s3_access_key_id: The access key ID for the bucket.
         s3_secret_access_key: The secret access key for the bucket.
         log_level: The level of the root logger, for example `INFO`.
+        pool_size: The most agent worker processes kept at once, idle or busy.
+        pool_wait_s: The seconds a thinking request waits for a free worker before it
+            fails with 503.
+        max_budget_s: The longest time budget of one decision in seconds; longer budgets
+            are shortened to it.
     """
 
     s3_endpoint_url: str
@@ -60,3 +65,6 @@ class ApiSettings(DatabaseSettings):
     s3_access_key_id: str
     s3_secret_access_key: SecretStr
     log_level: str = "INFO"
+    pool_size: int = Field(default=2, ge=1)
+    pool_wait_s: float = Field(default=10.0, ge=0.0)
+    max_budget_s: float = Field(default=30.0, gt=0.0)

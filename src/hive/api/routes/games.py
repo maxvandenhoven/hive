@@ -1,15 +1,25 @@
 """Routes that create, list, change, delete, export and play games."""
 
 import uuid
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Response, status
+from fastapi.sse import EventSourceResponse
 
 from hive.api.db.models import GameStatus
-from hive.api.dependencies import GameServiceDependency
+from hive.api.dependencies import (
+    GameServiceDependency,
+    SessionFactoryDependency,
+    StoreDependency,
+    ThinkingDependency,
+)
 from hive.api.errors import (
     GAME_NOT_FOUND_RESPONSES,
+    AgentRequiredError,
     AgentTurnError,
+    AgentUnavailableError,
+    CommitNotAllowedError,
     CoordinateEmptyError,
     GameNotActiveError,
     GameNotFoundError,
@@ -19,6 +29,7 @@ from hive.api.errors import (
     PieceNotMovableError,
     PlyConflictError,
     PlyOutOfRangeError,
+    PoolBusyError,
     error_responses,
 )
 from hive.api.routes import API_PREFIX
@@ -32,6 +43,7 @@ from hive.api.schemas import (
     GameUpdate,
     MoveCreate,
     PieceTargets,
+    ThinkEvent,
 )
 from hive.engine.record import GameRecord
 
@@ -317,3 +329,53 @@ async def undo_move(
         NoMoveToUndoError: If the game has no moves.
     """
     return await games.undo_move(game_id=game_id, expected_ply=expected_ply)
+
+
+@router.post(
+    "/{game_id}/think",
+    response_class=EventSourceResponse,
+    description="Let an agent think about the latest position within a time budget, "
+    "streaming `info` and `candidate` events and ending with the `decision`. With "
+    "`commit`, the agent playing the side to move plays its decision in the game. "
+    "Failures after the stream started end it with an `error` event. Closing the "
+    "stream stops the agent.",
+    responses=error_responses(
+        GameNotFoundError,
+        GameNotActiveError,
+        CommitNotAllowedError,
+        AgentRequiredError,
+        PoolBusyError,
+        AgentUnavailableError,
+    ),
+)
+async def think(
+    game_id: uuid.UUID,
+    thinking: ThinkingDependency,
+    session_factory: SessionFactoryDependency,
+    store: StoreDependency,
+) -> AsyncIterator[ThinkEvent]:
+    """Let an agent think about the latest position, streaming its search.
+
+    The request body is read by the thinking dependency, which checks it and starts the
+    decision before the stream starts.
+
+    Args:
+        game_id: The game ID, also read by the thinking dependency.
+        thinking: The running decision.
+        session_factory: Opens the session that commits the decision.
+        store: The object store of the app.
+
+    Yields:
+        The events of the decision, as server-sent events.
+
+    Raises:
+        GameNotFoundError: If there is no game with the ID.
+        GameNotActiveError: If the game is finished or abandoned.
+        CommitNotAllowedError: If the request commits, but no agent plays the side to
+            move or the request names another agent.
+        AgentRequiredError: If a person plays the side to move and no agent is named.
+        PoolBusyError: If every agent worker stayed busy.
+        AgentUnavailableError: If the worker of the agent failed to start.
+    """
+    async for event in thinking.events(session_factory=session_factory, store=store):
+        yield event
