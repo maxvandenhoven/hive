@@ -7,15 +7,27 @@ type Schemas = components["schemas"];
 export type AgentPlayer = Schemas["AgentPlayer"];
 export type AgentRegistration = Schemas["AgentRegistration"];
 export type AgentSpec = Schemas["AgentSpec"];
+export type BoardCell = Schemas["BoardCell"];
+export type Coordinate = Schemas["Coordinate"];
 export type GameCreate = Schemas["GameCreate"];
 export type GameDetail = Schemas["GameDetail"];
 export type GamePage = Schemas["GamePage"];
+export type GamePosition = Schemas["GamePosition"];
 export type GameResult = Schemas["GameResult"];
 export type GameStatus = Schemas["GameStatus"];
 export type GameSummary = Schemas["GameSummary"];
 export type GameUpdate = Schemas["GameUpdate"];
 export type HumanPlayer = Schemas["HumanPlayer"];
+export type MovablePiece = Schemas["MovablePiece"];
+export type Move = Schemas["Move"];
+export type MoveCreate = Schemas["MoveCreate"];
+export type MoveRead = Schemas["MoveRead"];
+export type MoveSource = Schemas["MoveSource"];
+export type Piece = Schemas["Piece"];
+export type PieceTargets = Schemas["PieceTargets"];
+export type PieceType = Piece["piece"];
 export type PlayerConfig = Schemas["PlayerConfig"];
+export type Rules = Schemas["Rules"];
 
 /** A failed API request, with the error code and message the API sent. */
 export class ApiRequestError extends Error {
