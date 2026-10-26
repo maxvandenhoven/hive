@@ -8,6 +8,7 @@ export type AgentPlayer = Schemas["AgentPlayer"];
 export type AgentRegistration = Schemas["AgentRegistration"];
 export type AgentSpec = Schemas["AgentSpec"];
 export type BoardCell = Schemas["BoardCell"];
+export type DecisionRecord = Schemas["DecisionRecord"];
 export type Coordinate = Schemas["Coordinate"];
 export type GameCreate = Schemas["GameCreate"];
 export type GameDetail = Schemas["GameDetail"];
@@ -28,6 +29,8 @@ export type PieceTargets = Schemas["PieceTargets"];
 export type PieceType = Piece["piece"];
 export type PlayerConfig = Schemas["PlayerConfig"];
 export type Rules = Schemas["Rules"];
+export type ThinkEvent = Schemas["ThinkEvent"];
+export type ThinkRequest = Schemas["ThinkRequest"];
 
 /** A failed API request, with the error code and message the API sent. */
 export class ApiRequestError extends Error {

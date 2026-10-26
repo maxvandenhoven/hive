@@ -2,9 +2,9 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import type { GameDetail, GamePosition } from "@/api/client";
+import type { DecisionRecord, GameDetail, GamePosition, Move } from "@/api/client";
 import { GamePage } from "@/pages/GamePage";
-import { mockApi } from "@/test/api";
+import { controlledEventStream, mockApi, serverSentEvents } from "@/test/api";
 import { gameDetail, gamePosition, moveRead } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
 
@@ -29,6 +29,41 @@ const AFTER_ANT = gamePosition({
   placeable_coords: [[2, 0]],
 });
 
+/** The move black's agent answers `AFTER_ANT` with. */
+const AGENT_MOVE: Move = { piece: "spider", from: null, to: [2, 0] };
+
+/** The position after the agent's answer, with white to move at ply 4. */
+const AFTER_AGENT = gamePosition({
+  ply: 4,
+  ply_count: 4,
+  board: [
+    ...AFTER_ANT.board,
+    { coord: [2, 0], stack: [{ piece: "spider", owner: "black" }] },
+  ],
+  hands: {
+    white: { queen: 0, beetle: 2, grasshopper: 3, spider: 2, ant: 2 },
+    black: { queen: 0, beetle: 2, grasshopper: 3, spider: 1, ant: 3 },
+  },
+  last_move: moveRead({ ply: 3, move: AGENT_MOVE, source: "agent" }),
+});
+
+function decisionRecord(): DecisionRecord {
+  return {
+    ply: 3,
+    player: "black",
+    agent_label: "negamax",
+    seed: 1,
+    budget_s: 5,
+    elapsed_s: 1.2,
+    overrun_s: 0,
+    close_reason: "final",
+    candidates: 2,
+    illegal_submissions: 0,
+    move: AGENT_MOVE,
+    worker_restarted: false,
+  };
+}
+
 interface GameApiOptions {
   game?: GameDetail;
   position?: GamePosition;
@@ -42,6 +77,8 @@ function mockGameApi(
   return mockApi({
     [`GET ${GAME_PATH}`]: () => ({ body: game }),
     [`GET ${GAME_PATH}/state`]: () => ({ body: position }),
+    // Agents think until the page closes the stream.
+    [`POST ${GAME_PATH}/think`]: ({ signal }) => controlledEventStream(signal).response,
     ...handlers,
   });
 }
@@ -211,7 +248,9 @@ describe("GamePage", () => {
     await user.click(screen.getByRole("img", { name: "Black queen at (1, 0)" }));
 
     expect(screen.queryByRole("button", { name: /^Play to/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /queen at/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(White|Black) queen at/ }),
+    ).not.toBeInTheDocument();
     for (const button of within(
       screen.getByRole("region", { name: "Black hand" }),
     ).getAllByRole("button")) {
@@ -306,5 +345,170 @@ describe("GamePage", () => {
     expect(
       await screen.findByText("Could not load the game: Game not found."),
     ).toBeInTheDocument();
+  });
+
+  it("lets the agent think and waits until its move is made on the board", async () => {
+    const requests = mockGameApi(
+      { position: AFTER_ANT },
+      {
+        [`POST ${GAME_PATH}/think`]: () =>
+          new Response(
+            serverSentEvents([
+              { type: "info", info: { depth: 2, score: 1.5, nps: 12000 } },
+              { type: "candidate", move: AGENT_MOVE, final: true },
+              { type: "decision", decision: decisionRecord(), position: AFTER_AGENT },
+            ]),
+            { headers: { "Content-Type": "text/event-stream" } },
+          ),
+      },
+    );
+    const user = renderGamePage();
+
+    const panel = await screen.findByRole("region", { name: "Agent thinking" });
+    expect(await within(panel).findByText("Make this move on the board")).toBeVisible();
+    expect(within(panel).getByText("Black: Place spider at (2, 0)")).toBeVisible();
+    expect(within(panel).getByText("+1.5")).toBeVisible();
+    expect(
+      screen.getByRole("img", { name: "Black spider at (2, 0)" }),
+    ).toBeInTheDocument();
+    // The person plays only once the move is made on the board.
+    expect(
+      screen.getByRole("button", { name: "Place white ant, 2 left" }),
+    ).toBeDisabled();
+    expect(requests.find((request) => request.path.endsWith("/think"))?.body).toEqual({
+      commit: true,
+    });
+
+    await user.click(within(panel).getByRole("button", { name: "Done" }));
+
+    expect(
+      screen.queryByRole("region", { name: "Agent thinking" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Place white ant, 2 left" })).toBeEnabled();
+  });
+
+  it("offers to try again when the agent could not think", async () => {
+    let attempts = 0;
+    mockGameApi(
+      { position: AFTER_ANT },
+      {
+        [`POST ${GAME_PATH}/think`]: () => {
+          attempts++;
+
+          return {
+            status: 503,
+            body: { code: "pool_busy", detail: "Every agent is busy." },
+          };
+        },
+      },
+    );
+    const user = renderGamePage();
+
+    const panel = await screen.findByRole("region", { name: "Agent thinking" });
+    await user.click(await within(panel).findByRole("button", { name: "Try again" }));
+
+    await waitFor(() => {
+      expect(attempts).toBe(2);
+    });
+  });
+
+  it("takes back the agent's answer together with the person's move", async () => {
+    let position = AFTER_AGENT;
+    const requests = mockGameApi(
+      { game: gameDetail({ ply_count: 4 }) },
+      {
+        [`GET ${GAME_PATH}/state`]: () => ({ body: position }),
+        [`DELETE ${GAME_PATH}/moves/last`]: ({ search }) => {
+          position = search === "?expected_ply=4" ? AFTER_ANT : gamePosition();
+
+          return { body: position };
+        },
+      },
+    );
+    const user = renderGamePage();
+
+    await user.click(await screen.findByRole("button", { name: "Undo" }));
+
+    expect(await screen.findByText("Undid the last 2 moves.")).toBeInTheDocument();
+    expect(
+      requests.filter((request) => request.method === "DELETE").map((r) => r.search),
+    ).toEqual(["?expected_ply=4", "?expected_ply=3"]);
+    expect(screen.getByRole("status")).toHaveTextContent("White to move");
+  });
+
+  it("replays earlier positions and returns to the live one", async () => {
+    const requests = mockGameApi(
+      {},
+      {
+        [`GET ${GAME_PATH}/state`]: ({ search }) => ({
+          body:
+            search === "?ply=1"
+              ? gamePosition({
+                  ply: 1,
+                  board: gamePosition().board.slice(0, 1),
+                  current_player: "black",
+                })
+              : gamePosition(),
+        }),
+      },
+    );
+    const user = renderGamePage();
+
+    await user.click(await screen.findByRole("button", { name: "Previous position" }));
+
+    expect(await screen.findByText("Replay · ply 1")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "Black queen at (1, 0)" }),
+    ).not.toBeInTheDocument();
+    expect(requests.map((request) => request.search)).toContain("?ply=1");
+    // Replayed positions cannot be played.
+    expect(
+      screen.getByRole("button", { name: "Place white ant, 3 left" }),
+    ).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Live position" }));
+
+    expect(screen.queryByText("Replay · ply 1")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Black queen at (1, 0)" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByRole("list", { name: "Moves" })).getByRole("button", {
+        name: /Place queen at \(0, 0\)/,
+      }),
+    );
+
+    expect(await screen.findByText("Replay · ply 1")).toBeInTheDocument();
+  });
+
+  it("plays an agent vs agent match until paused", async () => {
+    const match = gameDetail({
+      white: { type: "agent", spec: { kind: "random", params: {} }, budget_s: 1 },
+    });
+    const streams: ReturnType<typeof controlledEventStream>[] = [];
+    mockGameApi(
+      { game: match, position: AFTER_ANT },
+      {
+        [`POST ${GAME_PATH}/think`]: ({ signal }) => {
+          const stream = controlledEventStream(signal);
+          streams.push(stream);
+
+          return stream.response;
+        },
+      },
+    );
+    const user = renderGamePage();
+
+    await user.click(await screen.findByRole("button", { name: "Play" }));
+    await waitFor(() => {
+      expect(streams).toHaveLength(1);
+    });
+    expect(await screen.findByText("Black is thinking")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+
+    expect(screen.queryByText("Black is thinking")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Step" })).toBeEnabled();
   });
 });

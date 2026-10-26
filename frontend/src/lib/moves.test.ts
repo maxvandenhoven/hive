@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { describeMove, playerAtPly, toBoardView, toMoveView } from "@/lib/moves";
-import { gameDetail, moveRead, RULES } from "@/test/fixtures";
+import { gameDetail, RULES } from "@/test/fixtures";
 
 describe("describeMove", () => {
   it("describes placements, movements and passes", () => {
@@ -67,13 +67,14 @@ describe("toBoardView", () => {
 
 describe("toMoveView", () => {
   it("marks the coordinates of a move", () => {
-    const move = moveRead({ move: { piece: "ant", from: [0, 1], to: [2, 0] } });
-
-    expect(toMoveView(move)).toEqual({ from: [0, 1], to: [2, 0] });
+    expect(toMoveView({ piece: "ant", from: [0, 1], to: [2, 0] })).toEqual({
+      from: [0, 1],
+      to: [2, 0],
+    });
   });
 
-  it("marks nothing at the start and after a pass", () => {
+  it("marks nothing without a move or after a pass", () => {
+    expect(toMoveView(undefined)).toBeNull();
     expect(toMoveView(null)).toBeNull();
-    expect(toMoveView(moveRead({ move: null }))).toBeNull();
   });
 });
