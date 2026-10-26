@@ -571,3 +571,28 @@ class TestDbUpgrade:
         monkeypatch.setattr("alembic.command.upgrade", lambda config, revision: None)
 
         assert CliRunner().invoke(app, ["db", "upgrade"]).exit_code == 0
+
+
+class TestOpenapi:
+    def test_writes_schema_without_settings(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        for name in API_ENV:
+            monkeypatch.delenv(name, raising=False)
+
+        output = tmp_path / "openapi.json"
+        result = CliRunner().invoke(app, ["openapi", "--output", str(output)])
+        schema = json.loads(output.read_text())
+
+        assert result.exit_code == 0
+        assert schema["info"]["title"] == "Hive"
+        assert "/api/games" in schema["paths"]
+        assert output.read_text().endswith("}\n")
+
+    def test_needs_api_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(sys.modules, "fastapi", None)
+        result = CliRunner().invoke(app, ["openapi", "--output", "openapi.json"])
+
+        assert result.exit_code == 1
