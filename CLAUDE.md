@@ -19,8 +19,8 @@ One Python package `hive` with a single `pyproject.toml` and `uv.lock` at the re
 - `src/hive/assets/` — insect SVG/PNG assets
 - `src/hive/cli.py` — `hive` command line entry point (Typer)
 - `tests/` — mirrors `src/hive/`, for example `tests/engine/` for `src/hive/engine/`
-- `scripts/tooling/` — development tooling such as the comment checker (tests in
-  `tests/tooling/`)
+- `scripts/tooling/` — development tooling such as the comment and docstring checkers
+  (tests in `tests/tooling/`)
 
 Heavy dependencies live behind extras: `plotting`, `api`, `vision`, `train`.
 
@@ -31,12 +31,14 @@ Dependency management uses `uv`. Python 3.13.x is required (no other minor versi
 ```
 make sync           # uv sync --all-groups --all-extras
 make format         # ruff format and import sorting
-make lint           # ruff check --fix and the comment checker
+make lint           # ruff check --fix, the comment checker and the docstring checker
 make type           # ty check
 make check          # format + lint + type (no tests)
 make test           # pytest with coverage, excluding `slow` tests
 make test-slow      # pytest -m slow
 make perft          # perft speed benchmark (start position, depth 6)
+make dev            # .env from .env.example, Postgres + Garage, migrate, `hive serve --reload`
+make dev-services   # only the compose services and the migration
 make install-hooks  # install pre-commit hooks (including commit-msg)
 ```
 
@@ -55,6 +57,10 @@ See `docs/plans/tooling.md` for the full rules and how each one is enforced.
   `ANN`, no test exemptions). Test functions return `-> None`.
 - Google-style docstrings on public classes and functions (ruff `D`, `convention =
   "google"`). Do not repeat types in `Args:` or `Returns:`; the annotations carry them.
+- In `src/`, every docstring documents all arguments in `Args:` and the return value in
+  `Returns:` (`Yields:` for generators) unless the annotation is `None`. Checked by
+  `scripts/tooling/check_docstrings.py` (part of `make lint`). FastAPI routes and typer
+  commands set their public text with `description=` and `help=`.
 - Use single backticks (`` `code` ``) for inline code in docstrings, not double backticks.
 - Fill docstring prose and comments up to the 90-character limit by hand; do not wrap
   earlier. No tool reflows them, and ruff `E501` flags lines past 90 characters.

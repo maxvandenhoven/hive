@@ -5,9 +5,10 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+from pydantic import ValidationError
 
 from hive import __version__, bench
 from hive.agents.factory import AgentSpec, InvalidAgentSpecError
@@ -23,6 +24,9 @@ from hive.match.gauntlet import (
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult
 from hive.match.runner import MatchRunner
 from hive.match.worker import DEFAULT_GRACE_S, AgentWorkerError
+
+if TYPE_CHECKING:
+    from hive.api.settings import DatabaseSettings
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +52,7 @@ def print_version(value: bool) -> None:
         raise typer.Exit
 
 
-@app.callback()
+@app.callback(help="Hive engine, agents and tools.")
 def main(
     version: Annotated[
         bool,
@@ -60,10 +64,17 @@ def main(
         ),
     ] = False,
 ) -> None:
-    """Hive engine, agents and tools."""
+    """Hive engine, agents and tools.
+
+    Args:
+        version: Whether `--version` was passed, handled eagerly by `print_version`.
+    """
 
 
-@app.command("play")
+@app.command(
+    "play",
+    help="Play one timed match between two agents and log every decision and the result.",
+)
 def play(
     white: Annotated[str, typer.Option(help=f"The white agent: {AGENT_OPTION_HELP}")],
     black: Annotated[
@@ -89,7 +100,22 @@ def play(
         Path | None, typer.Option(help="Write the match result as JSON to this file.")
     ] = None,
 ) -> None:
-    """Play one timed match between two agents and log every decision and the result."""
+    """Play one timed match between two agents and log every decision and the result.
+
+    Args:
+        white: The white agent as a spec file, a preset name or inline YAML.
+        black: The black agent, in the same form as `white`.
+        budget: The time budget of every decision in seconds.
+        max_turns: The number of turns per player before the match stops, or `None`
+            for no cap.
+        seed: The match seed.
+        grace: The seconds an agent may take to return after it is stopped.
+        out: The file to write the match result to as JSON, or `None` to not write it.
+
+    Raises:
+        typer.BadParameter: If an agent spec is invalid.
+        typer.Exit: With code 1 if an agent worker fails.
+    """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     runner = MatchRunner(
         rules=Rules(),
@@ -185,7 +211,9 @@ def describe_match_result(result: MatchResult) -> str:
     return f"Stopped at the turn cap {plies}"
 
 
-@app.command("gauntlet")
+@app.command(
+    "gauntlet", help="Play a timed round robin between agents and write a JSON report."
+)
 def gauntlet(
     agents: Annotated[
         list[str],
@@ -247,7 +275,28 @@ def gauntlet(
         ),
     ] = False,
 ) -> None:
-    """Play a timed round robin between agents and write a JSON report."""
+    """Play a timed round robin between agents and write a JSON report.
+
+    Args:
+        agents: The participants, at least two, each as a spec file, a preset name or
+            inline YAML.
+        games_per_pair: The number of games between every pair, an even number.
+        budget: The time budget of every decision in seconds.
+        max_turns: The number of turns per player before a match stops, or `None` for
+            no cap.
+        seed: The gauntlet seed.
+        jobs: The number of matches played at the same time, or `None` for the number
+            of CPUs.
+        allow_oversubscribe: Whether to allow more jobs than the number of CPUs.
+        grace: The seconds an agent may take to return after it is stopped.
+        out: The report file, or `None` for `reports/gauntlet-<timestamp>.json`.
+        replays: Whether to keep every move and decision of every match in the report.
+
+    Raises:
+        typer.BadParameter: If there are fewer than two agents, a spec is invalid, too
+            many jobs are asked for, or the configuration is invalid.
+        typer.Exit: With code 1 if an agent worker fails.
+    """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     if len(agents) < 2:
@@ -328,7 +377,9 @@ def gauntlet(
     )
 
 
-@app.command("replay")
+@app.command(
+    "replay", help="Log the moves and decisions of a match from a gauntlet report."
+)
 def replay(
     report: Annotated[
         Path, typer.Argument(help="A gauntlet report written with `--replays`.")
@@ -344,7 +395,18 @@ def replay(
         ),
     ] = None,
 ) -> None:
-    """Log the moves and decisions of a match from a gauntlet report."""
+    """Log the moves and decisions of a match from a gauntlet report.
+
+    Args:
+        report: A gauntlet report written with `--replays`.
+        match: The index of the match in the report.
+        plot_dir: The directory to draw the board after every move in as SVG files, or
+            `None` to not draw them.
+
+    Raises:
+        typer.BadParameter: If the report cannot be read or has no such match, or the
+            `plotting` extra is missing when drawing boards.
+    """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     try:
@@ -405,13 +467,122 @@ def write_board_svgs(result: MatchResult, directory: Path) -> list[Path]:
     return paths
 
 
+def require_api_extra() -> None:
+    """Check that the `api` extra is installed.
+
+    Raises:
+        typer.Exit: With code 1 and a hint if it is not.
+    """
+    try:
+        import fastapi  # noqa: F401
+    except ImportError as e:
+        logger.error("This command needs the `api` extra: `uv sync --extra api`.")
+        raise typer.Exit(code=1) from e
+
+
+def load_settings[S: DatabaseSettings](kind: type[S]) -> S:
+    """Read settings from `HIVE_` environment variables and `.env`.
+
+    Args:
+        kind: The settings class, `ApiSettings` or the smaller `DatabaseSettings`.
+
+    Returns:
+        The settings.
+
+    Raises:
+        typer.Exit: With code 1 and the missing or invalid settings if they do not
+            validate.
+    """
+    try:
+        return kind()
+    except ValidationError as e:
+        logger.error(
+            "Invalid settings; set `HIVE_` environment variables or create `.env` "
+            "from `.env.example`.\n%s",
+            e,
+        )
+        raise typer.Exit(code=1) from e
+
+
+SERVE_GRACEFUL_SHUTDOWN_S = 5
+"""The seconds `hive serve` waits for open requests, such as thinking streams, before it
+closes them on shutdown or reload."""
+
+
+@app.command("serve", help="Serve the API, configured by `HIVE_` environment variables.")
+def serve(
+    host: Annotated[str, typer.Option(help="The address to listen on.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(min=1, max=65535, help="The port.")] = 8000,
+    reload: Annotated[
+        bool, typer.Option("--reload", help="Restart the server when the code changes.")
+    ] = False,
+) -> None:
+    """Serve the API, configured by `HIVE_` environment variables.
+
+    Args:
+        host: The address to listen on.
+        port: The port to listen on.
+        reload: Whether to restart the server when the code changes.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    require_api_extra()
+
+    import uvicorn
+
+    from hive.api.observability import logging_config
+    from hive.api.settings import ApiSettings
+
+    settings = load_settings(ApiSettings)
+
+    uvicorn.run(
+        "hive.api.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+        log_config=logging_config(settings.log_level),
+        timeout_graceful_shutdown=SERVE_GRACEFUL_SHUTDOWN_S,
+    )
+
+
+db_app = typer.Typer(no_args_is_help=True, help="Database schema migrations.")
+app.add_typer(db_app, name="db")
+
+
+@db_app.command(
+    "upgrade", help="Migrate the database at `HIVE_DATABASE_URL` up to a revision."
+)
+def db_upgrade(
+    revision: Annotated[
+        str, typer.Option(help="The Alembic revision to migrate to.")
+    ] = "head",
+) -> None:
+    """Migrate the database at `HIVE_DATABASE_URL` up to a revision.
+
+    Args:
+        revision: The Alembic revision to migrate to.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
+    require_api_extra()
+
+    from alembic import command
+
+    from hive.api.settings import DatabaseSettings
+
+    command.upgrade(load_settings(DatabaseSettings).alembic_config(), revision)
+    logger.info("Migrated the database to `%s`.", revision)
+
+
 bench_app = typer.Typer(no_args_is_help=True, help="Benchmarks and correctness checks.")
 app.add_typer(bench_app, name="bench")
 
 DEFAULT_PERFT_SUITE = Path("tests/data/perft/base.json")
 
 
-@bench_app.command("perft")
+@bench_app.command(
+    "perft", help="Run perft on a position and print nodes, seconds and nodes per second."
+)
 def bench_perft(
     depth: Annotated[int, typer.Option(min=0, help="The number of plies to walk.")],
     position: Annotated[
@@ -424,7 +595,18 @@ def bench_perft(
         Path, typer.Option(help="The perft suite with the positions and rules.")
     ] = DEFAULT_PERFT_SUITE,
 ) -> None:
-    """Run perft on a position and print nodes, seconds and nodes per second."""
+    """Run perft on a position and print nodes, seconds and nodes per second.
+
+    Args:
+        depth: The number of plies to walk.
+        position: The name of the position in the suite.
+        divide: Whether to print the count below each first move.
+        suite: The perft suite with the positions and rules.
+
+    Raises:
+        typer.BadParameter: If the suite has no position with the name.
+        typer.Exit: With code 1 if the count differs from the reference count.
+    """
     perft_suite = PerftSuite.load(suite)
 
     try:

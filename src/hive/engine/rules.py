@@ -28,6 +28,11 @@ BASE_PIECE_COUNTS: Mapping[PieceType, int] = MappingProxyType(
 """The number of copies of each piece type a player receives in the base game."""
 
 
+type PieceCount = Annotated[StrictInt, Field(ge=0)]
+"""The number of copies of a piece type. The same type is read and written, so the JSON
+schema of `Rules` is the same for requests and responses."""
+
+
 @dataclass(frozen=True, slots=True)
 class Rules(JsonCodec):
     """The rules of a Hive game, holding both the configuration and the rule behaviour.
@@ -51,8 +56,8 @@ class Rules(JsonCodec):
     """
 
     piece_counts: Annotated[
-        Mapping[PieceType, Annotated[StrictInt, Field(ge=0)]],
-        PlainSerializer(dict, return_type=dict[PieceType, int]),
+        Mapping[PieceType, PieceCount],
+        PlainSerializer(dict, return_type=dict[PieceType, PieceCount]),
     ] = field(default_factory=lambda: BASE_PIECE_COUNTS)
     starting_player: Player = Player.WHITE
     queen_by_turn: StrictInt | None = 4

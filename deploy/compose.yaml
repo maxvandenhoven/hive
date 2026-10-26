@@ -1,0 +1,49 @@
+# Local development services: Postgres and a single-node Garage (S3).
+#
+# Started by `make dev-services` (or `make dev`). The credentials are for local use only
+# and match `.env.example`, which `make dev` copies to `.env` for the API. On first start
+# Garage configures its single-node layout and creates the `hive` bucket and its access
+# key from the `GARAGE_DEFAULT_*` variables.
+name: hive
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
+      POSTGRES_DB: hive
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hive -d hive"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  garage:
+    image: dxflrs/garage:v2.5.0
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: GK0123456789abcdef01234567
+      GARAGE_DEFAULT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      GARAGE_DEFAULT_BUCKET: hive
+    ports:
+      - "3900:3900"
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    healthcheck:
+      # The image has no shell; the bucket exists once the bootstrap has finished.
+      test: ["CMD", "/garage", "bucket", "info", "hive"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres-data:
+  garage-meta:
+  garage-data:

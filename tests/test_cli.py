@@ -4,8 +4,10 @@ import logging
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
+from alembic.config import Config
 from typer.testing import CliRunner
 
 from hive import __version__
@@ -474,3 +476,98 @@ class TestReplay:
         )
 
         assert result.exit_code == 2
+
+
+API_ENV = {
+    "HIVE_DATABASE_URL": "postgresql+psycopg://u@db.invalid/x",
+    "HIVE_S3_ENDPOINT_URL": "http://s3.invalid:3900",
+    "HIVE_S3_ACCESS_KEY_ID": "key",
+    "HIVE_S3_SECRET_ACCESS_KEY": "secret",
+}
+"""Complete API settings as environment variables."""
+
+
+@pytest.fixture(scope="function")
+def api_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the API settings in the environment, away from any `.env` file."""
+    monkeypatch.chdir(tmp_path)
+
+    for name, value in API_ENV.items():
+        monkeypatch.setenv(name, value)
+
+
+class TestServe:
+    @pytest.mark.usefixtures("api_env")
+    def test_runs_app_factory_with_json_logs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+        monkeypatch.setattr(
+            "uvicorn.run", lambda app, **kwargs: calls.append((app, kwargs))
+        )
+        monkeypatch.setenv("HIVE_LOG_LEVEL", "DEBUG")
+        result = CliRunner().invoke(app, ["serve", "--port", "9000", "--reload"])
+
+        [(target, kwargs)] = calls
+        assert result.exit_code == 0
+        assert target == "hive.api.app:create_app"
+        assert kwargs["factory"] is True
+        assert (kwargs["host"], kwargs["port"], kwargs["reload"]) == (
+            "127.0.0.1",
+            9000,
+            True,
+        )
+        assert kwargs["log_config"]["root"]["level"] == "DEBUG"
+        assert kwargs["timeout_graceful_shutdown"] > 0
+
+    def test_needs_api_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(sys.modules, "fastapi", None)
+        result = CliRunner().invoke(app, ["serve"])
+
+        assert result.exit_code == 1
+
+    def test_needs_settings(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        for name in API_ENV:
+            monkeypatch.delenv(name, raising=False)
+
+        result = CliRunner().invoke(app, ["serve"])
+
+        assert result.exit_code == 1
+        assert "database_url" in caplog.text
+
+
+class TestDbUpgrade:
+    @pytest.mark.usefixtures("api_env")
+    def test_upgrades_database_from_settings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        upgrades: list[tuple[str, str]] = []
+
+        def upgrade(config: Config, revision: str) -> None:
+            upgrades.append((config.attributes["database_url"], revision))
+
+        monkeypatch.setattr("alembic.command.upgrade", upgrade)
+        result = CliRunner().invoke(app, ["db", "upgrade", "--revision", "0001"])
+
+        assert result.exit_code == 0
+        assert upgrades == [("postgresql+psycopg://u@db.invalid/x", "0001")]
+
+    def test_needs_only_the_database_url(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        for name in API_ENV:
+            monkeypatch.delenv(name, raising=False)
+
+        monkeypatch.setenv("HIVE_DATABASE_URL", "postgresql+psycopg://u@db.invalid/x")
+        monkeypatch.setattr("alembic.command.upgrade", lambda config, revision: None)
+
+        assert CliRunner().invoke(app, ["db", "upgrade"]).exit_code == 0

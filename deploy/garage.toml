@@ -1,0 +1,16 @@
+# Garage configuration for the local development stack in `compose.yaml`. The RPC secret
+# is for local use only.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "4a1c0c5e9f3b7d2e8a6f1b0c9d4e7f2a3b8c5d0e1f6a9b2c7d4e3f0a5b8c1d6e"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
