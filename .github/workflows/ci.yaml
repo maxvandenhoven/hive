@@ -24,10 +24,54 @@ jobs:
         run: uv sync --locked --all-groups --all-extras
 
       - name: Check
-        run: make check
+        run: make format-python lint-python type-python
 
       - name: Verify formatting left no changes
         run: git diff --exit-code
 
       - name: Test
-        run: make test
+        run: make test-python
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.2"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check the API client is up to date
+        working-directory: .
+        run: |
+          uv sync --locked --extra api
+          make api-client
+          git diff --exit-code -- frontend/src/api/schema.ts

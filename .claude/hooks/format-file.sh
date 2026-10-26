@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# PostToolUse hook: format the Python file Claude just edited and report remaining lint
-# and comment style errors. Exit code 2 feeds stderr back to Claude; exit code 0 means
-# nothing to report.
+# PostToolUse hook: format the Python or frontend file Claude just edited and report
+# remaining lint and comment style errors. Exit code 2 feeds stderr back to Claude; exit
+# code 0 means nothing to report.
 set -uo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -12,10 +12,25 @@ fi
 file_path="$(jq -r '.tool_input.file_path // empty')"
 repo_root="$(realpath "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}")"
 
-# Only format existing Python files inside the repository.
-[[ "$file_path" == *.py && -f "$file_path" ]] || exit 0
+# Only format existing files inside the repository.
+[[ -f "$file_path" ]] || exit 0
 file_path="$(realpath "$file_path")"
 [[ "$file_path" == "$repo_root"/* ]] || exit 0
+
+# Frontend sources are formatted with Prettier once the dependencies are installed. It
+# runs from `frontend/` so `.prettierignore` skips the generated API types.
+if [[ "$file_path" == "$repo_root"/frontend/src/* && "$file_path" =~ \.(ts|tsx|css)$ ]]; then
+    prettier="$repo_root/frontend/node_modules/.bin/prettier"
+    [[ -x "$prettier" ]] || exit 0
+
+    if ! output="$(cd "$repo_root/frontend" && "$prettier" --write --log-level warn "$file_path" 2>&1)"; then
+        echo "$output" >&2
+        exit 2
+    fi
+    exit 0
+fi
+
+[[ "$file_path" == *.py ]] || exit 0
 
 cd "$repo_root" || exit 0
 
