@@ -1113,3 +1113,193 @@ class TestApplyCheckedMove:
 
         with pytest.raises(IllegalMoveError):
             rules.apply_checked_move(state=state, move=move)
+
+    def test_message_names_move_and_reason(self, rules: Rules) -> None:
+        """Test that the error message describes the move and why it is not legal."""
+        state = rules.create_initial_state()
+        move = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0))
+        message = (
+            "Move `place ant at (1, 0)` is not legal for player `WHITE` at ply `0`: the "
+            "first piece must be placed at `(0, 0)`."
+        )
+
+        with pytest.raises(IllegalMoveError) as error:
+            rules.apply_checked_move(state=state, move=move)
+
+        assert str(error.value) == message
+
+
+class TestIllegalMoveReason:
+    """Test explaining why a move is not legal."""
+
+    @pytest.fixture(scope="function")
+    def state(self, rules: Rules) -> GameState:
+        """Build a state at ply 4 with white to move and both queens placed."""
+        return rules.from_board(
+            board=build_board(
+                [
+                    (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                    (Player.BLACK, PieceType.QUEEN, (1, 0)),
+                    (Player.WHITE, PieceType.ANT, (-1, 0)),
+                    (Player.BLACK, PieceType.ANT, (2, 0)),
+                ]
+            ),
+            current_player=Player.WHITE,
+        )
+
+    @pytest.mark.parametrize(
+        ("move", "reason"),
+        [
+            pytest.param(
+                None, "passing is only allowed when there is no legal move", id="pass"
+            ),
+            pytest.param(
+                Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(-2, 0)),
+                "there is no queen left in hand",
+                id="empty-hand",
+            ),
+            pytest.param(
+                Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(-1, 0)),
+                "the target is occupied",
+                id="occupied",
+            ),
+            pytest.param(
+                Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, -1)),
+                "a piece must be placed next to a piece of its owner and not next to a "
+                "piece of the opponent",
+                id="next-to-opponent",
+            ),
+            pytest.param(
+                Move(piece_type=PieceType.ANT, source_coord=(5, 5), target_coord=(5, 6)),
+                "there is no piece to move",
+                id="empty-source",
+            ),
+            pytest.param(
+                Move(
+                    piece_type=PieceType.QUEEN, source_coord=(1, 0), target_coord=(1, -1)
+                ),
+                "the piece belongs to `BLACK`",
+                id="opponent-piece",
+            ),
+            pytest.param(
+                Move(
+                    piece_type=PieceType.BEETLE,
+                    source_coord=(-1, 0),
+                    target_coord=(0, -1),
+                ),
+                "the piece is of type `ant`, not `beetle`",
+                id="wrong-type",
+            ),
+            pytest.param(
+                Move(
+                    piece_type=PieceType.QUEEN, source_coord=(0, 0), target_coord=(0, -1)
+                ),
+                "moving the piece would split the hive",
+                id="one-hive",
+            ),
+            pytest.param(
+                Move(piece_type=PieceType.ANT, source_coord=(-1, 0), target_coord=(5, 5)),
+                "the ant cannot reach the target",
+                id="unreachable",
+            ),
+        ],
+    )
+    def test_reasons(
+        self, rules: Rules, state: GameState, move: Move | None, reason: str
+    ) -> None:
+        """Test the reason of each kind of illegal move in a mid-game state."""
+        assert move not in rules.legal_moves(state)
+        assert rules.illegal_move_reason(state=state, move=move) == reason
+
+    @pytest.mark.parametrize(
+        ("target_coord", "current_ply", "reason"),
+        [
+            ((1, 0), 0, "the first piece must be placed at `(0, 0)`"),
+            ((2, 0), 1, "the second piece must be placed next to `(0, 0)`"),
+        ],
+    )
+    def test_opening_placements(
+        self, rules: Rules, target_coord: Coordinate, current_ply: int, reason: str
+    ) -> None:
+        """Test the reasons of placements away from the origin in the opening."""
+        placements: list[Placement] = [(Player.WHITE, PieceType.ANT, (0, 0))]
+        state = build_state(
+            rules=rules,
+            placements=placements[:current_ply],
+            current_player=Player.WHITE if current_ply == 0 else Player.BLACK,
+            current_ply=current_ply,
+        )
+        move = Move(
+            piece_type=PieceType.ANT, source_coord=None, target_coord=target_coord
+        )
+
+        assert rules.illegal_move_reason(state=state, move=move) == reason
+
+    def test_queen_deadline(self, rules: Rules) -> None:
+        """Test the reason of placing another piece when the queen is due."""
+        state = build_state(
+            rules=rules,
+            placements=[
+                (Player.WHITE, PieceType.ANT, (0, 0)),
+                (Player.BLACK, PieceType.ANT, (1, 0)),
+                (Player.WHITE, PieceType.ANT, (-1, 0)),
+                (Player.BLACK, PieceType.ANT, (2, 0)),
+                (Player.WHITE, PieceType.SPIDER, (-2, 0)),
+                (Player.BLACK, PieceType.SPIDER, (3, 0)),
+            ],
+            current_player=Player.WHITE,
+            current_ply=6,
+        )
+        move = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(-3, 0))
+
+        assert rules.illegal_move_reason(state=state, move=move) == (
+            "the queen must be placed by turn `4`"
+        )
+
+    def test_queen_on_first_turn(self) -> None:
+        """Test the reason of placing the queen first when the rules forbid it."""
+        rules = Rules(allow_queen_first_turn=False)
+        state = rules.create_initial_state()
+        move = Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
+
+        assert rules.illegal_move_reason(state=state, move=move) == (
+            "the queen may not be placed on the first turn"
+        )
+
+    def test_move_before_queen(self, rules: Rules) -> None:
+        """Test the reason of moving a piece before the queen is placed."""
+        state = build_state(
+            rules=rules,
+            placements=[
+                (Player.WHITE, PieceType.ANT, (0, 0)),
+                (Player.BLACK, PieceType.ANT, (1, 0)),
+            ],
+            current_player=Player.WHITE,
+            current_ply=2,
+        )
+        move = Move(piece_type=PieceType.ANT, source_coord=(0, 0), target_coord=(1, -1))
+
+        assert rules.illegal_move_reason(state=state, move=move) == (
+            "pieces may only move once their owner's queen is placed"
+        )
+
+    def test_immobile_piece(self, rules: Rules) -> None:
+        """Test the reason of a piece that may move but has no target to move to."""
+        state = build_state(
+            rules=rules,
+            placements=[
+                (Player.WHITE, PieceType.QUEEN, (0, 0)),
+                (Player.BLACK, PieceType.QUEEN, (1, 0)),
+                (Player.WHITE, PieceType.ANT, (1, -1)),
+                (Player.BLACK, PieceType.ANT, (0, -1)),
+                (Player.WHITE, PieceType.ANT, (-1, 0)),
+                (Player.BLACK, PieceType.ANT, (-1, 1)),
+            ],
+            current_player=Player.WHITE,
+            current_ply=6,
+        )
+
+        assert rules.immobility_reason(state=state, coord=(0, 0)) == (
+            "the queen has no legal target"
+        )
+        assert rules.immobility_reason(state=state, coord=(1, -1)) is None

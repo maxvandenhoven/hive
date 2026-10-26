@@ -292,16 +292,109 @@ class Rules(JsonCodec):
             move: The move to apply, or `None` to pass.
 
         Raises:
-            IllegalMoveError: If the move is not in `legal_moves(state)`.
+            IllegalMoveError: If the move is not in `legal_moves(state)`. The message
+                names the move and the reason from `illegal_move_reason`.
         """
         if move not in self.legal_moves(state):
             msg = (
-                f"Move `{move}` is not legal for player `{state.current_player.name}` at "
-                f"ply `{state.current_ply}`."
+                f"Move `{'pass' if move is None else move}` is not legal for player "
+                f"`{state.current_player.name}` at ply `{state.current_ply}`: "
+                f"{self.illegal_move_reason(state=state, move=move)}."
             )
             raise IllegalMoveError(msg)
 
         state.apply_move(move)
+
+    def illegal_move_reason(self, state: GameState, move: Move | None) -> str:
+        """Explain why a move is not legal, for messages to the player.
+
+        The checks follow the rules from the most basic (is there a piece to move) to the
+        most specific (can the piece reach the target), and the first that fails is the
+        reason. Reasons do not repeat the coordinates, which the move already names.
+
+        Args:
+            state: The current game state.
+            move: A move that is not in `legal_moves(state)`, or `None` for a pass.
+
+        Returns:
+            The reason, starting in lower case and without a final period.
+        """
+        if move is None:
+            return "passing is only allowed when there is no legal move"
+
+        piece_name = move.piece_type.name.lower()
+
+        if move.source_coord is None:
+            if move.piece_type not in self.placeable_piece_types(state):
+                if state.hand[state.current_player].get(move.piece_type, 0) == 0:
+                    return f"there is no {piece_name} left in hand"
+
+                if move.piece_type is not PieceType.QUEEN:
+                    return f"the queen must be placed by turn `{self.queen_by_turn}`"
+
+                return "the queen may not be placed on the first turn"
+
+            if move.target_coord not in self.placeable_coords(state):
+                if state.current_ply == 0:
+                    return "the first piece must be placed at `(0, 0)`"
+
+                if state.current_ply == 1:
+                    return "the second piece must be placed next to `(0, 0)`"
+
+                if state.is_occupied(move.target_coord):
+                    return "the target is occupied"
+
+                return (
+                    "a piece must be placed next to a piece of its owner and not next to "
+                    "a piece of the opponent"
+                )
+
+            return "the placement is not legal"
+
+        immobility_reason = self.immobility_reason(state=state, coord=move.source_coord)
+
+        if immobility_reason is not None:
+            return immobility_reason
+
+        top_piece_name = state.get_top_piece(move.source_coord).type.name.lower()
+
+        if top_piece_name != piece_name:
+            return f"the piece is of type `{top_piece_name}`, not `{piece_name}`"
+
+        return f"the {piece_name} cannot reach the target"
+
+    def immobility_reason(self, state: GameState, coord: Coordinate) -> str | None:
+        """Explain why the top piece at a coordinate cannot move, for messages.
+
+        Args:
+            state: The current game state.
+            coord: The axial coordinate `(q, r)` of the piece.
+
+        Returns:
+            The reason, starting in lower case and without a final period, or `None` if
+            the piece has at least one legal target.
+        """
+        if not state.is_occupied(coord):
+            return "there is no piece to move"
+
+        top_piece = state.get_top_piece(coord)
+
+        if top_piece.owner != state.current_player:
+            return f"the piece belongs to `{top_piece.owner.name}`"
+
+        if (
+            not self.move_before_queen
+            and state.get_queen_coord(state.current_player) is None
+        ):
+            return "pieces may only move once their owner's queen is placed"
+
+        if coord in state.get_articulation_points():
+            return "moving the piece would split the hive"
+
+        if not self.PIECE_TARGET_COORDS[top_piece.type](self, state, coord):
+            return f"the {top_piece.type.name.lower()} has no legal target"
+
+        return None
 
     def legal_moves(self, state: GameState) -> list[Move | None]:
         """Get all legal moves for the current player.

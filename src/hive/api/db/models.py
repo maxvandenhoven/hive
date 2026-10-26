@@ -26,7 +26,7 @@ from hive.api.players import PlayerConfig
 from hive.engine.codec import json_adapter
 from hive.engine.record import BoardSetup, GameRecord
 from hive.engine.rules import Rules
-from hive.engine.state import Move
+from hive.engine.state import GameState, Move, Player
 from hive.match.records import DecisionRecord
 
 NAMING_CONVENTION = {
@@ -53,6 +53,25 @@ class GameResult(StrEnum):
     WHITE = "white"
     BLACK = "black"
     DRAW = "draw"
+
+    @classmethod
+    def from_winners(cls, winners: list[Player] | None) -> "GameResult | None":
+        """Get the result from the winners the rules determined.
+
+        Args:
+            winners: The winners from `Rules.winners`: `None` while the game is in
+                progress, one player for a win, or both players for a draw.
+
+        Returns:
+            The result, or `None` while the game is in progress.
+        """
+        if winners is None:
+            return None
+
+        if len(winners) == len(Player):
+            return cls.DRAW
+
+        return cls.WHITE if winners[0] is Player.WHITE else cls.BLACK
 
 
 class MoveSource(StrEnum):
@@ -294,12 +313,44 @@ class GameRow(DatabaseBase):
         """The object key prefix of the photos of the game."""
         return f"photos/{self.id}/"
 
-    def to_record(self) -> GameRecord:
+    def player(self, side: Player) -> PlayerConfig:
+        """Get the player of a side.
+
+        Args:
+            side: The side.
+
+        Returns:
+            The white or the black player.
+        """
+        return self.white_player if side is Player.WHITE else self.black_player
+
+    def to_record(self, ply: int | None = None) -> GameRecord:
         """Build the game record of the game, which needs its moves loaded.
+
+        Args:
+            ply: The number of moves to include from the start, or `None` for every move.
 
         Returns:
             The rules, setup and moves of the game. The moves are not replayed.
         """
         return GameRecord(
-            rules=self.rules, setup=self.setup, moves=[row.move for row in self.moves]
+            rules=self.rules,
+            setup=self.setup,
+            moves=[row.move for row in self.moves[:ply]],
         )
+
+    def replay(self, ply: int | None = None) -> GameState:
+        """Replay the game from its starting position, which needs its moves loaded.
+
+        Args:
+            ply: The number of moves to play from the start, or `None` for every move.
+
+        Returns:
+            The state after the moves.
+
+        Raises:
+            InvalidBoardError: If the stored setup is not valid under the stored rules.
+            IllegalMoveError: If a stored move is not legal, which the move endpoints
+                never store.
+        """
+        return self.to_record(ply).replay()

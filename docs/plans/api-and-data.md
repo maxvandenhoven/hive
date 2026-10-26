@@ -31,11 +31,19 @@ stateless per request: load the game's moves from Postgres, replay them with
   later sweep of `photos/<id>/` prefixes without a game can remove. WP 11 (moves,
   undo, state) and WP 12 (committing agent decisions) extend the service rather than the
   routes.
+- **Moves (WP 11)**: the API's `ply` is always the record ply, the index into the stored
+  moves, also for games from the board editor (where the engine's own ply starts at the
+  setup's). Positions are replayed from the stored moves on every request. Writes load
+  the game with `get_game(lock=True)` (`SELECT ... FOR UPDATE`), so moves and undos of
+  one game run one at a time and `expected_ply` checks cannot race. Every move ends in
+  `GameService.append_move`, which checks legality, stores the move and finishes the
+  game; WP 12 commits agent decisions through it with their `DecisionRecord`.
 - **Errors** (`api/errors.py`): services raise `ApiError` subclasses (`GameNotFoundError`,
-  later for example `PlyConflictError`), which one exception handler turns into an
-  `ErrorResponse` (`{code, detail}`) with the error's status code. Routes declare them in
-  `responses` (for example `GAME_NOT_FOUND_RESPONSES`), so the generated client knows
-  every error shape.
+  `PlyConflictError`, `MoveNotLegalError`, ...), which one exception handler turns into
+  an `ErrorResponse` (`{code, detail}`) with the error's status code. Routes declare them
+  with `error_responses(...)`, so the generated client knows every error shape. A 422
+  response allows both `ErrorResponse` and FastAPI's `HTTPValidationError`, since
+  declaring a 422 replaces FastAPI's own.
 - **OpenAPI**: operation IDs are the handler names (`create_game`, `list_games`), so they
   must be unique and stable; every response, including `/readyz` and the export download,
   has a schema.
@@ -101,10 +109,10 @@ the generated frontend client.
 | PATCH | `/games/{id}` | 10 | Rename, change status. |
 | DELETE | `/games/{id}` | 10 | Delete game, moves, photos (including objects). |
 | GET | `/games/{id}/export` | 10 | Serialized `GameRecord` as JSON download. |
-| GET | `/games/{id}/state?ply=N` | 11 | Board (stacks), hands, side to move, ply, result, last move, movable pieces, placeable coords and piece types. `ply` enables replay. |
-| GET | `/games/{id}/targets?q=&r=` | 11 | Legal targets for the tile at `(q, r)`. |
-| POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply}`. Validated with `Rules.apply_checked_move`; `expected_ply` gives optimistic concurrency (409 on mismatch). Updates status/result when the game ends. |
-| DELETE | `/games/{id}/moves/last` | 11 | Undo the last move. |
+| GET | `/games/{id}/state?ply=N` | 11 | `GamePosition`: board (stacks), hands, side to move, `ply` and `ply_count`, result, last move (the stored move, so a pass is told apart from the start), `movable_pieces` (with at least one target), `placeable_coords`, `placeable_piece_types` and `must_pass`. The move lists are empty once the game ended. `ply` (default: latest) enables replay; past the last move is 422 `ply_out_of_range`. |
+| GET | `/games/{id}/targets?q=&r=` | 11 | Legal targets of the top piece at `(q, r)` in the latest position. 404 `coordinate_empty`; 422 `piece_not_movable` with the reason from `Rules.immobility_reason` (other side's piece, queen not placed, one-hive rule, no target, game over). |
+| POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply, allow_agent_side}`, returning the new `GamePosition` (201). `source` is `manual` or `photo`; `photo_id` is required with `photo` only, must belong to the game, and is marked `confirmed`. Checks in order: 409 `ply_conflict` on an `expected_ply` mismatch, 409 `game_not_active` for finished or abandoned games, 409 `agent_turn` when an agent plays the side to move (any source) unless `allow_agent_side`, 422 `move_not_legal` with the reason from `Rules.illegal_move_reason`. Sets status `finished` and the result when the game ends. |
+| DELETE | `/games/{id}/moves/last` | 11 | Undo the last move, returning the new `GamePosition`. Optional `expected_ply` (409 `ply_conflict`); 409 `no_move_to_undo` without moves. Reopens finished games (status `active`, no result); abandoned games stay abandoned. Unconfirms the move's photo. |
 | POST | `/games/{id}/think` | 12 | SSE stream. Body: `{agent?: AgentSpec, budget_s?, commit: bool}`. Streams `info` and `candidate` events, ends with `decision`. With `commit=true` (only allowed on an agent side, using that side's spec), the final move is stored with `source=agent` and its `DecisionRecord`. |
 | POST | `/games/{id}/photos` | 16 | Upload a photo (multipart) for the current ply; stores it. From WP 19 also runs reader + matcher and returns candidates. |
 | GET | `/photos/{id}/image` | 16 | Stream the stored image. |

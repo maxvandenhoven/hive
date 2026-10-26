@@ -58,6 +58,8 @@ class Rules:
     def placeable_piece_types(self, state: GameState) -> list[PieceType]: ...
     def winners(self, state: GameState) -> list[Player] | None: ...
     def is_finished(self, state: GameState) -> bool: ...
+    def illegal_move_reason(self, state: GameState, move: Move | None) -> str: ...
+    def immobility_reason(self, state: GameState, coord: Coordinate) -> str | None: ...
 ```
 
 Notes:
@@ -86,6 +88,11 @@ Notes:
 - `movable_pieces` and `target_coords` power the frontend utilities "which tiles can move"
   and "legal targets for this tile". For placements, the frontend uses `placeable_coords`.
 - Agents receive `rules: Rules` instead of a `Ruleset`.
+- `illegal_move_reason` and `immobility_reason` (WP 11) explain why a move is not legal
+  or a piece cannot move, for messages to the player (for example "moving the piece would
+  split the hive"). They only run on error paths; `apply_checked_move` puts the reason in
+  its `IllegalMoveError` message, and `Move.__str__` describes the move (`place ant at
+  (1, 0)`).
 
 ## Validated entry points (WP 04)
 
