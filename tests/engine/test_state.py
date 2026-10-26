@@ -797,3 +797,21 @@ class TestCanSlide:
             Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, -1))
         )
         assert state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
+
+
+@pytest.mark.parametrize(
+    ("move", "description"),
+    [
+        (
+            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0)),
+            "place ant at (1, 0)",
+        ),
+        (
+            Move(piece_type=PieceType.BEETLE, source_coord=(0, 0), target_coord=(0, -1)),
+            "move beetle from (0, 0) to (0, -1)",
+        ),
+    ],
+)
+def test_move_str(move: Move, description: str) -> None:
+    """Test that a move describes itself as a placement or a movement."""
+    assert str(move) == description

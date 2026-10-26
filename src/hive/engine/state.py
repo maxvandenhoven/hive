@@ -72,6 +72,19 @@ class Move(JsonCodec):
     source_coord: Annotated[Coordinate | None, Field(alias="from")]
     target_coord: Annotated[Coordinate, Field(alias="to")]
 
+    def __str__(self) -> str:
+        """Describe the move for messages, for example `move ant from (0, 0) to (1, 0)`.
+
+        Returns:
+            The description of the placement or movement.
+        """
+        piece_name = self.piece_type.name.lower()
+
+        if self.source_coord is None:
+            return f"place {piece_name} at {self.target_coord}"
+
+        return f"move {piece_name} from {self.source_coord} to {self.target_coord}"
+
 
 @dataclass(frozen=True, slots=True)
 class BoardCell(JsonCodec):
