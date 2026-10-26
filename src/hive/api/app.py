@@ -1,5 +1,6 @@
 """The FastAPI app factory and the lifespan that opens the database, store and pool."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -9,12 +10,15 @@ from fastapi import FastAPI
 from hive import __version__
 from hive.api.db.session import Database
 from hive.api.errors import ApiError, handle_api_error
+from hive.api.frontend import FrontendFiles
 from hive.api.metrics import ApiMetrics, HttpMetricsMiddleware
 from hive.api.observability import REQUEST_ID_HEADER
 from hive.api.pool import AgentPool
 from hive.api.routes import agents, games, health, metrics
 from hive.api.settings import ApiSettings
 from hive.api.storage import ObjectStore
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -86,5 +90,13 @@ def create_app(
     app.include_router(metrics.router)
     app.include_router(agents.router)
     app.include_router(games.router)
+
+    # The frontend is mounted last, so every route above takes precedence over its files.
+    frontend_dir = resolved_settings.frontend_dir
+
+    if frontend_dir is not None and frontend_dir.is_dir():
+        app.mount("/", FrontendFiles(directory=str(frontend_dir)), name="frontend")
+    elif frontend_dir is not None:
+        logger.info("No frontend build at `%s`; serving the API only.", frontend_dir)
 
     return app

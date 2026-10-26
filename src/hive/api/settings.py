@@ -1,5 +1,7 @@
 """Settings of the API service, read from `HIVE_` environment variables or `.env`."""
 
+from pathlib import Path
+
 from alembic.config import Config
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -57,6 +59,9 @@ class ApiSettings(DatabaseSettings):
             fails with 503.
         max_budget_s: The longest time budget of one decision in seconds; longer budgets
             are shortened to it.
+        frontend_dir: The built frontend, served at `/` with a fallback to `index.html`
+            for client-side routes. Relative paths start at the working directory. If it
+            is `None` or does not exist, only the API is served.
     """
 
     s3_endpoint_url: str
@@ -68,3 +73,4 @@ class ApiSettings(DatabaseSettings):
     pool_size: int = Field(default=2, ge=1)
     pool_wait_s: float = Field(default=10.0, ge=0.0)
     max_budget_s: float = Field(default=30.0, gt=0.0)
+    frontend_dir: Path | None = Path("frontend/dist")

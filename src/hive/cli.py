@@ -545,6 +545,33 @@ def serve(
     )
 
 
+@app.command(
+    "openapi", help="Write the OpenAPI schema of the API as JSON, without serving it."
+)
+def openapi(
+    output: Annotated[Path, typer.Option(help="The JSON file to write.")],
+) -> None:
+    """Write the OpenAPI schema of the API as JSON, without serving it.
+
+    The frontend generates its API types from the file (`make api-client`).
+
+    Args:
+        output: The JSON file to write.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
+    require_api_extra()
+
+    from hive.api.app import create_app
+    from hive.api.settings import ApiSettings
+
+    # The schema does not depend on the settings, so none are read from the environment.
+    settings = ApiSettings.model_construct(frontend_dir=None)
+    schema = create_app(settings=settings).openapi()
+    output.write_text(json.dumps(schema, indent=2) + "\n")
+    logger.info("Wrote the OpenAPI schema to `%s`.", output)
+
+
 db_app = typer.Typer(no_args_is_help=True, help="Database schema migrations.")
 app.add_typer(db_app, name="db")
 

@@ -7,13 +7,13 @@ well on a phone at the table (camera, touch) and on a desktop (agent vs agent, r
 
 | Concern | Choice |
 |---|---|
-| Build | Vite + React + TypeScript (strict) |
+| Build | Vite + React + TypeScript (strict, `noUncheckedIndexedAccess`; 5.9, see `tooling.md`) |
 | Package manager | npm (lockfile committed) |
 | Styling | Tailwind CSS |
-| Components | shadcn/ui, copied into `frontend/src/components/ui/` and themed; app components build on them |
+| Components | shadcn/ui (Radix base, `radix-nova` style, Lucide icons), copied into `frontend/src/components/ui/` and themed; app components build on them. Add primitives with `npx shadcn@latest add <name>` |
 | Server state | TanStack Query |
 | Routing | React Router |
-| API types | `openapi-typescript` generated from FastAPI's OpenAPI schema into `frontend/src/api/schema.ts`, with a thin typed fetch wrapper; CI fails if the generated file is stale |
+| API types | `openapi-typescript` generated from FastAPI's OpenAPI schema (`hive openapi`, no server needed) into `frontend/src/api/schema.ts` by `make api-client`; `openapi-fetch` is the thin typed client, and `unwrap` turns error bodies into an `ApiRequestError` with the API error `code`. CI fails if the generated file is stale |
 | Streaming | `fetch` + a small SSE reader for `POST /think` (`EventSource` only supports GET) |
 | Lint/format/test | ESLint, Prettier, Vitest + Testing Library |
 
@@ -24,17 +24,22 @@ the image and mounted by FastAPI.
 
 ```
 frontend/src/
-├─ api/                 # schema.ts (generated), client.ts, queries.ts (TanStack hooks), sse.ts
+├─ api/                 # schema.ts (generated), client.ts, queries.ts (TanStack hooks),
+│                       # queryClient.ts (failed mutations become toasts), sse.ts
+├─ lib/                 # agentParams.ts (param forms from JSON schema), players.ts, time.ts
+├─ test/                # setup.ts (jsdom polyfills for Radix), fixtures, fetch mock, render
 ├─ components/
-│  ├─ ui/               # shadcn/ui primitives: Button, Dialog, Sheet, Toast, Select, ...
+│  ├─ ui/               # shadcn/ui primitives: Button, Dialog, Field, Select, Sonner, ...
 │  ├─ board/
 │  │  ├─ types.ts       # BoardRendererProps, view models
 │  │  ├─ SvgBoard.tsx   # first renderer
 │  │  ├─ hex.ts         # axial ↔ pixel math (ported from hive/plotting/svg/geometry.py)
 │  │  └─ useBoardInteraction.ts
-│  ├─ HandTray.tsx  MoveList.tsx  PlayerSetup.tsx  AgentPicker.tsx
+│  ├─ HandTray.tsx  MoveList.tsx  PlayerSetup.tsx  AgentPicker.tsx  AgentParamInput.tsx
+│  ├─ NewGameDialog.tsx  RenameGameDialog.tsx  DeleteGameDialog.tsx  GamesTable.tsx
 │  ├─ ThinkingPanel.tsx  CameraCapture.tsx  MatchCandidates.tsx  ReplayControls.tsx
-├─ pages/               # GamesPage.tsx, GamePage.tsx, NewGameDialog
+├─ pages/               # GamesPage.tsx, GamePage.tsx, NotFoundPage.tsx
+├─ App.tsx              # router (`/`, `/games/:gameId`) and query client
 └─ main.tsx
 ```
 
@@ -67,10 +72,17 @@ Stacks show the top piece with a stack height badge; tapping a stack lists its c
 
 ## Flows
 
-**Games page (WP 13).** List games (name, players, status, ply, updated), create, rename,
-delete, open. New game dialog: choose each side as human or agent; for agents pick kind,
-params (form generated from the param schema) and time budget. Human vs human is not
-offered.
+**Games page (WP 13).** List games (name, players, status, ply, updated), paged by
+`?page=N`; open, rename, export and delete from a row menu. New game dialog: choose each
+side as human or agent; for agents pick kind, label, params (form generated from the param
+schema) and time budget. Human vs human is not offered: the human option is disabled while
+the other side is human. An empty name defaults to the players (`Human vs negamax (5 s)`),
+and the new game opens once created.
+
+The param form (`lib/agentParams.ts`) supports integers, numbers, booleans, strings and
+string enums, each optionally nullable (an empty input is `null`); other schemas are edited
+as JSON. Inputs hold drafts that are checked live against the schema bounds, and params left
+at their default are not sent, so specs keep following the agent defaults.
 
 **Game page, human turn (WP 14).** Board + hand trays + move list. Manual entry by tapping.
 Undo last move. Game over banner.

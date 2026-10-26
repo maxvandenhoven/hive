@@ -120,8 +120,10 @@ the generated frontend client.
 | GET | `/healthz`, `/readyz` | 10 | Liveness; readiness checks DB, S3 and (from WP 24) model loaded. |
 | GET | `/metrics` | 12 | Prometheus metrics. |
 
-Static files: the built frontend (`frontend/dist`) is mounted at `/` with an SPA fallback
-to `index.html` for client-side routes.
+Static files: the built frontend (`HIVE_FRONTEND_DIR`, default `frontend/dist` relative to
+the working directory) is mounted at `/` after every route, with an SPA fallback to
+`index.html` for client-side routes (`hive.api.frontend.FrontendFiles`). Unknown paths under
+`/api` stay a JSON 404. Without a build, only the API is served.
 
 ## Agent worker pool (WP 12)
 
