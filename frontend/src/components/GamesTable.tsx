@@ -2,7 +2,8 @@ import { DownloadIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon } from "lucid
 import { Link } from "react-router";
 
 import { gameExportUrl, type GameSummary } from "@/api/client";
-import { GameStatusBadge } from "@/components/GameStatusBadge";
+import { GAME_SCENARIO_ICONS } from "@/components/scenarioIcons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -19,7 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { describePlayer } from "@/lib/players";
+import {
+  describeGameScenario,
+  describeNextAction,
+  describePlayer,
+  gameScenario,
+} from "@/lib/players";
 import { formatRelativeTime } from "@/lib/time";
 
 interface GameActionsProps {
@@ -67,21 +73,53 @@ function GameActions({ game, onRename, onDelete }: GameActionsProps) {
   );
 }
 
+/** The scenario of a game as an icon and a short label, such as `hints game`. */
+function GameScenarioLabel({ game }: { game: GameSummary }) {
+  const Icon = GAME_SCENARIO_ICONS[gameScenario(game)];
+
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Icon aria-hidden className="size-3.5 shrink-0" />
+      {describeGameScenario(game)}
+    </span>
+  );
+}
+
+/**
+ * What happens next in a game: honey when it waits for a person, such as `Your turn`,
+ * secondary for an agent's turn or a result, outline once abandoned.
+ */
+function GameNextActionBadge({ game }: { game: GameSummary }) {
+  const action = describeNextAction(game);
+  let variant: "default" | "secondary" | "outline" = "secondary";
+
+  if (game.status === "abandoned") {
+    variant = "outline";
+  } else if (action.waitsForPerson) {
+    variant = "default";
+  }
+
+  return <Badge variant={variant}>{action.label}</Badge>;
+}
+
 interface GamesTableProps {
   games: GameSummary[];
   onRename: (game: GameSummary) => void;
   onDelete: (game: GameSummary) => void;
 }
 
-/** The games with their players, status, ply and last change; names open the game. */
+/**
+ * The games with their scenario, next action, players, ply and last change; names open
+ * the game.
+ */
 export function GamesTable({ games, onRename, onDelete }: GamesTableProps) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
-          <TableHead className="hidden sm:table-cell">Players</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead>Next</TableHead>
+          <TableHead className="hidden lg:table-cell">Players</TableHead>
           <TableHead className="text-right">Ply</TableHead>
           <TableHead className="hidden md:table-cell">Updated</TableHead>
           <TableHead className="w-0">
@@ -92,16 +130,22 @@ export function GamesTable({ games, onRename, onDelete }: GamesTableProps) {
       <TableBody>
         {games.map((game) => (
           <TableRow key={game.id}>
-            <TableCell className="max-w-48 truncate font-medium">
-              <Link to={`/games/${game.id}`} className="hover:underline">
-                {game.name}
-              </Link>
-            </TableCell>
-            <TableCell className="hidden text-muted-foreground sm:table-cell">
-              {describePlayer(game.white)} vs {describePlayer(game.black)}
+            <TableCell className="max-w-48 sm:max-w-72">
+              <div className="flex flex-col gap-0.5">
+                <Link
+                  to={`/games/${game.id}`}
+                  className="truncate font-medium hover:underline"
+                >
+                  {game.name}
+                </Link>
+                <GameScenarioLabel game={game} />
+              </div>
             </TableCell>
             <TableCell>
-              <GameStatusBadge game={game} />
+              <GameNextActionBadge game={game} />
+            </TableCell>
+            <TableCell className="hidden text-muted-foreground lg:table-cell">
+              {describePlayer(game.white)} vs {describePlayer(game.black)}
             </TableCell>
             <TableCell className="text-right tabular-nums">{game.ply_count}</TableCell>
             <TableCell className="hidden text-muted-foreground md:table-cell">

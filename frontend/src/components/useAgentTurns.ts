@@ -7,8 +7,8 @@ import { streamThinkEvents } from "@/api/sse";
 import type { ThinkInfo } from "@/lib/search";
 
 /**
- * How agent turns run: in a `human` game a person makes each agent move on the board
- * and confirms it; in a `match` (agent vs agent) moves follow each other while playing.
+ * How agent turns run: in a `human` game only table moves need confirmation; in a
+ * `match` (agent vs agent) moves follow each other while playing.
  */
 export type AgentTurnMode = "human" | "match";
 
@@ -120,7 +120,7 @@ export interface AgentTurns {
  * Agent turns: when an agent is to move, it thinks with `commit=true`, streaming its
  * search, and its move is stored in the game.
  *
- * In a human game the committed move then waits for **Done** before the person plays.
+ * In a table game the committed move waits for **Done**; screen games play on immediately.
  * A match plays on while `autoplay` is set, waiting `delayS` between moves, or one move
  * per `step`. The stream is closed, which stops the agent without committing, when the
  * page closes, a match pauses or another write starts.
@@ -238,7 +238,10 @@ export function useAgentTurns({ game, position, idle }: AgentTurnsOptions): Agen
         ? { type: "thinking", ply, startedAt: null, info: null, candidate: undefined }
         : { type: "idle" }),
     agent,
-    awaitingDone: mode === "human" && current?.type === "committed",
+    awaitingDone:
+      mode === "human" &&
+      game.board_location === "table" &&
+      current?.type === "committed",
     autoplay,
     delayS,
     setAutoplay: (next) => {

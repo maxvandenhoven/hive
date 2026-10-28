@@ -26,7 +26,9 @@ the image and mounted by FastAPI.
 frontend/src/
 ├─ api/                 # schema.ts (generated), client.ts, queries.ts (TanStack hooks),
 │                       # queryClient.ts (failed mutations become toasts), sse.ts
-├─ lib/                 # agentParams.ts (param forms from JSON schema), players.ts, time.ts,
+├─ lib/                 # agentParams.ts (param forms from JSON schema), players.ts
+│                       # (player, scenario and next action descriptions), newGame.ts
+│                       # (new game choices, requests, remembered choices), time.ts,
 │                       # moves.ts (move descriptions, side at a ply, board view models),
 │                       # search.ts (search info summaries and formatting)
 ├─ test/                # setup.ts (jsdom polyfills for Radix), fixtures, fetch mock, render
@@ -47,8 +49,9 @@ frontend/src/
 │  │  └─ useBoardInteraction.ts # selection → targets → move
 │  ├─ HandTray.tsx  MoveList.tsx  GameHeader.tsx  GameOverBanner.tsx
 │  ├─ useAgentTurns.ts  ThinkingPanel.tsx  MatchControls.tsx  ReplayControls.tsx
-│  ├─ PlayerSetup.tsx  AgentPicker.tsx  AgentParamInput.tsx  GameStatusBadge.tsx
-│  ├─ NewGameDialog.tsx  RenameGameDialog.tsx  DeleteGameDialog.tsx  GamesTable.tsx
+│  ├─ AgentChoiceField.tsx  AgentPicker.tsx  AgentParamInput.tsx  GameStatusBadge.tsx
+│  ├─ NewGameDialog.tsx  ChoiceCards.tsx  scenarioIcons.ts
+│  ├─ RenameGameDialog.tsx  DeleteGameDialog.tsx  GamesTable.tsx
 │  ├─ CameraCapture.tsx  MatchCandidates.tsx
 ├─ pages/               # GamesPage.tsx, GamePage.tsx, NotFoundPage.tsx
 ├─ App.tsx              # router (`/`, `/games/:gameId`) and query client
@@ -108,7 +111,7 @@ apart by shape, dash or fill so it reads without colour:
 | Mark | Prop | Drawing |
 |---|---|---|
 | Can move | `movable` | Solid ring on the tile, which is raised by a shadow (`--board-movable`) |
-| Selected | `selected` | Solid wide halo behind the tile (`--board-movable`) |
+| Selected | `selected` | Narrow unfilled outline around the rounded tile (`--board-movable`) |
 | Can go here | `highlights`, empty hex | Dashed hex with a dot (`--board-target`) |
 | Can climb on top | `highlights`, occupied hex | Dashed ring with a dot on the tile (`--board-target`) |
 | Last move | `lastMove` | Dotted outline with a light fill on from, stronger on to (`--board-last-move`) |
@@ -116,7 +119,7 @@ apart by shape, dash or fill so it reads without colour:
 | Not allowed | `forbidden` | Hex with a cross (`--board-forbidden`), for the rule diagrams of WP 38 |
 
 The hand trays use the same components: a placeable piece is raised with a ring, the
-selected one has the halo.
+selected one has an unfilled outline.
 
 **Legend.** `BoardLegend` is a Key button with a small panel that lists the marks on the
 board now first (`boardMarksShown(props)`), then the rest, each with a swatch drawn by
@@ -164,7 +167,9 @@ the mockup where WCAG AA needed it (marked *).
 
 Honey is for fills, never for text on light surfaces (2:1). Links are foreground text with
 a honey underline. Status badges: active is primary (honey), finished secondary, abandoned
-outline.
+outline. In the game list the next action badge is primary when the game waits for a
+person (*Your turn*, *Agent's move to make*), secondary for an agent's turn or a result,
+and outline once abandoned.
 
 **Board colours.** Each board colour has one meaning, shared by the 2D board, the 2.5D
 board (WP 39), the legend (WP 32) and the help. CSS can use the classes; renderers that
@@ -191,12 +196,41 @@ arrives in WP 37).
 
 ## Flows
 
-**Games page (WP 13).** List games (name, players, status, ply, updated), paged by
-`?page=N`; open, rename, export and delete from a row menu. New game dialog: choose each
-side as human or agent; for agents pick kind, label, params (form generated from the param
-schema) and time budget. Human vs human is not offered: the human option is disabled while
-the other side is human. An empty name defaults to the players (`Human vs negamax (5 s)`),
-and the new game opens once created.
+**Games page (WP 13, WP 34).** List games, paged by `?page=N`; open, rename, export and
+delete from a row menu. Each row shows the name with the scenario under it (an icon and
+*vs agent · on screen*, *vs agent · at the table*, *hints game* or *watching*), the next
+action rather than only the status (*Your turn*, *White to move* in a hints game, *Agent's
+move to make* for a pending move, *nm3 to move*, *White won*), the players (wide screens),
+the ply and when it changed. `lib/players.ts` derives both from the `GameSummary`
+(`gameScenario`, `describeGameScenario`, `describeNextAction`), without loading moves.
+
+**New game (WP 34).** A flow that asks what the person wants to do instead of a player
+type per side (D26). On a phone it is a full-screen sheet, on a desktop a dialog; both
+have a back button from the setup to the scenarios.
+
+1. *Choose a scenario*: three large cards with an icon and one sentence: *Play against an
+   agent*, *Play a friend with hints*, *Watch two agents*.
+2. *Set it up*:
+   - Against an agent: where to play (*On this screen* or *At the table*, each with one
+     line on what it means), your colour (white, black or random, drawn when the game
+     starts), the opponent, and hints for yourself (off by default) with a hint strength.
+   - A friend with hints: who gets hints (white, black or both) and the hint strength.
+     Always at the table.
+   - Watch two agents: the white and the black agent. Always on the screen.
+   - An optional name, defaulting from the scenario (`You vs nm3`, `Hints game`,
+     `nm3 vs nm2`).
+
+Agents are picked by `AgentChoiceField` from `GET /agents/presets` as named strengths with
+the default budget (5 s); **Advanced…** opens `AgentPicker` (kind, params, label and
+budget), starting from the chosen preset. The first game defaults to the strongest preset
+(the last by name) against the person, and the strongest against the weakest when
+watching. Without presets the choice starts in Advanced with the first kind.
+`lib/newGame.ts` holds the choices of all three scenarios (so switching keeps them),
+builds the `GameCreate` request (players, hint agents and `board_location`) and remembers
+the choices per device (`localStorage`, checked field by field against the agents now
+offered) once a game is created. With remembered choices the flow opens at the setup of
+the last scenario, so a similar game takes two taps (New game, Start game). The new game
+opens once created.
 
 The param form (`lib/agentParams.ts`) supports integers, numbers, booleans, strings and
 string enums, each optionally nullable (an empty input is `null`); other schemas are edited

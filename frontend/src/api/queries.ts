@@ -23,7 +23,8 @@ import {
  * refreshes them too.
  */
 export const queryKeys = {
-  agentKinds: ["agents"] as const,
+  agentKinds: ["agents", "kinds"] as const,
+  agentPresets: ["agents", "presets"] as const,
   games: ["games"] as const,
   gamePages: ["games", "page"] as const,
   gamePage: (limit: number, offset: number) => ["games", "page", limit, offset] as const,
@@ -41,6 +42,15 @@ export function useAgentKinds() {
   return useQuery({
     queryKey: queryKeys.agentKinds,
     queryFn: async () => unwrap(await api.GET("/api/agents")),
+    staleTime: Infinity,
+  });
+}
+
+/** The shipped agent presets, offered as named strengths; they only change on deploy. */
+export function useAgentPresets() {
+  return useQuery({
+    queryKey: queryKeys.agentPresets,
+    queryFn: async () => unwrap(await api.GET("/api/agents/presets")),
     staleTime: Infinity,
   });
 }

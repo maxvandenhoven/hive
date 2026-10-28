@@ -1,5 +1,5 @@
 import type { PieceType, PlayerConfig } from "@/api/client";
-import { MovableRing, MovableShadow, SelectedHalo } from "@/components/board/marks";
+import { MovableRing, MovableShadow, SelectedOutline } from "@/components/board/marks";
 import { PieceTile } from "@/components/board/PieceTile";
 import { Button } from "@/components/ui/button";
 import { PIECE_NAMES, PIECE_TYPES } from "@/lib/moves";
@@ -25,11 +25,11 @@ interface TrayPieceProps {
   selected: boolean;
 }
 
-/** A piece in hand with the board's marks: raised when placeable, a halo when selected. */
+/** A piece in hand with the board's marks: raised when placeable, an outline when selected. */
 function TrayPiece({ piece, side, placeable, selected }: TrayPieceProps) {
   return (
     <svg viewBox="-1.1 -1.1 2.25 2.25" aria-hidden="true" className="size-9 shrink-0">
-      {selected && <SelectedHalo />}
+      {selected && <SelectedOutline />}
       {placeable && <MovableShadow />}
       <PieceTile piece={{ piece, owner: side }} />
       {placeable && <MovableRing />}
