@@ -6,15 +6,14 @@
 import { useId } from "react";
 
 import type { BoardMarkKind } from "@/components/board/boardMarks";
-import { hexPoints, type PixelPoint } from "@/components/board/hex";
+import { hexPoints, roundedHexPath, type PixelPoint } from "@/components/board/hex";
 import { TILE_RADIUS } from "@/components/board/PieceTile";
 import { cn } from "@/lib/utils";
 
 const ORIGIN = { x: 0, y: 0 };
 const HALO_POINTS = hexPoints(ORIGIN, 1);
-// A little larger than a hex, so it reads as a wide band rather than a thick ring; the
-// tiles next to it are drawn over its edge.
-const SELECTED_POINTS = hexPoints(ORIGIN, 1.08);
+const SELECTED_PATH = roundedHexPath(0.96);
+const TILE_PATH = roundedHexPath(TILE_RADIUS);
 const RING_POINTS = hexPoints(ORIGIN, TILE_RADIUS);
 const TARGET_POINTS = hexPoints(ORIGIN, 0.8);
 const LAST_MOVE_POINTS = hexPoints(ORIGIN, 0.96);
@@ -27,9 +26,9 @@ const SHADOW_OFFSET = { x: 0.06, y: 0.1 };
 /** The shadow under a tile that can move, drawn before the tile so it looks raised. */
 export function MovableShadow() {
   return (
-    <polygon
+    <path
       data-mark="movable"
-      points={RING_POINTS}
+      d={TILE_PATH}
       transform={`translate(${SHADOW_OFFSET.x} ${SHADOW_OFFSET.y})`}
       className="fill-foreground/35"
     />
@@ -39,9 +38,9 @@ export function MovableShadow() {
 /** The ring on a tile that can move, drawn over the tile. */
 export function MovableRing() {
   return (
-    <polygon
+    <path
       data-mark="movable"
-      points={RING_POINTS}
+      d={TILE_PATH}
       fill="none"
       strokeWidth={0.08}
       className="stroke-board-movable"
@@ -49,13 +48,15 @@ export function MovableRing() {
   );
 }
 
-/** A solid halo behind the selected tile. */
-export function SelectedHalo() {
+/** An unfilled outline around the selected tile that leaves neighbours visible. */
+export function SelectedOutline() {
   return (
-    <polygon
+    <path
       data-mark="selected"
-      points={SELECTED_POINTS}
-      className="fill-board-movable"
+      d={SELECTED_PATH}
+      fill="none"
+      strokeWidth={0.06}
+      className="stroke-board-movable"
     />
   );
 }
@@ -216,7 +217,7 @@ function SwatchMarks({ kind }: { kind: BoardMarkKind }) {
     case "selected":
       return (
         <>
-          <SelectedHalo />
+          <SelectedOutline />
           <MovableShadow />
           <BlankTile />
           <MovableRing />

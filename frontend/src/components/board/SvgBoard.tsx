@@ -18,7 +18,7 @@ import {
   axialToPixel,
   formatHex,
   hexKey,
-  hexPoints,
+  roundedHexPath,
   pixelToAxial,
   sameHex,
 } from "@/components/board/hex";
@@ -27,7 +27,7 @@ import {
   LastMoveMark,
   MovableRing,
   MovableShadow,
-  SelectedHalo,
+  SelectedOutline,
   SuggestionMark,
   TargetMark,
 } from "@/components/board/marks";
@@ -66,7 +66,7 @@ const ZOOM_STEP = 1.25;
 /** How far each piece below the top one peeks out of a stack. */
 const STACK_OFFSET = 0.08;
 
-const RING_POINTS = hexPoints({ x: 0, y: 0 }, TILE_RADIUS);
+const TILE_PATH = roundedHexPath(TILE_RADIUS);
 
 function describePiece(piece: Piece): string {
   return `${SIDE_TITLES[piece.owner]} ${PIECE_NAMES[piece.piece].toLowerCase()}`;
@@ -85,14 +85,28 @@ function StackLayers({ pieces }: { pieces: Piece[] }) {
     .map((piece, index) => ({ piece, depth: index + 1 }))
     .reverse()
     .map(({ piece, depth }) => (
-      <polygon
+      <path
         key={depth}
-        points={RING_POINTS}
+        d={TILE_PATH}
         transform={`translate(${depth * STACK_OFFSET} ${depth * STACK_OFFSET})`}
         strokeWidth={0.04}
         className={cn(TILE_FILL_CLASSES[piece.owner], "stroke-tile-stroke")}
       />
     ));
+}
+
+/** A keyboard focus mark whose stroke stays small at every board zoom. */
+function BoardFocusRing() {
+  return (
+    <path
+      d={TILE_PATH}
+      fill="none"
+      strokeWidth={2}
+      vectorEffect="non-scaling-stroke"
+      pointerEvents="none"
+      className="hidden stroke-ring group-focus-visible/board-button:block"
+    />
+  );
 }
 
 function StackBadge({ height }: { height: number }) {
@@ -149,7 +163,7 @@ function buttonProps(
     role: "button",
     tabIndex: 0,
     "aria-label": label,
-    className: "cursor-pointer",
+    className: "group/board-button cursor-pointer outline-none",
     onClick,
     onKeyDown: (event: KeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -298,6 +312,7 @@ export function SvgBoard({
         <PieceTile piece={top} />
         {movableKeys.has(key) && <MovableRing />}
         {height > 1 && <StackBadge height={height} />}
+        {interactive && <BoardFocusRing />}
       </g>
     );
   };
@@ -320,6 +335,7 @@ export function SvgBoard({
         )}
       >
         <TargetMark occupied={occupied} />
+        <BoardFocusRing />
       </g>
     );
   };
@@ -363,7 +379,7 @@ export function SvgBoard({
           )}
           {selected !== null && (
             <g transform={translate(selected)}>
-              <SelectedHalo />
+              <SelectedOutline />
             </g>
           )}
           {board.map(renderStack)}

@@ -74,6 +74,27 @@ export function hexPoints(center: PixelPoint, size = 1): string {
     .join(" ");
 }
 
+/** A hex with gently rounded corners, as an SVG path. */
+export function roundedHexPath(size: number): string {
+  const corners = hexCorners({ x: 0, y: 0 }, size);
+  const point = ({ x, y }: PixelPoint) => `${roundForSvg(x)},${roundForSvg(y)}`;
+  const toward = (a: PixelPoint, b: PixelPoint): PixelPoint => ({
+    x: a.x + (b.x - a.x) * 0.1,
+    y: a.y + (b.y - a.y) * 0.1,
+  });
+
+  return (
+    corners
+      .map((corner, index) => {
+        const before = corners[(index + 5) % 6] ?? corner;
+        const after = corners[(index + 1) % 6] ?? corner;
+
+        return `${index === 0 ? "M" : "L"} ${point(toward(corner, before))} Q ${point(corner)} ${point(toward(corner, after))}`;
+      })
+      .join(" ") + " Z"
+  );
+}
+
 function roundForSvg(value: number): number {
   return Math.round(value * 1000) / 1000 + 0;
 }

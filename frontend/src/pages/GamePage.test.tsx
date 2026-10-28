@@ -487,9 +487,7 @@ describe("GamePage", () => {
         "Your turn: tap a piece on the board or in your hand",
       ),
     ).toBeVisible();
-    expect(
-      within(prompt).queryByRole("button", { name: "Done" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Done" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Place white ant, 2 left" })).toBeEnabled();
     expect(requests.some((request) => request.path.endsWith("/confirm"))).toBe(false);
   });
