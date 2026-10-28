@@ -7,6 +7,7 @@ import {
   fitViewBox,
   panViewBox,
   viewBoxAttribute,
+  visibleViewBox,
   zoomViewBox,
   type ViewBox,
 } from "@/components/board/viewBox";
@@ -106,5 +107,31 @@ describe("viewBoxAttribute", () => {
     expect(viewBoxAttribute({ x: -1.23456, y: 2, width: 10.00001, height: 8 })).toBe(
       "-1.235 2 10 8",
     );
+  });
+});
+
+describe("visibleViewBox", () => {
+  const view: ViewBox = { x: -4, y: -3, width: 8, height: 6 };
+
+  it("widens the view on a wide screen, around its centre", () => {
+    expect(visibleViewBox(view, { width: 800, height: 300 })).toEqual({
+      x: -8,
+      y: -3,
+      width: 16,
+      height: 6,
+    });
+  });
+
+  it("heightens the view on a tall screen", () => {
+    expect(visibleViewBox(view, { width: 400, height: 600 })).toEqual({
+      x: -4,
+      y: -6,
+      width: 8,
+      height: 12,
+    });
+  });
+
+  it("keeps the view before the SVG is laid out", () => {
+    expect(visibleViewBox(view, { width: 0, height: 0 })).toEqual(view);
   });
 });
