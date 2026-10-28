@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, DownloadIcon, SkipForwardIcon, Undo2Icon } from "lucide-react";
+import { ArrowLeftIcon, DownloadIcon, Undo2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
@@ -14,30 +14,40 @@ import { SvgBoard } from "@/components/board/SvgBoard";
 import type { BoardRenderer } from "@/components/board/types";
 import { useBoardInteraction } from "@/components/board/useBoardInteraction";
 import { GameHeader } from "@/components/GameHeader";
-import { GameOverBanner } from "@/components/GameOverBanner";
 import { HandTray } from "@/components/HandTray";
-import { MatchControls } from "@/components/MatchControls";
+import { HintButton } from "@/components/HintButton";
 import { MoveList } from "@/components/MoveList";
 import { ReplayControls } from "@/components/ReplayControls";
 import { ThinkingPanel } from "@/components/ThinkingPanel";
+import { TurnPrompt } from "@/components/TurnPrompt";
 import { useAgentTurns, type AgentTurns } from "@/components/useAgentTurns";
+import { useHint, type Hint } from "@/components/useHint";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { playerAtPly, toBoardView, toMoveView } from "@/lib/moves";
-import type { PlayerSide } from "@/lib/players";
+import { gameScenario, type PlayerSide } from "@/lib/players";
+import { describeTurnPrompt } from "@/lib/turnPrompt";
 
 /** The board renderer; a 3D renderer can take its place behind the same props. */
 const Board: BoardRenderer = SvgBoard;
 
-/** The side drawn below the board: the side a person plays, white if both or none. */
+/**
+ * The side drawn below the board: against an agent the person's side, in a hints game
+ * and a match white.
+ */
 function homeSide(game: GameDetail): PlayerSide {
-  return game.black.type === "human" && game.white.type !== "human" ? "black" : "white";
+  return gameScenario(game) === "agent" && game.black.type === "human"
+    ? "black"
+    : "white";
 }
 
 /**
  * How many moves undo takes back: in a human game back to the person's last turn, so
  * the agent does not answer the undone move again at once; otherwise one.
+ *
+ * A pending agent move counts as the agent's answer: undoing it takes back the person's
+ * move too, and the person takes both back on the table.
  */
 function undoPlies(game: GameDetail, turns: AgentTurns, plyCount: number): number {
   const lastMover = plyCount > 0 ? game[playerAtPly(game, plyCount - 1)] : null;
@@ -45,13 +55,24 @@ function undoPlies(game: GameDetail, turns: AgentTurns, plyCount: number): numbe
   return turns.mode === "human" && plyCount >= 2 && lastMover?.type === "agent" ? 2 : 1;
 }
 
-/** The move to point out on the board: the agent's best move, or the move to make. */
-function proposedMove(turns: AgentTurns): Move | null | undefined {
+/**
+ * The move to point out on the board: the agent's best move while it thinks, the
+ * pending move to make on the table, or a hint that was asked for.
+ */
+function proposedMove(
+  turns: AgentTurns,
+  hint: Hint,
+  position: GamePosition,
+): Move | null | undefined {
   if (turns.state.type === "thinking") {
     return turns.state.candidate;
   }
 
-  return turns.awaitingDone && turns.state.type === "committed" ? turns.state.move : null;
+  if (turns.awaitingDone) {
+    return position.last_move?.move;
+  }
+
+  return hint.state.type === "shown" ? hint.state.move : null;
 }
 
 interface GameScreenProps {
@@ -60,12 +81,17 @@ interface GameScreenProps {
   position: GamePosition;
 }
 
-/** The board, hands, moves, agent turns, replay and actions of a loaded game. */
+/**
+ * The turn prompt, board, hands, moves, agent turns, hints, replay and actions of a
+ * loaded game.
+ */
 function GameScreen({ game, position }: GameScreenProps) {
   const playMove = usePlayMove(game.id);
   const undoMove = useUndoMove(game.id);
-  const busy = playMove.isPending || undoMove.isPending;
-  const turns = useAgentTurns({ game, position, idle: !busy });
+  const writing = playMove.isPending || undoMove.isPending;
+  const turns = useAgentTurns({ game, position, idle: !writing });
+  const hint = useHint({ game, position });
+  const busy = writing || turns.confirming;
   const [replayPly, setReplayPly] = useState<number | null>(null);
   // A replay past the last move, for example after an undo, shows the latest position.
   const shownPly =
@@ -87,15 +113,24 @@ function GameScreen({ game, position }: GameScreenProps) {
     });
   };
 
+  const hintMove = hint.state.type === "shown" ? hint.state.move : null;
   const interaction = useBoardInteraction({
     gameId: game.id,
     position,
     enabled: canPlay,
+    hint: hintMove,
     onMove: play,
   });
   const board = useMemo(() => toBoardView(shown.board), [shown.board]);
+  const liveBoard = useMemo(() => toBoardView(position.board), [position.board]);
   const lastMove = useMemo(() => toMoveView(shown.last_move?.move), [shown.last_move]);
-  const proposed = live ? toMoveView(proposedMove(turns)) : null;
+  const proposed = live ? toMoveView(proposedMove(turns, hint, position)) : null;
+  const prompt = describeTurnPrompt({
+    game,
+    position,
+    turnState: turns.state.type,
+    shownPly,
+  });
   const home = homeSide(game);
   const away = home === "white" ? "black" : "white";
   const selectedPiece =
@@ -109,9 +144,18 @@ function GameScreen({ game, position }: GameScreenProps) {
       placeable={side === sideToMove && canPlay ? position.placeable_piece_types : []}
       selected={side === sideToMove ? selectedPiece : null}
       toMove={live && active && side === sideToMove}
+      action={
+        side === sideToMove && prompt.kind === "turn" && hint.agent !== null ? (
+          <HintButton hint={hint} size="sm" />
+        ) : undefined
+      }
       onSelect={interaction.clickHandPiece}
     />
   );
+
+  const pass = () => {
+    play(null);
+  };
 
   const undo = () => {
     if (turns.mode === "match") {
@@ -133,10 +177,22 @@ function GameScreen({ game, position }: GameScreenProps) {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] xl:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="flex flex-col gap-3 lg:col-start-2 lg:row-start-1">
         <GameHeader game={game} position={position} />
-        <GameOverBanner game={game} position={position} />
         <ThinkingPanel game={game} position={position} turns={turns} />
       </div>
       <div className="flex flex-col gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+        <TurnPrompt
+          prompt={prompt}
+          position={position}
+          board={liveBoard}
+          turns={turns}
+          hint={hint}
+          busy={busy}
+          onPass={pass}
+          onUndo={undo}
+          onLive={() => {
+            setReplayPly(null);
+          }}
+        />
         {renderTray(away)}
         <Card className="relative aspect-square max-h-[65dvh] w-full bg-board-surface py-0 lg:aspect-auto lg:h-[max(24rem,calc(100dvh-19rem))] lg:max-h-none">
           <Board
@@ -159,28 +215,17 @@ function GameScreen({ game, position }: GameScreenProps) {
         {renderTray(home)}
       </div>
       <div className="flex flex-col gap-4 lg:col-start-2 lg:row-start-2">
-        {turns.mode === "match" && game.status === "active" && (
-          <MatchControls turns={turns} />
-        )}
         <div className="flex flex-wrap gap-2">
-          {canPlay && position.must_pass && (
+          {prompt.kind !== "over" && (
             <Button
-              onClick={() => {
-                play(null);
-              }}
+              variant="outline"
+              disabled={position.ply_count === 0 || busy || game.status === "abandoned"}
+              onClick={undo}
             >
-              <SkipForwardIcon />
-              Pass
+              <Undo2Icon />
+              Undo
             </Button>
           )}
-          <Button
-            variant="outline"
-            disabled={position.ply_count === 0 || busy || game.status === "abandoned"}
-            onClick={undo}
-          >
-            <Undo2Icon />
-            Undo
-          </Button>
           <Button variant="outline" asChild>
             <a href={gameExportUrl(game.id)} download>
               <DownloadIcon />
@@ -207,8 +252,8 @@ function GameScreen({ game, position }: GameScreenProps) {
 }
 
 /**
- * A game: the board with manual move entry and agent turns, the hands, the moves,
- * replay and undo.
+ * A game: what to do now for its scenario, the board with manual move entry, agent
+ * turns and hints, the hands, the moves, replay and undo.
  */
 export function GamePage() {
   const { gameId = "" } = useParams();

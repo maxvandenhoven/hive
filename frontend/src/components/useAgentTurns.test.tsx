@@ -14,6 +14,7 @@ import { gameDetail, gamePosition } from "@/test/fixtures";
 import { renderQueryHook } from "@/test/render";
 
 const GAME = gameDetail();
+const SCREEN_GAME = gameDetail({ board_location: "screen" });
 const GAME_PATH = `/api/games/${GAME.id}`;
 const THINK = `POST ${GAME_PATH}/think`;
 const MATCH = gameDetail({
@@ -96,9 +97,9 @@ function renderTurns(initialProps: Partial<TurnsProps> = {}) {
 }
 
 describe("useAgentTurns in a human game", () => {
-  it("lets the agent think, streams its search and waits for Done", async () => {
+  it("lets the agent think, streams its search and plays on at once on the screen", async () => {
     const { streams, requests } = mockThinking();
-    const { result } = renderTurns();
+    const { result } = renderTurns({ game: SCREEN_GAME });
 
     expect(result.current.mode).toBe("human");
     expect(result.current.state).toMatchObject({ type: "thinking", ply: 3 });
@@ -130,15 +131,9 @@ describe("useAgentTurns in a human game", () => {
         move: MOVE,
       });
     });
-    expect(result.current.awaitingDone).toBe(true);
-    expect(result.current.agent).toBeNull();
-
-    act(() => {
-      result.current.done();
-    });
-
+    // The move is applied: nothing waits for Done, and the agent does not think again.
     expect(result.current.awaitingDone).toBe(false);
-    expect(result.current.state).toEqual({ type: "idle" });
+    expect(result.current.agent).toBeNull();
     expect(thinkRequests(requests)).toHaveLength(1);
   });
 
@@ -168,6 +163,29 @@ describe("useAgentTurns in a human game", () => {
         expect.objectContaining({ method: "POST", body: { expected_ply: 4 } }),
       ]);
     });
+  });
+
+  it("waits for Done on a pending move after a remount, without thinking", async () => {
+    const pending = { ...WHITE_TO_MOVE, pending_move: true };
+    const { requests } = mockThinking(pending, {
+      [`POST ${GAME_PATH}/moves/last/confirm`]: () => ({ body: WHITE_TO_MOVE }),
+    });
+    const { result } = renderTurns({ position: pending });
+
+    expect(result.current.awaitingDone).toBe(true);
+    expect(result.current.state).toEqual({ type: "idle" });
+
+    act(() => {
+      result.current.done();
+    });
+
+    await waitFor(() => {
+      expect(result.current.awaitingDone).toBe(false);
+    });
+    expect(thinkRequests(requests)).toEqual([]);
+    expect(requests.filter((request) => request.path.endsWith("/confirm"))).toHaveLength(
+      1,
+    );
   });
 
   it("does not think on a person's turn", () => {

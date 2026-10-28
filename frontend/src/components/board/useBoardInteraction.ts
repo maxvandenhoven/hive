@@ -20,20 +20,34 @@ interface HexClickContext {
   selection: BoardSelection | null;
   movablePieces: MovablePiece[];
   highlights: HexCoord[];
+  /** A hint shown on the board, or `null`; `null` too for a hint to pass. */
+  hint?: Move | null;
 }
 
 /**
  * The intent of a click on a hex: play the selection to a highlighted hex, select a
  * movable tile, or clear the selection for anything else, including the selected tile.
+ *
+ * Without a selection, the target of a hint selects the hinted piece, like its tile or
+ * hand piece does, so following a hint takes two taps wherever the person taps first.
  */
 export function resolveHexClick(
-  { selection, movablePieces, highlights }: HexClickContext,
+  { selection, movablePieces, highlights, hint = null }: HexClickContext,
   coord: HexCoord,
 ): BoardIntent {
   if (selection !== null && highlights.some((highlight) => sameHex(highlight, coord))) {
     const from = selection.type === "board" ? selection.coord : null;
 
     return { type: "play", move: { piece: selection.piece, from, to: coord } };
+  }
+
+  if (selection === null && hint !== null && sameHex(hint.to, coord)) {
+    const hinted: BoardSelection =
+      hint.from === null
+        ? { type: "hand", piece: hint.piece }
+        : { type: "board", coord: hint.from, piece: hint.piece };
+
+    return { type: "select", selection: hinted };
   }
 
   const movable = movablePieces.find((piece) => sameHex(piece.coord, coord));
@@ -71,6 +85,8 @@ interface BoardInteractionOptions {
   position: GamePosition | undefined;
   /** Whether the side to move is played here now: a person's turn in an active game. */
   enabled: boolean;
+  /** The hint shown on the board, whose target selects the hinted piece. */
+  hint?: Move | null;
   onMove: (move: Move) => void;
 }
 
@@ -96,6 +112,7 @@ export function useBoardInteraction({
   gameId,
   position,
   enabled,
+  hint = null,
   onMove,
 }: BoardInteractionOptions): BoardInteraction {
   const [stored, setStored] = useState<{ ply: number; selection: BoardSelection } | null>(
@@ -135,7 +152,7 @@ export function useBoardInteraction({
     highlights,
     clickHex: (coord) => {
       if (live !== null) {
-        apply(resolveHexClick({ selection, movablePieces, highlights }, coord));
+        apply(resolveHexClick({ selection, movablePieces, highlights, hint }, coord));
       }
     },
     clickHandPiece: (piece) => {

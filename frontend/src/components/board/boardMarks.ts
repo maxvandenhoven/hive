@@ -46,7 +46,8 @@ export const BOARD_MARKS: readonly BoardMarkInfo[] = [
   {
     kind: "suggestion",
     label: "Agent suggestion",
-    description: "An arrow to a double ring: an agent's best move or the move to make.",
+    description:
+      "An arrow to a double ring: an agent's best move, the move to make or a hint.",
   },
   {
     kind: "forbidden",

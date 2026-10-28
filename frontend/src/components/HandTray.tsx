@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { PieceType, PlayerConfig } from "@/api/client";
 import { MovableRing, MovableShadow, SelectedHalo } from "@/components/board/marks";
 import { PieceTile } from "@/components/board/PieceTile";
@@ -15,6 +17,8 @@ interface HandTrayProps {
   placeable: PieceType[];
   selected: PieceType | null;
   toMove: boolean;
+  /** An action of the side, such as the Hint button on its turn. */
+  action?: ReactNode;
   onSelect: (piece: PieceType) => void;
 }
 
@@ -45,6 +49,7 @@ export function HandTray({
   placeable,
   selected,
   toMove,
+  action,
   onSelect,
 }: HandTrayProps) {
   const pieces = PIECE_TYPES.filter((piece) => (hand[piece] ?? 0) > 0);
@@ -97,6 +102,7 @@ export function HandTray({
           <li className="text-sm text-muted-foreground">No pieces left to place</li>
         )}
       </ul>
+      {action !== undefined && <div className="ml-auto">{action}</div>}
     </section>
   );
 }

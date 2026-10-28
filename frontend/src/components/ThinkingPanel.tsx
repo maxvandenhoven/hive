@@ -1,8 +1,7 @@
-import { CheckIcon, Loader2Icon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-
+import { Loader2Icon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
 import type { GameDetail, GamePosition } from "@/api/client";
 import type { AgentTurns } from "@/components/useAgentTurns";
+import { useSecondsLeft } from "@/components/useSecondsLeft";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,29 +11,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { describeMove } from "@/lib/moves";
+import {
+  boardBeforeMove,
+  capitalize,
+  describeMoveOnBoard,
+  toBoardView,
+} from "@/lib/moves";
 import { describePlayer, SIDE_TITLES, type PlayerSide } from "@/lib/players";
 import { formatCount, formatScore, summarizeSearch, type ThinkInfo } from "@/lib/search";
 
-/** How often the time left is redrawn, in milliseconds. */
-const CLOCK_INTERVAL_MS = 100;
-
 /** The seconds an agent has left of its budget, counting down. */
 function TimeLeft({ startedAt, budgetS }: { startedAt: number | null; budgetS: number }) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, CLOCK_INTERVAL_MS);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
-
-  const left =
-    startedAt === null ? budgetS : Math.max(0, budgetS - (now - startedAt) / 1000);
+  const left = useSecondsLeft(startedAt, budgetS);
 
   return (
     <div className="flex items-center gap-3">
@@ -78,19 +66,21 @@ interface ThinkingPanelProps {
 }
 
 /**
- * The agent turn: the live search while an agent thinks, the move to make on the board
- * with **Done** once it committed, or the failure with a retry.
+ * The agent turn: the live search while an agent thinks, the failure with a retry, and in
+ * a match the move just played while the next one waits. The turn prompt says what to do
+ * with a move to make on the table.
  */
 export function ThinkingPanel({ game, position, turns }: ThinkingPanelProps) {
   const { state } = turns;
 
-  if (state.type === "idle") {
+  if (state.type === "idle" || (state.type === "committed" && turns.mode !== "match")) {
     return null;
   }
 
   const side = position.current_player;
   // A committed move was made by the side before the one to move now.
   const mover: PlayerSide = side === "white" ? "black" : "white";
+  const board = toBoardView(position.board);
 
   if (state.type === "thinking") {
     const player = game[side];
@@ -111,7 +101,9 @@ export function ThinkingPanel({ game, position, turns }: ThinkingPanelProps) {
           <SearchStats info={state.info} />
           <p className="text-sm">
             <span className="text-muted-foreground">Best so far: </span>
-            {state.candidate === undefined ? "–" : describeMove(state.candidate)}
+            {state.candidate === undefined
+              ? "–"
+              : capitalize(describeMoveOnBoard(state.candidate, board))}
           </p>
         </CardContent>
       </Card>
@@ -139,30 +131,17 @@ export function ThinkingPanel({ game, position, turns }: ThinkingPanelProps) {
   }
 
   return (
-    <Card
-      size="sm"
-      role="region"
-      aria-label="Agent thinking"
-      className={turns.awaitingDone ? "ring-2 ring-board-suggestion" : undefined}
-    >
+    <Card size="sm" role="region" aria-label="Agent thinking">
       <CardHeader>
-        <CardTitle>
-          {turns.awaitingDone
-            ? "Make this move on the board"
-            : `${SIDE_TITLES[mover]} played`}
-        </CardTitle>
+        <CardTitle>{SIDE_TITLES[mover]} played</CardTitle>
         <CardDescription className="text-base text-foreground">
-          {SIDE_TITLES[mover]}: {describeMove(state.move)}
+          {capitalize(
+            describeMoveOnBoard(state.move, boardBeforeMove(board, state.move)),
+          )}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent>
         <SearchStats info={state.info} />
-        {turns.awaitingDone && (
-          <Button size="lg" onClick={turns.done}>
-            <CheckIcon />
-            Done
-          </Button>
-        )}
       </CardContent>
     </Card>
   );

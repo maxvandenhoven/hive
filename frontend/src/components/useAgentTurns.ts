@@ -7,8 +7,9 @@ import { streamThinkEvents } from "@/api/sse";
 import type { ThinkInfo } from "@/lib/search";
 
 /**
- * How agent turns run: in a `human` game a person makes each agent move on the board
- * and confirms it; in a `match` (agent vs agent) moves follow each other while playing.
+ * How agent turns run: in a `human` game an agent answers each person's move (to be made
+ * on the table and confirmed in a `table` game); in a `match` (agent vs agent) moves
+ * follow each other while playing.
  */
 export type AgentTurnMode = "human" | "match";
 
@@ -43,7 +44,7 @@ export type AgentTurnAction =
 
 /**
  * The next agent turn state: a stream starts, reports and ends in a committed move or a
- * failure; continuing (after Done, the delay or a retry) returns to idle.
+ * failure; continuing (after the delay of a match or a retry) returns to idle.
  */
 export function agentTurnReducer(
   state: AgentTurnState,
@@ -97,8 +98,14 @@ export interface AgentTurns {
   state: AgentTurnState;
   /** The agent to move, or `null` on a person's turn and once the game is over. */
   agent: AgentPlayer | null;
-  /** Whether a committed move waits for a person to make it on the board. */
+  /**
+   * Whether the last move is an agent move that waits for a person to make it on the
+   * table and press **Done**: the stored pending move of a `table` game, so it survives
+   * a reload.
+   */
   awaitingDone: boolean;
+  /** Whether **Done** is being sent. */
+  confirming: boolean;
   /** Whether a match plays on by itself; human games always do. */
   autoplay: boolean;
   /** The pause between the moves of a match in seconds. */
@@ -107,10 +114,7 @@ export interface AgentTurns {
   setDelayS: (delayS: number) => void;
   /** Let the agent to move in a paused match play one move. */
   step: () => void;
-  /**
-   * Confirm that the committed move was made on the board, which the API stores for a
-   * pending move.
-   */
+  /** Confirm that the pending agent move was made on the table. */
   done: () => void;
   /** Think again after a failure. */
   retry: () => void;
@@ -120,8 +124,10 @@ export interface AgentTurns {
  * Agent turns: when an agent is to move, it thinks with `commit=true`, streaming its
  * search, and its move is stored in the game.
  *
- * In a human game the committed move then waits for **Done** before the person plays.
- * A match plays on while `autoplay` is set, waiting `delayS` between moves, or one move
+ * On the screen the person plays on at once. At the table the API stores the move as
+ * pending (D27), and the person plays once they made it on the table and pressed
+ * **Done**, which confirms it; this follows the stored position, so it survives a
+ * reload. A match plays on while `autoplay` is set, waiting `delayS` between moves, or one move
  * per `step`. The stream is closed, which stops the agent without committing, when the
  * page closes, a match pauses or another write starts.
  */
@@ -238,7 +244,8 @@ export function useAgentTurns({ game, position, idle }: AgentTurnsOptions): Agen
         ? { type: "thinking", ply, startedAt: null, info: null, candidate: undefined }
         : { type: "idle" }),
     agent,
-    awaitingDone: mode === "human" && current?.type === "committed",
+    awaitingDone: position.pending_move,
+    confirming: confirmMove.isPending,
     autoplay,
     delayS,
     setAutoplay: (next) => {
@@ -250,8 +257,6 @@ export function useAgentTurns({ game, position, idle }: AgentTurnsOptions): Agen
       setStepPending(true);
     },
     done: () => {
-      dispatch({ type: "continued" });
-
       if (position.pending_move) {
         confirmMove.mutate(ply, {
           onError: (error) => {
