@@ -95,6 +95,20 @@ function StackLayers({ pieces }: { pieces: Piece[] }) {
     ));
 }
 
+/** A keyboard focus mark whose stroke stays small at every board zoom. */
+function BoardFocusRing() {
+  return (
+    <path
+      d={TILE_PATH}
+      fill="none"
+      strokeWidth={2}
+      vectorEffect="non-scaling-stroke"
+      pointerEvents="none"
+      className="hidden stroke-ring group-focus-visible/board-button:block"
+    />
+  );
+}
+
 function StackBadge({ height }: { height: number }) {
   return (
     <g transform="translate(0.52 -0.56)" aria-hidden="true">
@@ -149,7 +163,7 @@ function buttonProps(
     role: "button",
     tabIndex: 0,
     "aria-label": label,
-    className: "cursor-pointer",
+    className: "group/board-button cursor-pointer outline-none",
     onClick,
     onKeyDown: (event: KeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -298,6 +312,7 @@ export function SvgBoard({
         <PieceTile piece={top} />
         {movableKeys.has(key) && <MovableRing />}
         {height > 1 && <StackBadge height={height} />}
+        {interactive && <BoardFocusRing />}
       </g>
     );
   };
@@ -320,6 +335,7 @@ export function SvgBoard({
         )}
       >
         <TargetMark occupied={occupied} />
+        <BoardFocusRing />
       </g>
     );
   };
