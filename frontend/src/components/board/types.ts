@@ -31,12 +31,14 @@ export interface BoardRendererProps {
   board: BoardView;
   /** The hexes a click plays a move to: legal targets or placements. */
   highlights: HexCoord[];
-  /** The tiles that may move, outlined. */
+  /** The tiles that may move, ringed and raised. */
   movable: HexCoord[];
   selected: HexCoord | null;
   lastMove: MoveView | null;
   /** A move to point out, such as an agent's best move or the move to make next. */
   proposedMove: MoveView | null;
+  /** Hexes marked "not allowed", for the rule diagrams; games leave it out. */
+  forbidden?: HexCoord[];
   onHexClick: (coord: HexCoord) => void;
 }
 

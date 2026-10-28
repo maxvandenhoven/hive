@@ -1,5 +1,6 @@
 import type { PieceType, PlayerConfig } from "@/api/client";
-import { PieceIcon } from "@/components/board/PieceTile";
+import { MovableRing, MovableShadow, SelectedHalo } from "@/components/board/marks";
+import { PieceTile } from "@/components/board/PieceTile";
 import { Button } from "@/components/ui/button";
 import { PIECE_NAMES, PIECE_TYPES } from "@/lib/moves";
 import { describePlayer, SIDE_TITLES, type PlayerSide } from "@/lib/players";
@@ -15,6 +16,25 @@ interface HandTrayProps {
   selected: PieceType | null;
   toMove: boolean;
   onSelect: (piece: PieceType) => void;
+}
+
+interface TrayPieceProps {
+  piece: PieceType;
+  side: PlayerSide;
+  placeable: boolean;
+  selected: boolean;
+}
+
+/** A piece in hand with the board's marks: raised when placeable, a halo when selected. */
+function TrayPiece({ piece, side, placeable, selected }: TrayPieceProps) {
+  return (
+    <svg viewBox="-1.1 -1.1 2.25 2.25" aria-hidden="true" className="size-9 shrink-0">
+      {selected && <SelectedHalo />}
+      {placeable && <MovableShadow />}
+      <PieceTile piece={{ piece, owner: side }} />
+      {placeable && <MovableRing />}
+    </svg>
+  );
 }
 
 /** The pieces one side has left to place; tapping one highlights where it may go. */
@@ -48,22 +68,26 @@ export function HandTray({
           return (
             <li key={piece}>
               <Button
-                variant={selected === piece ? "secondary" : "ghost"}
+                variant="ghost"
                 size="lg"
                 aria-pressed={selected === piece}
                 aria-label={`Place ${SIDE_TITLES[side].toLowerCase()} ${PIECE_NAMES[piece].toLowerCase()}, ${count} left`}
                 disabled={!placeable.includes(piece)}
                 className={cn(
-                  "h-11 gap-1 px-1.5 tabular-nums",
+                  "h-11 gap-1 px-1 tabular-nums",
                   // Only pieces that cannot be placed on this turn look disabled.
                   placeable.length === 0 && "disabled:opacity-100",
-                  selected === piece && "ring-2 ring-board-movable",
                 )}
                 onClick={() => {
                   onSelect(piece);
                 }}
               >
-                <PieceIcon piece={{ piece, owner: side }} className="size-8" />
+                <TrayPiece
+                  piece={piece}
+                  side={side}
+                  placeable={placeable.includes(piece)}
+                  selected={selected === piece}
+                />
                 <span className="text-muted-foreground">×{count}</span>
               </Button>
             </li>

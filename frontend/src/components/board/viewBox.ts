@@ -98,3 +98,33 @@ export function zoomViewBox({
 export function viewBoxAttribute({ x, y, width, height }: ViewBox): string {
   return [x, y, width, height].map((value) => Math.round(value * 1000) / 1000).join(" ");
 }
+
+/** The size of an element on the screen, in pixels. */
+export interface ScreenSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * The part of the board an SVG of this size shows for a view.
+ *
+ * The SVG scales the view to fit and centres it (`xMidYMid meet`), so it shows more than
+ * the view along the side where its shape differs, such as left and right of a square
+ * view on a wide screen.
+ */
+export function visibleViewBox(view: ViewBox, size: ScreenSize): ViewBox {
+  if (size.width <= 0 || size.height <= 0) {
+    return view;
+  }
+
+  const scale = Math.min(size.width / view.width, size.height / view.height);
+  const width = size.width / scale;
+  const height = size.height / scale;
+
+  return {
+    x: view.x - (width - view.width) / 2,
+    y: view.y - (height - view.height) / 2,
+    width,
+    height,
+  };
+}

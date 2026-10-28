@@ -1,14 +1,19 @@
 import { ScanIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react";
 import {
-  useId,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type MouseEvent,
+  type RefObject,
 } from "react";
 
 import type { Piece } from "@/api/client";
+import { BoardLegend } from "@/components/board/BoardLegend";
+import { boardMarksShown } from "@/components/board/boardMarks";
+import { TILE_FILL_CLASSES } from "@/components/board/colors";
+import { gridCells, gridPath } from "@/components/board/grid";
 import {
   axialToPixel,
   formatHex,
@@ -17,19 +22,24 @@ import {
   pixelToAxial,
   sameHex,
 } from "@/components/board/hex";
-import { TILE_FILL_CLASSES } from "@/components/board/colors";
+import {
+  ForbiddenMark,
+  LastMoveMark,
+  MovableRing,
+  MovableShadow,
+  SelectedHalo,
+  SuggestionMark,
+  TargetMark,
+} from "@/components/board/marks";
 import { PieceIcon, PieceTile, TILE_RADIUS } from "@/components/board/PieceTile";
-import type {
-  BoardRendererProps,
-  BoardStack,
-  HexCoord,
-  MoveView,
-} from "@/components/board/types";
+import type { BoardRendererProps, BoardStack, HexCoord } from "@/components/board/types";
 import { screenToBoard, useViewGestures } from "@/components/board/useViewGestures";
 import {
   fitViewBox,
   viewBoxAttribute,
+  visibleViewBox,
   zoomViewBox,
+  type ScreenSize,
   type ViewBox,
 } from "@/components/board/viewBox";
 import { Button } from "@/components/ui/button";
@@ -56,10 +66,7 @@ const ZOOM_STEP = 1.25;
 /** How far each piece below the top one peeks out of a stack. */
 const STACK_OFFSET = 0.08;
 
-const ORIGIN = { x: 0, y: 0 };
-const HALO_POINTS = hexPoints(ORIGIN, 1);
-const RING_POINTS = hexPoints(ORIGIN, TILE_RADIUS);
-const TARGET_POINTS = hexPoints(ORIGIN, 0.8);
+const RING_POINTS = hexPoints({ x: 0, y: 0 }, TILE_RADIUS);
 
 function describePiece(piece: Piece): string {
   return `${SIDE_TITLES[piece.owner]} ${PIECE_NAMES[piece.piece].toLowerCase()}`;
@@ -105,56 +112,31 @@ function StackBadge({ height }: { height: number }) {
   );
 }
 
-/** An arrow from where a proposed move starts and a ring where it ends. */
-function ProposedMove({ move, arrowId }: { move: MoveView; arrowId: string }) {
-  const to = axialToPixel(move.to);
-  let arrow = null;
+/** The size of the SVG on the screen, or `null` before it is laid out. */
+function useScreenSize(ref: RefObject<SVGSVGElement | null>): ScreenSize | null {
+  const [size, setSize] = useState<ScreenSize | null>(null);
 
-  if (move.from !== null) {
-    const from = axialToPixel(move.from);
-    const length = Math.hypot(to.x - from.x, to.y - from.y);
-    // End the line at the ring, so the arrowhead stays visible.
-    const end = length > 0 ? (length - TILE_RADIUS * 0.75) / length : 0;
+  useEffect(() => {
+    const element = ref.current;
 
-    arrow = (
-      <line
-        x1={from.x}
-        y1={from.y}
-        x2={from.x + (to.x - from.x) * end}
-        y2={from.y + (to.y - from.y) * end}
-        strokeWidth={0.14}
-        strokeLinecap="round"
-        markerEnd={`url(#${arrowId})`}
-        className="stroke-board-suggestion"
-      />
-    );
-  }
+    if (element === null) {
+      return;
+    }
 
-  return (
-    <g pointerEvents="none" opacity={0.9} aria-hidden="true">
-      <defs>
-        <marker
-          id={arrowId}
-          viewBox="0 0 10 10"
-          refX="5"
-          refY="5"
-          markerWidth="3"
-          markerHeight="3"
-          orient="auto-start-reverse"
-        >
-          <path d="M 0 0 L 10 5 L 0 10 z" className="fill-board-suggestion" />
-        </marker>
-      </defs>
-      {arrow}
-      <polygon
-        points={RING_POINTS}
-        transform={`translate(${to.x} ${to.y})`}
-        fill="none"
-        strokeWidth={0.12}
-        className="stroke-board-suggestion"
-      />
-    </g>
-  );
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry !== undefined) {
+        const { width, height } = entry.contentRect;
+        setSize({ width, height });
+      }
+    });
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [ref]);
+
+  return size;
 }
 
 /** The SVG attributes that make a part of the board a button. */
@@ -179,8 +161,9 @@ function buttonProps(
 }
 
 /**
- * The board as an SVG: tiles with their insects, owner colours and stack heights, the
- * movable outlines, the targets and the last move.
+ * The board as an SVG on a background hex grid: tiles with their insects, owner colours
+ * and stack heights, and the marks (movable, selected, targets, last move, an agent's
+ * suggestion, forbidden), which the Key button explains.
  *
  * The view fits the board until it is panned (drag) or zoomed (pinch, mouse wheel or the
  * buttons); the fit button returns to fitting. Tapping a stack shows its contents.
@@ -192,10 +175,11 @@ export function SvgBoard({
   selected,
   lastMove,
   proposedMove,
+  forbidden = [],
   onHexClick,
 }: BoardRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const arrowId = useId();
+  const screenSize = useScreenSize(svgRef);
   const fitted = useMemo(() => fitViewBox(board.map((stack) => stack.coord)), [board]);
   const limits = useMemo(
     () => ({
@@ -212,6 +196,20 @@ export function SvgBoard({
     view,
     limits,
     onViewChange: setManualView,
+  });
+  const grid = useMemo(() => {
+    const visible = screenSize === null ? view : visibleViewBox(view, screenSize);
+
+    return gridPath(gridCells(visible));
+  }, [view, screenSize]);
+  const shownMarks = boardMarksShown({
+    board,
+    highlights,
+    movable,
+    selected,
+    lastMove,
+    proposedMove,
+    forbidden,
   });
   const highlightKeys = new Set(highlights.map(hexKey));
   const movableKeys = new Set(movable.map(hexKey));
@@ -295,16 +293,10 @@ export function SvgBoard({
               },
             })}
       >
+        {movableKeys.has(key) && <MovableShadow />}
         <StackLayers pieces={stack.pieces} />
         <PieceTile piece={top} />
-        {movableKeys.has(key) && (
-          <polygon
-            points={RING_POINTS}
-            fill="none"
-            strokeWidth={0.08}
-            className="stroke-board-movable"
-          />
-        )}
+        {movableKeys.has(key) && <MovableRing />}
         {height > 1 && <StackBadge height={height} />}
       </g>
     );
@@ -327,21 +319,7 @@ export function SvgBoard({
           },
         )}
       >
-        {occupied ? (
-          <polygon
-            points={RING_POINTS}
-            strokeWidth={0.12}
-            className="fill-board-target/20 stroke-board-target"
-          />
-        ) : (
-          <polygon
-            points={TARGET_POINTS}
-            strokeWidth={0.05}
-            strokeDasharray="0.15 0.1"
-            className="fill-board-target/15 stroke-board-target"
-          />
-        )}
-        <circle r={0.16} className="fill-board-target" />
+        <TargetMark occupied={occupied} />
       </g>
     );
   };
@@ -365,31 +343,41 @@ export function SvgBoard({
           onClick={clickBackground}
           {...handlers}
         >
+          <path
+            d={grid}
+            fill="none"
+            strokeWidth={1.25}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+            className="stroke-board-grid"
+          />
           {lastMove?.from != null && (
-            <polygon
-              points={HALO_POINTS}
-              transform={translate(lastMove.from)}
-              className="fill-board-last-move/35"
-            />
+            <g transform={translate(lastMove.from)}>
+              <LastMoveMark part="from" />
+            </g>
           )}
           {lastMove !== null && (
-            <polygon
-              points={HALO_POINTS}
-              transform={translate(lastMove.to)}
-              className="fill-board-last-move/70"
-            />
+            <g transform={translate(lastMove.to)}>
+              <LastMoveMark part="to" />
+            </g>
           )}
           {selected !== null && (
-            <polygon
-              points={HALO_POINTS}
-              transform={translate(selected)}
-              className="fill-board-movable"
-            />
+            <g transform={translate(selected)}>
+              <SelectedHalo />
+            </g>
           )}
           {board.map(renderStack)}
           {highlights.map(renderTarget)}
+          {forbidden.map((coord) => (
+            <g key={hexKey(coord)} transform={translate(coord)}>
+              <ForbiddenMark />
+            </g>
+          ))}
           {proposedMove !== null && (
-            <ProposedMove move={proposedMove} arrowId={arrowId} />
+            <SuggestionMark
+              from={proposedMove.from === null ? null : axialToPixel(proposedMove.from)}
+              to={axialToPixel(proposedMove.to)}
+            />
           )}
           {openStack !== undefined && (
             <PopoverAnchor asChild>
@@ -402,6 +390,7 @@ export function SvgBoard({
             </PopoverAnchor>
           )}
         </svg>
+        <BoardLegend shown={shownMarks} className="absolute top-2 bottom-2 left-2" />
         <div className="absolute right-2 bottom-2 flex gap-1">
           <Button
             variant="outline"

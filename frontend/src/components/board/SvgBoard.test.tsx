@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SvgBoard } from "@/components/board/SvgBoard";
 import type { BoardRendererProps, HexCoord } from "@/components/board/types";
@@ -40,6 +40,10 @@ function viewBox(): string | null {
 }
 
 describe("SvgBoard", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("draws the top piece of every stack", () => {
     renderBoard();
 
@@ -119,6 +123,75 @@ describe("SvgBoard", () => {
     await user.click(fit);
 
     expect(viewBox()).toBe(fitted);
+  });
+
+  it("draws a background grid", () => {
+    const { container } = render(
+      <SvgBoard
+        board={BOARD}
+        highlights={[]}
+        movable={[]}
+        selected={null}
+        lastMove={null}
+        proposedMove={null}
+        onHexClick={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector("path.stroke-board-grid")?.getAttribute("d")).toMatch(
+      /^M.*Z$/,
+    );
+  });
+
+  it("draws each mark and lists it in the key with its label", async () => {
+    const { user } = renderBoard({
+      movable: [[0, 0]],
+      selected: [0, 0],
+      highlights: [
+        [-1, 0],
+        [1, 0],
+      ],
+      lastMove: { from: [3, -1], to: [2, -1] },
+      proposedMove: { from: [2, -1], to: [3, -2] },
+      forbidden: [[0, 1]],
+    });
+    const svg = screen.getByRole("group", { name: "Board" });
+
+    for (const kind of [
+      "movable",
+      "selected",
+      "target",
+      "climb",
+      "lastMove",
+      "suggestion",
+      "forbidden",
+    ]) {
+      expect(svg.querySelector(`[data-mark="${kind}"]`)).not.toBeNull();
+    }
+
+    await user.click(screen.getByRole("button", { name: "Key" }));
+
+    expect(
+      within(screen.getByRole("list", { name: "On the board" }))
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector(".font-medium")?.textContent),
+    ).toEqual([
+      "Can move",
+      "Selected",
+      "Can go here",
+      "Can climb on top",
+      "Last move",
+      "Agent suggestion",
+      "Not allowed",
+    ]);
+  });
+
+  it("draws no marks it is not given", () => {
+    renderBoard();
+
+    expect(
+      screen.getByRole("group", { name: "Board" }).querySelector("[data-mark]"),
+    ).toBeNull();
   });
 
   it("fits the board as it grows", () => {
