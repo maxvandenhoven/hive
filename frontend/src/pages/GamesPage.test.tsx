@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import type { GamePage, GameSummary } from "@/api/client";
 import { GAMES_PAGE_SIZE, GamesPage } from "@/pages/GamesPage";
-import { mockApi } from "@/test/api";
-import { AGENT_KINDS, gameSummary } from "@/test/fixtures";
+import { mockApi, type RecordedRequest } from "@/test/api";
+import { AGENT_KINDS, AGENT_PRESETS, gameSummary } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
 
 const GAME = gameSummary();
@@ -30,18 +30,55 @@ function row(name: string): HTMLElement {
   return element;
 }
 
+const NM2_SPEC = AGENT_PRESETS[0]?.spec;
+const NM3_SPEC = AGENT_PRESETS[1]?.spec;
+
+/** Mock the API of the new game flow; created games echo the request. */
+function mockNewGame(): RecordedRequest[] {
+  return mockApi({
+    "GET /api/games": () => page([]),
+    "GET /api/agents": () => ({ body: AGENT_KINDS }),
+    "GET /api/agents/presets": () => ({ body: AGENT_PRESETS }),
+    "POST /api/games": ({ body }) => ({
+      status: 201,
+      body: { ...GAME, ...(body as object), rules: {}, setup: null, moves: [] },
+    }),
+  });
+}
+
+/** The body of the last game created. */
+function postedGame(requests: RecordedRequest[]): unknown {
+  return requests.filter((request) => request.method === "POST").at(-1)?.body;
+}
+
+async function openNewGame(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "New game" }));
+
+  return screen.findByRole("dialog");
+}
+
+async function choose(
+  user: ReturnType<typeof userEvent.setup>,
+  combobox: HTMLElement,
+  option: string,
+): Promise<void> {
+  await user.click(combobox);
+  await user.click(screen.getByRole("option", { name: option }));
+}
+
 async function openActions(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole("button", { name: `Actions for ${name}` }));
 }
 
 describe("GamesPage", () => {
-  it("lists the games with players, status, ply and export link", async () => {
+  it("lists the games with players, ply and export link", async () => {
     const finished = gameSummary({
       id: "0c4a3b5e-0000-4000-8000-000000000002",
       name: "Agent match",
       status: "finished",
       result: "white",
       white: { type: "agent", spec: { kind: "random", label: "rnd" }, budget_s: 1 },
+      board_location: "screen",
       ply_count: 40,
     });
     mockApi({ "GET /api/games": () => page([GAME, finished]) });
@@ -56,7 +93,6 @@ describe("GamesPage", () => {
     expect(cells.map((cell) => cell.textContent)).toEqual(
       expect.arrayContaining(["rnd (1 s) vs negamax (5 s)", "White won", "40"]),
     );
-    expect(within(row("Evening game")).getByText("Active")).toBeInTheDocument();
 
     await openActions(user, "Evening game");
 
@@ -64,6 +100,52 @@ describe("GamesPage", () => {
       "href",
       `${GAME_PATH}/export`,
     );
+  });
+
+  it("shows the scenario and the next action of each game", async () => {
+    const nm3 = { type: "agent", spec: { kind: "negamax", label: "nm3" }, budget_s: 5 };
+    const hinted = { type: "human", hint: { spec: nm3.spec, budget_s: 5 } };
+    const games = [
+      gameSummary({ name: "On screen", board_location: "screen" }),
+      gameSummary({ name: "Pending", pending_move: true }),
+      gameSummary({
+        name: "Agent thinks",
+        black: nm3 as GameSummary["black"],
+        current_player: "black",
+        current_player_type: "agent",
+      }),
+      gameSummary({
+        name: "Hints",
+        white: hinted as GameSummary["white"],
+        black: { type: "human" },
+        current_player: "black",
+      }),
+      gameSummary({
+        name: "Watching",
+        white: nm3 as GameSummary["white"],
+        board_location: "screen",
+        current_player_type: "agent",
+      }),
+      gameSummary({ name: "Over", status: "finished", result: "black" }),
+    ].map((game, index) => ({ ...game, id: `game-${index}` }));
+    mockApi({ "GET /api/games": () => page(games) });
+    renderPage(<GamesPage />);
+    await screen.findByRole("link", { name: "On screen" });
+
+    const expected = [
+      ["On screen", "vs agent · on screen", "Your turn"],
+      ["Pending", "vs agent · at the table", "Agent's move to make"],
+      ["Agent thinks", "vs agent · at the table", "nm3 to move"],
+      ["Hints", "hints game", "Black to move"],
+      ["Watching", "watching", "nm3 to move"],
+      ["Over", "vs agent · at the table", "Black won"],
+    ];
+
+    for (const [name, scenario, next] of expected) {
+      const cells = within(row(name ?? "")).getAllByRole("cell");
+      expect(cells[0]).toHaveTextContent(`${name}${scenario}`);
+      expect(cells[1]).toHaveTextContent(next ?? "");
+    }
   });
 
   it("shows an empty list", async () => {
@@ -166,62 +248,173 @@ describe("GamesPage", () => {
     expect(await screen.findByText("Game not found.")).toBeInTheDocument();
   });
 
-  it("creates a human vs agent game and opens it", async () => {
-    const requests = mockApi({
-      "GET /api/games": () => page([]),
-      "GET /api/agents": () => ({ body: AGENT_KINDS }),
-      "POST /api/games": ({ body }) => ({
-        status: 201,
-        body: { ...GAME, ...(body as object), rules: {}, setup: null, moves: [] },
-      }),
-    });
+  it("plays against an agent on the screen by default and opens the game", async () => {
+    const requests = mockNewGame();
     const user = userEvent.setup();
     renderPage(<GamesPage />);
 
-    await user.click(await screen.findByRole("button", { name: "New game" }));
-    const dialog = await screen.findByRole("dialog", { name: "New game" });
-    await within(dialog).findByRole("group", { name: "Black" });
-    await user.type(within(dialog).getByRole("textbox", { name: "Depth" }), "2");
-    await user.click(within(dialog).getByRole("button", { name: "Create game" }));
+    const dialog = await openNewGame(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: /Play against an agent/ }),
+    );
+
+    expect(within(dialog).getByRole("radio", { name: /On this screen/ })).toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: "White" })).toBeChecked();
+    expect(within(dialog).getByRole("combobox", { name: "Opponent" })).toHaveTextContent(
+      "nm3",
+    );
+    expect(
+      within(dialog).getByRole("textbox", { name: "Name (optional)" }),
+    ).toHaveAttribute("placeholder", "You vs nm3");
+
+    await user.click(within(dialog).getByRole("button", { name: "Start game" }));
 
     expect(await screen.findByText(`Game page ${GAME.id}`)).toBeInTheDocument();
-    expect(requests.find((request) => request.method === "POST")?.body).toEqual({
-      name: "Human vs negamax (5 s)",
+    expect(postedGame(requests)).toEqual({
+      name: "You vs nm3",
       white: { type: "human" },
-      black: {
-        type: "agent",
-        spec: { kind: "negamax", params: { depth: 2 }, label: null },
-        budget_s: 5,
-      },
+      black: { type: "agent", spec: NM3_SPEC, budget_s: 5 },
+      board_location: "screen",
     });
   });
 
-  it("creates an agent vs agent game", async () => {
-    const requests = mockApi({
-      "GET /api/games": () => page([]),
-      "GET /api/agents": () => ({ body: AGENT_KINDS }),
-      "POST /api/games": ({ body }) => ({
-        status: 201,
-        body: { ...GAME, ...(body as object), rules: {}, setup: null, moves: [] },
-      }),
-    });
+  it("plays against an agent at the table as black with hints", async () => {
+    const requests = mockNewGame();
     const user = userEvent.setup();
     renderPage(<GamesPage />);
 
-    await user.click(await screen.findByRole("button", { name: "New game" }));
-    const dialog = await screen.findByRole("dialog", { name: "New game" });
-    const white = await within(dialog).findByRole("group", { name: "White" });
-    await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Bots");
-    await user.click(within(white).getByRole("combobox", { name: "Player" }));
-    await user.click(screen.getByRole("option", { name: "Agent" }));
-    await user.click(within(dialog).getByRole("button", { name: "Create game" }));
+    const dialog = await openNewGame(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: /Play against an agent/ }),
+    );
+    await user.click(within(dialog).getByRole("radio", { name: /At the table/ }));
+    await user.click(within(dialog).getByRole("radio", { name: "Black" }));
+    await choose(user, within(dialog).getByRole("combobox", { name: "Opponent" }), "nm2");
+    await user.click(within(dialog).getByRole("checkbox", { name: /Hints for you/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Start game" }));
 
     await waitFor(() => {
-      expect(requests.find((request) => request.method === "POST")?.body).toMatchObject({
-        name: "Bots",
-        white: { type: "agent", spec: { kind: "negamax" } },
-        black: { type: "agent", spec: { kind: "negamax" } },
+      expect(postedGame(requests)).toEqual({
+        name: "You vs nm2",
+        white: { type: "agent", spec: NM2_SPEC, budget_s: 5 },
+        black: { type: "human", hint: { spec: NM3_SPEC, budget_s: 5 } },
+        board_location: "table",
       });
+    });
+  });
+
+  it("plays a friend with hints for one side", async () => {
+    const requests = mockNewGame();
+    const user = userEvent.setup();
+    renderPage(<GamesPage />);
+
+    const dialog = await openNewGame(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: /Play a friend with hints/ }),
+    );
+    await user.click(within(dialog).getByRole("radio", { name: "White" }));
+    await choose(
+      user,
+      within(dialog).getByRole("combobox", { name: "Hint strength" }),
+      "nm2",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Start game" }));
+
+    await waitFor(() => {
+      expect(postedGame(requests)).toEqual({
+        name: "Hints game",
+        white: { type: "human", hint: { spec: NM2_SPEC, budget_s: 5 } },
+        black: { type: "human" },
+        board_location: "table",
+      });
+    });
+  });
+
+  it("watches two agents, one of them set up in advanced", async () => {
+    const requests = mockNewGame();
+    const user = userEvent.setup();
+    renderPage(<GamesPage />);
+
+    const dialog = await openNewGame(user);
+    await user.click(within(dialog).getByRole("button", { name: /Watch two agents/ }));
+    await choose(
+      user,
+      within(dialog).getByRole("combobox", { name: "Black agent" }),
+      "Advanced…",
+    );
+    const depth = within(dialog).getByRole("textbox", { name: "Depth" });
+    await user.clear(depth);
+    await user.type(depth, "1");
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "Name (optional)" }),
+      "Bots",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Start game" }));
+
+    await waitFor(() => {
+      expect(postedGame(requests)).toEqual({
+        name: "Bots",
+        white: { type: "agent", spec: NM3_SPEC, budget_s: 5 },
+        black: {
+          type: "agent",
+          spec: { kind: "negamax", params: { depth: 1 }, label: null },
+          budget_s: 5,
+        },
+        board_location: "screen",
+      });
+    });
+  });
+
+  it("goes back from the setup to the scenarios", async () => {
+    mockNewGame();
+    const user = userEvent.setup();
+    renderPage(<GamesPage />);
+
+    const dialog = await openNewGame(user);
+    await user.click(within(dialog).getByRole("button", { name: /Watch two agents/ }));
+
+    expect(
+      within(dialog).getByRole("heading", { name: "Watch two agents" }),
+    ).toBeVisible();
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "Back to the scenarios" }),
+    );
+
+    expect(
+      within(dialog).getByRole("button", { name: /Play a friend with hints/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("remembers the last choices and opens at their setup", async () => {
+    const requests = mockNewGame();
+    const user = userEvent.setup();
+    renderPage(<GamesPage />);
+
+    let dialog = await openNewGame(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: /Play a friend with hints/ }),
+    );
+    await user.click(within(dialog).getByRole("radio", { name: "Black" }));
+    await user.click(within(dialog).getByRole("button", { name: "Start game" }));
+    await screen.findByText(`Game page ${GAME.id}`);
+
+    renderPage(<GamesPage />);
+    dialog = await openNewGame(user);
+
+    expect(
+      within(dialog).getByRole("heading", { name: "Play a friend with hints" }),
+    ).toBeVisible();
+    expect(within(dialog).getByRole("radio", { name: "Black" })).toBeChecked();
+
+    await user.click(within(dialog).getByRole("button", { name: "Start game" }));
+
+    await waitFor(() => {
+      expect(requests.filter((request) => request.method === "POST")).toHaveLength(2);
+    });
+    expect(postedGame(requests)).toMatchObject({
+      white: { type: "human" },
+      black: { type: "human", hint: { spec: NM3_SPEC } },
     });
   });
 });

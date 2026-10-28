@@ -12,12 +12,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { parseAgentParamFields, type AgentParamDrafts } from "@/lib/agentParams";
-import { agentDraft, type AgentPlayerDraft, type PlayerDraftErrors } from "@/lib/players";
+import { agentDraft, type AgentDraftErrors, type AgentPlayerDraft } from "@/lib/players";
 
 interface AgentPickerProps {
   value: AgentPlayerDraft;
   agentKinds: AgentRegistration[];
-  errors: PlayerDraftErrors | null;
+  errors: AgentDraftErrors | null;
   onChange: (draft: AgentPlayerDraft) => void;
 }
 

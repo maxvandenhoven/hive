@@ -1,7 +1,10 @@
 import type {
+  AgentPlayer,
   AgentRegistration,
+  AgentSpec,
   GameResult,
   GameSummary,
+  HintAgent,
   PlayerConfig,
 } from "@/api/client";
 import {
@@ -21,7 +24,7 @@ export const PLAYER_SIDES: PlayerSide[] = ["white", "black"];
 
 export const SIDE_TITLES: Record<PlayerSide, string> = { white: "White", black: "Black" };
 
-/** An agent side as the form edits it, with the text typed into each input. */
+/** An agent as the advanced form edits it, with the text typed into each input. */
 export interface AgentPlayerDraft {
   type: "agent";
   kind: string;
@@ -30,28 +33,37 @@ export interface AgentPlayerDraft {
   params: AgentParamDrafts;
 }
 
-/** A side setup as the form edits it. */
-export type PlayerDraft = { type: "human" } | AgentPlayerDraft;
-
-export interface PlayerDraftErrors {
+export interface AgentDraftErrors {
   kind?: string;
   budget?: string;
   params: AgentParamErrors;
 }
 
-export type PlayerDraftResult =
-  { ok: true; player: PlayerConfig } | { ok: false; errors: PlayerDraftErrors };
+export type AgentDraftResult =
+  { ok: true; player: AgentPlayer } | { ok: false; errors: AgentDraftErrors };
 
-export const HUMAN_DRAFT: PlayerDraft = { type: "human" };
+/**
+ * The draft of an agent of a kind, with its default params and budget.
+ *
+ * `params` and `label` start the draft from a spec instead, such as a preset.
+ */
+export function agentDraft(
+  registration: AgentRegistration,
+  { params = {}, label = "" }: { params?: AgentSpec["params"]; label?: string } = {},
+): AgentPlayerDraft {
+  // The drafts of a form whose defaults are the values of the spec.
+  const drafts = defaultAgentParamDrafts(
+    parseAgentParamFields(registration.params_schema).map((field) =>
+      field.name in params ? { ...field, defaultValue: params[field.name] } : field,
+    ),
+  );
 
-/** The draft of an agent of a kind, with its default params and budget. */
-export function agentDraft(registration: AgentRegistration): AgentPlayerDraft {
   return {
     type: "agent",
     kind: registration.kind,
-    label: "",
+    label,
     budget: String(DEFAULT_AGENT_BUDGET_S),
-    params: defaultAgentParamDrafts(parseAgentParamFields(registration.params_schema)),
+    params: drafts,
   };
 }
 
@@ -61,16 +73,12 @@ function parseBudget(text: string): number | null {
   return text.trim() !== "" && Number.isFinite(budget) && budget > 0 ? budget : null;
 }
 
-/** Parse and check a side setup against the registered agent kinds. */
-export function parsePlayerDraft(
-  draft: PlayerDraft,
+/** Parse and check an agent draft against the registered agent kinds. */
+export function parseAgentDraft(
+  draft: AgentPlayerDraft,
   agentKinds: AgentRegistration[],
-): PlayerDraftResult {
-  if (draft.type === "human") {
-    return { ok: true, player: { type: "human" } };
-  }
-
-  const errors: PlayerDraftErrors = { params: {} };
+): AgentDraftResult {
+  const errors: AgentDraftErrors = { params: {} };
   const registration = agentKinds.find((kind) => kind.kind === draft.kind);
   const budget = parseBudget(draft.budget);
 
@@ -109,13 +117,84 @@ export function parsePlayerDraft(
   };
 }
 
-/** A short name of a side, such as `Human` or `negamax (5 s)`. */
+/** The name of an agent: its label, or its kind without one. */
+export function agentName(spec: AgentSpec): string {
+  return spec.label ?? spec.kind;
+}
+
+/** A short name of an agent with its budget, such as `nm3 (5 s)`. */
+export function describeAgent(agent: { spec: AgentSpec; budget_s: number }): string {
+  return `${agentName(agent.spec)} (${agent.budget_s} s)`;
+}
+
+/** A short description of the hints of a side, such as `hints from nm3 (5 s)`. */
+export function describeHintAgent(hint: HintAgent): string {
+  return `hints from ${describeAgent(hint)}`;
+}
+
+/** A short name of a side, such as `Human`, `Human · hints from nm3 (5 s)` or `nm3 (5 s)`. */
 export function describePlayer(player: PlayerConfig): string {
-  if (player.type === "human") {
-    return "Human";
+  if (player.type === "agent") {
+    return describeAgent(player);
   }
 
-  return `${player.spec.label ?? player.spec.kind} (${player.budget_s} s)`;
+  return player.hint ? `Human · ${describeHintAgent(player.hint)}` : "Human";
+}
+
+/**
+ * What a game is for (D26), told apart by its players.
+ *
+ * `agent` is a person against an agent, `hints` two people with hints at the table and
+ * `watch` two agents on the screen.
+ */
+export type GameScenario = "agent" | "hints" | "watch";
+
+export const GAME_SCENARIOS: GameScenario[] = ["agent", "hints", "watch"];
+
+/** The title and one-sentence description of each scenario, as the new game flow offers it. */
+export const GAME_SCENARIO_INFO: Record<
+  GameScenario,
+  { title: string; description: string }
+> = {
+  agent: {
+    title: "Play against an agent",
+    description: "You play one side and an agent plays the other.",
+  },
+  hints: {
+    title: "Play a friend with hints",
+    description: "Two people play at the table, and an agent suggests moves on request.",
+  },
+  watch: {
+    title: "Watch two agents",
+    description: "Two agents play each other on this screen.",
+  },
+};
+
+/** The scenario of a game, from the number of sides people play. */
+export function gameScenario(game: Pick<GameSummary, "white" | "black">): GameScenario {
+  const humans = [game.white, game.black].filter((player) => player.type === "human");
+
+  if (humans.length === 0) {
+    return "watch";
+  }
+
+  return humans.length === 1 ? "agent" : "hints";
+}
+
+/** The short label of a game's scenario in the list, such as `vs agent · on screen`. */
+export function describeGameScenario(
+  game: Pick<GameSummary, "white" | "black" | "board_location">,
+): string {
+  switch (gameScenario(game)) {
+    case "agent":
+      return game.board_location === "screen"
+        ? "vs agent · on screen"
+        : "vs agent · at the table";
+    case "hints":
+      return "hints game";
+    case "watch":
+      return "watching";
+  }
 }
 
 const RESULT_LABELS: Record<GameResult, string> = {
@@ -124,11 +203,49 @@ const RESULT_LABELS: Record<GameResult, string> = {
   draw: "Draw",
 };
 
-/** The status of a game as shown in the list, with the result once it is finished. */
+/** The status of a game, with the result once it is finished. */
 export function describeGameStatus(game: Pick<GameSummary, "status" | "result">): string {
   if (game.result !== null) {
     return RESULT_LABELS[game.result];
   }
 
   return game.status === "active" ? "Active" : "Abandoned";
+}
+
+/** What happens next in a game, and whether it waits for a person. */
+export interface GameNextAction {
+  label: string;
+  waitsForPerson: boolean;
+}
+
+/**
+ * What happens next in a game, as the list shows it.
+ *
+ * A person's turn is `Your turn` against an agent and `White to move` in a hints game; a
+ * pending agent move is `Agent's move to make`, and an agent's turn names the agent.
+ * Finished and abandoned games show their status.
+ */
+export function describeNextAction(
+  game: Pick<
+    GameSummary,
+    "status" | "result" | "white" | "black" | "current_player" | "pending_move"
+  >,
+): GameNextAction {
+  if (game.status !== "active") {
+    return { label: describeGameStatus(game), waitsForPerson: false };
+  }
+
+  if (game.pending_move) {
+    return { label: "Agent's move to make", waitsForPerson: true };
+  }
+
+  const player = game[game.current_player];
+
+  if (player.type === "agent") {
+    return { label: `${agentName(player.spec)} to move`, waitsForPerson: false };
+  }
+
+  return gameScenario(game) === "agent"
+    ? { label: "Your turn", waitsForPerson: true }
+    : { label: `${SIDE_TITLES[game.current_player]} to move`, waitsForPerson: true };
 }

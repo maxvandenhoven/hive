@@ -1,4 +1,5 @@
 import type {
+  AgentPreset,
   AgentRegistration,
   GameDetail,
   GamePosition,
@@ -44,6 +45,20 @@ export const AGENT_KINDS: AgentRegistration[] = [
       title: "RandomAgentParams",
       type: "object",
     },
+  },
+];
+
+/** Presets shaped like the shipped ones, sorted by name as the API lists them. */
+export const AGENT_PRESETS: AgentPreset[] = [
+  {
+    name: "nm2",
+    description: "Negamax searching two plies ahead; quick and easy to beat.",
+    spec: { kind: "negamax", params: { depth: 2 }, label: "nm2" },
+  },
+  {
+    name: "nm3",
+    description: "Negamax searching three plies ahead; slower and stronger.",
+    spec: { kind: "negamax", params: { depth: 3 }, label: "nm3" },
   },
 ];
 

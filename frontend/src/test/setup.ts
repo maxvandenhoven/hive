@@ -25,4 +25,6 @@ window.matchMedia = (query: string): MediaQueryList => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  // Remembered choices and panels must not leak into the next test.
+  window.localStorage.clear();
 });
