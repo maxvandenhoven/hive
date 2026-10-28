@@ -64,8 +64,10 @@ game
   status        text      -- active | finished | abandoned
   rules         jsonb     -- Rules
   setup         jsonb null -- BoardSetup from the editor, or null for the initial state
-  white_player  jsonb     -- {"type": "human"} or {"type": "agent", "spec": AgentSpec, "budget_s": 5.0}
+  white_player  jsonb     -- {"type": "human", "hint": null | {"spec": AgentSpec, "budget_s": 5.0}}
+                          -- or {"type": "agent", "spec": AgentSpec, "budget_s": 5.0}
   black_player  jsonb
+  board_location text     -- screen | table (WP 33)
   result        text null -- white | black | draw
   created_at    timestamptz
   updated_at    timestamptz
@@ -77,6 +79,7 @@ move
   source        text      -- manual | photo | agent
   photo_id      uuid null fk → photo
   decision      jsonb null -- DecisionRecord for agent moves
+  pending       bool      -- agent move at the table not yet confirmed on the board (WP 33)
   created_at    timestamptz
 
 photo
@@ -93,6 +96,31 @@ photo
   created_at    timestamptz
 ```
 
+### Game setups (WP 33)
+
+The players and the board location tell the supported setups apart (D26), checked by
+`BoardLocation.setup_error` when a game is created or moved (422):
+
+| Players | Board location |
+|---|---|
+| Human vs agent, either colour | `screen` or `table` |
+| Human vs human, a `hint` agent on at least one side | `table` |
+| Agent vs agent | `screen` |
+
+A create request without `board_location` gets `screen` for agent vs agent and `table`
+otherwise, as migration `0002` did for existing games. A hint agent (`HintAgent`, a spec
+and a budget on `HumanPlayer`) only answers `think` requests; hints are not stored.
+
+In a `table` game, a committed agent move is stored with `pending = true` (D27): the
+physical board is behind until a person makes the move and confirms it with
+`POST /games/{id}/moves/last/confirm` (or, from WP 19, a matching photo). Only the last
+move can be pending. While it is, playing a move or committing a decision is 409
+`move_pending`; undoing it is allowed. Moving a game to the `screen` confirms a pending
+move, and agent moves on the screen are never pending. `GameSummary` (and `GameDetail`)
+carry `board_location`, `current_player`, `current_player_type` and `pending_move`, so
+the game list shows the next action without loading the moves; `pending_move` and
+`ply_count` are counted in SQL.
+
 All photos are kept, including unconfirmed ones, so a labeling pipeline can be added later
 without schema changes. Deleting a game deletes its photo objects in Garage.
 
@@ -104,17 +132,19 @@ the generated frontend client.
 | Method | Path | WP | Purpose |
 |---|---|---|---|
 | GET | `/agents` | 10 | Agent kinds, descriptions and param schemas (from the factory registry). |
-| POST | `/games` | 10 | Create a game: name, players, optional rules and setup. Rejects human vs human. |
+| GET | `/agents/presets` | 33 | Shipped presets (`nm2`, `nm3`, ...) as `{name, description, spec}`, sorted by name, offered as named strengths. |
+| POST | `/games` | 10, 33 | Create a game: name, players, optional `board_location`, rules and setup. Rejects unsupported setups with 422 (see "Game setups"). |
 | GET | `/games` | 10 | List games (filter by status, newest first, paginated). |
 | GET | `/games/{id}` | 10 | Game metadata and move list. |
-| PATCH | `/games/{id}` | 10 | Rename, change status. |
+| PATCH | `/games/{id}` | 10, 33 | Rename, change status, change `board_location` within the same setup rules (422 `setup_not_supported`). Moving to the `screen` confirms a pending move. |
 | DELETE | `/games/{id}` | 10 | Delete game, moves, photos (including objects). |
 | GET | `/games/{id}/export` | 10 | Serialized `GameRecord` as JSON download. |
-| GET | `/games/{id}/state?ply=N` | 11 | `GamePosition`: board (stacks), hands, side to move, `ply` and `ply_count`, result, last move (the stored move, so a pass is told apart from the start), `movable_pieces` (with at least one target), `placeable_coords`, `placeable_piece_types` and `must_pass`. The move lists are empty once the game ended. `ply` (default: latest) enables replay; past the last move is 422 `ply_out_of_range`. |
+| GET | `/games/{id}/state?ply=N` | 11 | `GamePosition`: board (stacks), hands, side to move, `ply` and `ply_count`, result, last move (the stored move, so a pass is told apart from the start), `movable_pieces` (with at least one target), `placeable_coords`, `placeable_piece_types`, `must_pass` and `pending_move` (whether the game's last move waits for confirmation, at any `ply`). The move lists are empty once the game ended. `ply` (default: latest) enables replay; past the last move is 422 `ply_out_of_range`. |
 | GET | `/games/{id}/targets?q=&r=` | 11 | Legal targets of the top piece at `(q, r)` in the latest position. 404 `coordinate_empty`; 422 `piece_not_movable` with the reason from `Rules.immobility_reason` (other side's piece, queen not placed, one-hive rule, no target, game over). |
-| POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply, allow_agent_side}`, returning the new `GamePosition` (201). `source` is `manual` or `photo`; `photo_id` is required with `photo` only, must belong to the game, and is marked `confirmed`. Checks in order: 409 `ply_conflict` on an `expected_ply` mismatch, 409 `game_not_active` for finished or abandoned games, 409 `agent_turn` when an agent plays the side to move (any source) unless `allow_agent_side`, 422 `move_not_legal` with the reason from `Rules.illegal_move_reason`. Sets status `finished` and the result when the game ends. |
+| POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply, allow_agent_side}`, returning the new `GamePosition` (201). `source` is `manual` or `photo`; `photo_id` is required with `photo` only, must belong to the game, and is marked `confirmed`. Checks in order: 409 `ply_conflict` on an `expected_ply` mismatch, 409 `game_not_active` for finished or abandoned games, 409 `move_pending` while the last move waits for confirmation, 409 `agent_turn` when an agent plays the side to move (any source) unless `allow_agent_side`, 422 `move_not_legal` with the reason from `Rules.illegal_move_reason`. Sets status `finished` and the result when the game ends. |
+| POST | `/games/{id}/moves/last/confirm` | 33 | Confirm that the pending last move was made on the physical board: `{expected_ply}`, returning the `GamePosition`. 409 `ply_conflict` on a mismatch, 409 `no_pending_move` if the last move is not pending. |
 | DELETE | `/games/{id}/moves/last` | 11 | Undo the last move, returning the new `GamePosition`. Optional `expected_ply` (409 `ply_conflict`); 409 `no_move_to_undo` without moves. Reopens finished games (status `active`, no result); abandoned games stay abandoned. Unconfirms the move's photo. |
-| POST | `/games/{id}/think` | 12 | SSE stream about the latest position. Body: `{agent?: AgentSpec, budget_s?, commit: bool}`; `agent` defaults to the side to move's agent and `budget_s` to its budget (5 s for a human side), clamped to `HIVE_MAX_BUDGET_S`. Streams `info` and `candidate` events, ends with `decision` (with the new `GamePosition` when committed), or `error` after a failed commit (for example `ply_conflict` when a move was played meanwhile) or a failed worker. With `commit=true` (only allowed on an agent side, using that side's spec), the final move is stored with `source=agent` and its `DecisionRecord`. Errors before the stream: 404 `game_not_found`, 409 `game_not_active`, 409 `commit_not_allowed`, 422 `agent_required` (human side without `agent`), 503 `pool_busy`, 503 `agent_unavailable`. |
+| POST | `/games/{id}/think` | 12 | SSE stream about the latest position. Body: `{agent?: AgentSpec, budget_s?, commit: bool}`; `agent` defaults to the side to move's agent, or the hint agent of a human side (WP 33), and `budget_s` to its budget (5 s without one), clamped to `HIVE_MAX_BUDGET_S`. Streams `info` and `candidate` events, ends with `decision` (with the new `GamePosition` when committed), or `error` after a failed commit (for example `ply_conflict` when a move was played meanwhile) or a failed worker. With `commit=true` (only allowed on an agent side, using that side's spec), the final move is stored with `source=agent` and its `DecisionRecord`, pending in `table` games. Errors before the stream: 404 `game_not_found`, 409 `game_not_active`, 409 `commit_not_allowed`, 409 `move_pending` (commit while a move is pending), 422 `agent_required` (human side without `agent` or hint agent), 503 `pool_busy`, 503 `agent_unavailable`. |
 | POST | `/games/{id}/photos` | 16 | Upload a photo (multipart) for the current ply; stores it. From WP 19 also runs reader + matcher and returns candidates. |
 | GET | `/photos/{id}/image` | 16 | Stream the stored image. |
 | GET | `/healthz`, `/readyz` | 10 | Liveness; readiness checks DB, S3 and (from WP 24) model loaded. |
