@@ -11,6 +11,7 @@ import {
 
 import type { Piece } from "@/api/client";
 import { BoardLegend } from "@/components/board/BoardLegend";
+import { hiveCentre, moveArc, moveArrow } from "@/components/board/arrows";
 import { boardMarksShown } from "@/components/board/boardMarks";
 import { TILE_FILL_CLASSES } from "@/components/board/colors";
 import { gridCells, gridPath } from "@/components/board/grid";
@@ -27,12 +28,24 @@ import {
   LastMoveMark,
   MovableRing,
   MovableShadow,
+  MoveArrow,
   SelectedHalo,
-  SuggestionMark,
+  SelectionLift,
+  SuggestionRing,
+  SuggestionSource,
   TargetMark,
 } from "@/components/board/marks";
+import {
+  usePrefersReducedMotion,
+  useTransitionAnimation,
+} from "@/components/board/motion";
 import { PieceIcon, PieceTile, TILE_RADIUS } from "@/components/board/PieceTile";
-import type { BoardRendererProps, BoardStack, HexCoord } from "@/components/board/types";
+import type {
+  BoardRendererProps,
+  BoardStack,
+  HexCoord,
+  MoveView,
+} from "@/components/board/types";
 import { screenToBoard, useViewGestures } from "@/components/board/useViewGestures";
 import {
   fitViewBox,
@@ -166,7 +179,8 @@ function buttonProps(
  * suggestion, forbidden), which the Key button explains.
  *
  * The view fits the board until it is panned (drag) or zoomed (pinch, mouse wheel or the
- * buttons); the fit button returns to fitting. Tapping a stack shows its contents.
+ * buttons); the fit button returns to fitting. Tapping a stack shows its contents. Moves
+ * are drawn as curved arrows, and a `transition` drops or moves its tile in.
  */
 export function SvgBoard({
   board,
@@ -176,9 +190,28 @@ export function SvgBoard({
   lastMove,
   proposedMove,
   forbidden = [],
+  transition = null,
   onHexClick,
 }: BoardRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const tileRef = useRef<SVGGElement>(null);
+  const shadowRef = useRef<SVGPolygonElement>(null);
+  const ghostRef = useRef<SVGGElement>(null);
+  const reducedMotion = usePrefersReducedMotion();
+  const centre = useMemo(() => hiveCentre(board.map((stack) => stack.coord)), [board]);
+  const transitionArc = useMemo(
+    () =>
+      transition?.from == null
+        ? null
+        : moveArc({ from: transition.from, to: transition.to, centre }),
+    [transition, centre],
+  );
+  useTransitionAnimation({
+    transition,
+    arc: transitionArc,
+    reducedMotion,
+    elements: { tile: tileRef, shadow: shadowRef, ghost: ghostRef },
+  });
   const screenSize = useScreenSize(svgRef);
   const fitted = useMemo(() => fitViewBox(board.map((stack) => stack.coord)), [board]);
   const limits = useMemo(
@@ -257,6 +290,19 @@ export function SvgBoard({
     setManualView(zoomViewBox({ view, factor, focus, limits }));
   };
 
+  const arrowOf = (move: MoveView | null) =>
+    move?.from == null
+      ? null
+      : moveArrow(moveArc({ from: move.from, to: move.to, centre }));
+  const lastMoveArrow = arrowOf(lastMove);
+  const proposedArrow = arrowOf(proposedMove);
+  const transitionKey = transition === null ? null : hexKey(transition.to);
+  // The tile that moves is drawn last, so it travels over the others.
+  const stacksInOrder = [
+    ...board.filter((stack) => hexKey(stack.coord) !== transitionKey),
+    ...board.filter((stack) => hexKey(stack.coord) === transitionKey),
+  ];
+
   const renderStack = (stack: BoardStack) => {
     const [top] = stack.pieces;
 
@@ -265,6 +311,8 @@ export function SvgBoard({
     }
 
     const key = hexKey(stack.coord);
+    const moving = key === transitionKey;
+    const lifted = selected !== null && sameHex(selected, stack.coord);
     const height = stack.pieces.length;
     const label = `${describePiece(top)} at ${formatHex(stack.coord)}${
       height > 1 ? `, on a stack of ${height}` : ""
@@ -295,8 +343,21 @@ export function SvgBoard({
       >
         {movableKeys.has(key) && <MovableShadow />}
         <StackLayers pieces={stack.pieces} />
-        <PieceTile piece={top} />
-        {movableKeys.has(key) && <MovableRing />}
+        {moving && (
+          <polygon
+            ref={shadowRef}
+            points={RING_POINTS}
+            opacity={0}
+            pointerEvents="none"
+            className="fill-foreground"
+          />
+        )}
+        <g ref={moving ? tileRef : undefined} data-moving={moving ? "" : undefined}>
+          <SelectionLift lifted={lifted}>
+            <PieceTile piece={top} />
+            {movableKeys.has(key) && <MovableRing />}
+          </SelectionLift>
+        </g>
         {height > 1 && <StackBadge height={height} />}
       </g>
     );
@@ -319,7 +380,9 @@ export function SvgBoard({
           },
         )}
       >
-        <TargetMark occupied={occupied} />
+        <g className="animate-in duration-200 fade-in">
+          <TargetMark occupied={occupied} />
+        </g>
       </g>
     );
   };
@@ -356,9 +419,14 @@ export function SvgBoard({
               <LastMoveMark part="from" />
             </g>
           )}
-          {lastMove !== null && (
+          {lastMove !== null && lastMove.from === null && (
             <g transform={translate(lastMove.to)}>
               <LastMoveMark part="to" />
+            </g>
+          )}
+          {proposedMove?.from != null && (
+            <g transform={translate(proposedMove.from)}>
+              <SuggestionSource />
             </g>
           )}
           {selected !== null && (
@@ -366,7 +434,26 @@ export function SvgBoard({
               <SelectedHalo />
             </g>
           )}
-          {board.map(renderStack)}
+          {stacksInOrder.map(renderStack)}
+          {reducedMotion && transition?.from != null && (
+            <g
+              ref={ghostRef}
+              data-ghost=""
+              transform={translate(transition.from)}
+              opacity={0}
+              pointerEvents="none"
+              aria-hidden="true"
+            >
+              <PieceTile piece={transition.piece} />
+            </g>
+          )}
+          {lastMoveArrow !== null && (
+            <MoveArrow
+              key={`lastMove:${String(lastMove?.from)}>${String(lastMove?.to)}`}
+              arrow={lastMoveArrow}
+              mark="lastMove"
+            />
+          )}
           {highlights.map(renderTarget)}
           {forbidden.map((coord) => (
             <g key={hexKey(coord)} transform={translate(coord)}>
@@ -374,9 +461,15 @@ export function SvgBoard({
             </g>
           ))}
           {proposedMove !== null && (
-            <SuggestionMark
-              from={proposedMove.from === null ? null : axialToPixel(proposedMove.from)}
-              to={axialToPixel(proposedMove.to)}
+            <g transform={translate(proposedMove.to)}>
+              <SuggestionRing />
+            </g>
+          )}
+          {proposedArrow !== null && (
+            <MoveArrow
+              key={`suggestion:${String(proposedMove?.from)}>${String(proposedMove?.to)}`}
+              arrow={proposedArrow}
+              mark="suggestion"
             />
           )}
           {openStack !== undefined && (

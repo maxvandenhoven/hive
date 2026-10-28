@@ -20,6 +20,31 @@ export interface MoveView {
   to: HexCoord;
 }
 
+/** How a piece arrives on its hex: placed from the hand, moved, or climbing a stack. */
+export type BoardTransitionKind = "place" | "move" | "climb";
+
+/**
+ * A move to animate, set when the position shown advances by exactly one ply: a live
+ * move, a committed agent move or a replay step forward. Jumps, steps back and undo show
+ * the new position at once and have none.
+ *
+ * The board passed with it is already the position after the move, so a renderer draws
+ * the moved piece on `to` and animates it in: a placement drops onto its hex, a move or
+ * climb travels from `from` along an arc, ending on top of a stack for a climb while the
+ * pieces below stay put. A new `key` starts a new animation and cancels a running one;
+ * the same key never animates twice. Animations never delay input.
+ */
+export interface BoardTransition {
+  /** Identifies the ply and its move. */
+  key: string;
+  kind: BoardTransitionKind;
+  /** The piece that moved, as it stands on top of `to`. */
+  piece: Piece;
+  /** Where the piece came from, `null` for a placement. */
+  from: HexCoord | null;
+  to: HexCoord;
+}
+
 /**
  * What a board renderer draws and reports; renderers know nothing about the game.
  *
@@ -42,6 +67,8 @@ export interface BoardRendererProps {
   proposedMove: MoveView | null;
   /** Hexes marked "not allowed", for the rule diagrams; games leave it out. */
   forbidden?: HexCoord[];
+  /** The move to animate, if the position shown just advanced by one ply. */
+  transition?: BoardTransition | null;
   onHexClick: (coord: HexCoord) => void;
 }
 

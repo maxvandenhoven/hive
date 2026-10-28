@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 
 import type { PieceType, PlayerConfig } from "@/api/client";
-import { MovableRing, MovableShadow, SelectedHalo } from "@/components/board/marks";
+import {
+  MovableRing,
+  MovableShadow,
+  SelectedHalo,
+  SelectionLift,
+} from "@/components/board/marks";
 import { PieceTile } from "@/components/board/PieceTile";
 import { Button } from "@/components/ui/button";
 import { PIECE_NAMES, PIECE_TYPES } from "@/lib/moves";
@@ -35,8 +40,10 @@ function TrayPiece({ piece, side, placeable, selected }: TrayPieceProps) {
     <svg viewBox="-1.1 -1.1 2.25 2.25" aria-hidden="true" className="size-9 shrink-0">
       {selected && <SelectedHalo />}
       {placeable && <MovableShadow />}
-      <PieceTile piece={{ piece, owner: side }} />
-      {placeable && <MovableRing />}
+      <SelectionLift lifted={selected}>
+        <PieceTile piece={{ piece, owner: side }} />
+        {placeable && <MovableRing />}
+      </SelectionLift>
     </svg>
   );
 }

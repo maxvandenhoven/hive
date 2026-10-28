@@ -41,7 +41,8 @@ export const BOARD_MARKS: readonly BoardMarkInfo[] = [
   {
     kind: "lastMove",
     label: "Last move",
-    description: "A dotted outline where it came from and where it went.",
+    description:
+      "An arrow from a dotted outline where it came from; a placed tile gets the outline.",
   },
   {
     kind: "suggestion",

@@ -662,6 +662,44 @@ describe("GamePage", () => {
         .map((region) => region.getAttribute("aria-label")),
     ).toEqual(["Black hand", "White hand"]);
   });
+
+  it("animates a move as it arrives, but not an undo", async () => {
+    let position = AFTER_ANT;
+    mockGameApi(
+      { game: gameDetail({ board_location: "screen" }) },
+      {
+        [`GET ${GAME_PATH}/state`]: () => ({ body: position }),
+        [`POST ${GAME_PATH}/think`]: () => {
+          position = AFTER_AGENT;
+
+          return thinkResponse([
+            { type: "decision", decision: decisionRecord(), position: AFTER_AGENT },
+          ]);
+        },
+        [`DELETE ${GAME_PATH}/moves/last`]: ({ search }) => {
+          position = search === "?expected_ply=4" ? AFTER_ANT : gamePosition();
+
+          return { body: position };
+        },
+      },
+    );
+    const user = renderGamePage();
+
+    const spider = await screen.findByRole("img", { name: "Black spider at (2, 0)" });
+
+    expect(spider.querySelector("[data-moving]")).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("img", { name: "White ant at (-1, 0)" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("group", { name: "Board" }).querySelector("[data-moving]"),
+    ).toBeNull();
+  });
 });
 
 describe("GamePage hints", () => {

@@ -3,10 +3,11 @@
  * and one colour token, and differs from the others in shape, dash or fill too, so it
  * reads without colour. The legend draws its swatches with the same components.
  */
-import { useId } from "react";
+import type { ReactNode } from "react";
 
+import { moveArc, moveArrow, type MoveArrowGeometry } from "@/components/board/arrows";
 import type { BoardMarkKind } from "@/components/board/boardMarks";
-import { hexPoints, type PixelPoint } from "@/components/board/hex";
+import { hexPoints } from "@/components/board/hex";
 import { TILE_RADIUS } from "@/components/board/PieceTile";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,32 @@ export function MovableRing() {
   );
 }
 
+/** How far a selected tile lifts towards the top of the screen. */
+const SELECTED_LIFT = 0.1;
+
+/**
+ * Lifts its tile a little when it is selected, easing up and down; the shadow under it,
+ * drawn outside, then shows more. The lift is a CSS transform, separate from the
+ * `transform` attribute that animates a move.
+ */
+export function SelectionLift({
+  lifted,
+  children,
+}: {
+  lifted: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <g
+      data-lifted={lifted ? "" : undefined}
+      style={{ transform: `translateY(${lifted ? -SELECTED_LIFT : 0}px)` }}
+      className="transition-transform duration-150 ease-out motion-reduce:transition-none"
+    >
+      {children}
+    </g>
+  );
+}
+
 /** A solid halo behind the selected tile. */
 export function SelectedHalo() {
   return (
@@ -88,8 +115,8 @@ export function TargetMark({ occupied }: { occupied: boolean }) {
 }
 
 /**
- * A dotted outline with a light fill on where the last move came from, and a stronger one
- * behind the tile where it went.
+ * A dotted outline with a light fill: faint on the hex the last move came from (its arrow
+ * goes from there), stronger behind a tile that was placed.
  */
 export function LastMoveMark({ part }: { part: "from" | "to" }) {
   return (
@@ -110,64 +137,95 @@ export function LastMoveMark({ part }: { part: "from" | "to" }) {
   );
 }
 
-interface SuggestionMarkProps {
-  /** Where the move starts, or `null` for a placement. */
-  from: PixelPoint | null;
-  to: PixelPoint;
-}
+/** The marks drawn as a move arrow. */
+export type MoveArrowMark = "lastMove" | "suggestion";
 
-/** An agent's suggested move: an arrow from where it starts to a double ring. */
-export function SuggestionMark({ from, to }: SuggestionMarkProps) {
-  const arrowId = useId();
-  let arrow = null;
+const ARROW_CLASSES: Record<MoveArrowMark, { stroke: string; fill: string }> = {
+  lastMove: { stroke: "stroke-board-last-move", fill: "fill-board-last-move" },
+  suggestion: { stroke: "stroke-board-suggestion", fill: "fill-board-suggestion" },
+};
 
-  if (from !== null) {
-    const length = Math.hypot(to.x - from.x, to.y - from.y);
-    // End the line at the ring, so the arrowhead stays visible.
-    const end = length > 0 ? (length - 0.95) / length : 0;
-
-    arrow = (
-      <line
-        x1={from.x}
-        y1={from.y}
-        x2={from.x + (to.x - from.x) * end}
-        y2={from.y + (to.y - from.y) * end}
-        strokeWidth={0.14}
-        strokeLinecap="round"
-        markerEnd={`url(#${arrowId})`}
-        className="stroke-board-suggestion"
-      />
-    );
-  }
+/**
+ * A curved arrow for a move, in the colour of its mark, on a light casing so it reads
+ * over tiles of both colours. It fades in whenever it is drawn anew.
+ */
+export function MoveArrow({
+  arrow,
+  mark,
+}: {
+  arrow: MoveArrowGeometry;
+  mark: MoveArrowMark;
+}) {
+  const head = arrow.head.map(({ x, y }) => `${x},${y}`).join(" ");
+  const classes = ARROW_CLASSES[mark];
 
   return (
-    <g data-mark="suggestion" pointerEvents="none" opacity={0.9} aria-hidden="true">
-      <defs>
-        <marker
-          id={arrowId}
-          viewBox="0 0 10 10"
-          refX="5"
-          refY="5"
-          markerWidth="3"
-          markerHeight="3"
-          orient="auto-start-reverse"
-        >
-          <path d="M 0 0 L 10 5 L 0 10 z" className="fill-board-suggestion" />
-        </marker>
-      </defs>
-      {arrow}
-      <g transform={`translate(${to.x} ${to.y})`} fill="none">
-        <polygon
-          points={SUGGESTION_OUTER_POINTS}
-          strokeWidth={0.08}
-          className="stroke-board-suggestion"
-        />
-        <polygon
-          points={SUGGESTION_INNER_POINTS}
-          strokeWidth={0.06}
-          className="stroke-board-suggestion"
-        />
-      </g>
+    <g
+      data-mark={mark}
+      data-arrow={mark}
+      pointerEvents="none"
+      aria-hidden="true"
+      className="animate-in duration-300 fade-in"
+    >
+      <path
+        d={arrow.path}
+        fill="none"
+        strokeWidth={0.28}
+        strokeLinecap="round"
+        className="stroke-card/80"
+      />
+      <polygon
+        points={head}
+        strokeWidth={0.14}
+        strokeLinejoin="round"
+        className="fill-card/80 stroke-card/80"
+      />
+      <path
+        d={arrow.path}
+        fill="none"
+        strokeWidth={0.14}
+        strokeLinecap="round"
+        className={classes.stroke}
+      />
+      <polygon points={head} className={classes.fill} />
+    </g>
+  );
+}
+
+/**
+ * A faint dotted hex where a suggested move starts, so it shows also once the piece has
+ * left it on the screen while it still stands there on the table.
+ */
+export function SuggestionSource() {
+  return (
+    <g data-mark="suggestion" pointerEvents="none">
+      <polygon points={HALO_POINTS} className="fill-board-suggestion/15" />
+      <polygon
+        points={LAST_MOVE_POINTS}
+        fill="none"
+        strokeWidth={0.09}
+        strokeLinecap="round"
+        strokeDasharray="0 0.19"
+        className="stroke-board-suggestion"
+      />
+    </g>
+  );
+}
+
+/** A double ring where an agent suggests a piece goes, at the end of its arrow. */
+export function SuggestionRing() {
+  return (
+    <g data-mark="suggestion" pointerEvents="none" fill="none" aria-hidden="true">
+      <polygon
+        points={SUGGESTION_OUTER_POINTS}
+        strokeWidth={0.08}
+        className="stroke-board-suggestion"
+      />
+      <polygon
+        points={SUGGESTION_INNER_POINTS}
+        strokeWidth={0.06}
+        className="stroke-board-suggestion"
+      />
     </g>
   );
 }
@@ -190,6 +248,10 @@ export function ForbiddenMark() {
     </g>
   );
 }
+
+/** The arrow of the swatches, from the hex left of the origin to the origin. */
+const SWATCH_ARROW = moveArrow(moveArc({ from: [-1, 0], to: [0, 0], centre: null }));
+const SWATCH_SOURCE = "translate(-1.732 0)";
 
 /** A tile without an insect, for swatches. */
 function BlankTile() {
@@ -234,12 +296,23 @@ function SwatchMarks({ kind }: { kind: BoardMarkKind }) {
     case "lastMove":
       return (
         <>
-          <LastMoveMark part="to" />
+          <g transform={SWATCH_SOURCE}>
+            <LastMoveMark part="from" />
+          </g>
           <BlankTile />
+          <MoveArrow arrow={SWATCH_ARROW} mark="lastMove" />
         </>
       );
     case "suggestion":
-      return <SuggestionMark from={{ x: -2.4, y: 0 }} to={ORIGIN} />;
+      return (
+        <>
+          <g transform={SWATCH_SOURCE}>
+            <BlankTile />
+          </g>
+          <SuggestionRing />
+          <MoveArrow arrow={SWATCH_ARROW} mark="suggestion" />
+        </>
+      );
     case "forbidden":
       return <ForbiddenMark />;
   }
@@ -253,7 +326,10 @@ export function MarkSwatch({
   kind: BoardMarkKind;
   className?: string;
 }) {
-  const viewBox = kind === "suggestion" ? "-2.6 -1.2 3.8 2.4" : "-1.2 -1.2 2.4 2.4";
+  const viewBox =
+    kind === "suggestion" || kind === "lastMove"
+      ? "-2.8 -1.2 4 2.4"
+      : "-1.2 -1.2 2.4 2.4";
 
   return (
     <svg

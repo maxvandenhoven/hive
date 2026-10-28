@@ -11,6 +11,7 @@ import {
 } from "@/api/client";
 import { useGame, useGamePosition, usePlayMove, useUndoMove } from "@/api/queries";
 import { SvgBoard } from "@/components/board/SvgBoard";
+import { useBoardTransition } from "@/components/board/transition";
 import type { BoardRenderer } from "@/components/board/types";
 import { useBoardInteraction } from "@/components/board/useBoardInteraction";
 import { GameHeader } from "@/components/GameHeader";
@@ -123,7 +124,16 @@ function GameScreen({ game, position }: GameScreenProps) {
   });
   const board = useMemo(() => toBoardView(shown.board), [shown.board]);
   const liveBoard = useMemo(() => toBoardView(position.board), [position.board]);
-  const lastMove = useMemo(() => toMoveView(shown.last_move?.move), [shown.last_move]);
+  const transition = useBoardTransition({
+    ply: shown.ply,
+    lastMove: shown.last_move?.move,
+    board,
+  });
+  // A move still to make on the table is drawn as the suggestion only, not as made.
+  const lastMove = useMemo(
+    () => (live && turns.awaitingDone ? null : toMoveView(shown.last_move?.move)),
+    [live, turns.awaitingDone, shown.last_move],
+  );
   const proposed = live ? toMoveView(proposedMove(turns, hint, position)) : null;
   const prompt = describeTurnPrompt({
     game,
@@ -204,6 +214,7 @@ function GameScreen({ game, position }: GameScreenProps) {
             }
             lastMove={lastMove}
             proposedMove={proposed}
+            transition={transition}
             onHexClick={interaction.clickHex}
           />
           {!live && (

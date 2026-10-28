@@ -2,8 +2,13 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FADE_DURATION_MS, MOVE_DURATION_MS } from "@/components/board/motion";
 import { SvgBoard } from "@/components/board/SvgBoard";
-import type { BoardRendererProps, HexCoord } from "@/components/board/types";
+import type {
+  BoardRendererProps,
+  BoardTransition,
+  HexCoord,
+} from "@/components/board/types";
 
 const BOARD: BoardRendererProps["board"] = [
   { coord: [0, 0], pieces: [{ piece: "queen", owner: "white" }] },
@@ -221,5 +226,184 @@ describe("SvgBoard", () => {
     );
 
     expect(viewBox()).not.toBe(before);
+  });
+
+  it("draws a move as an arrow from a faint source hex", () => {
+    renderBoard({ lastMove: { from: [3, -1], to: [2, -1] } });
+    const svg = screen.getByRole("group", { name: "Board" });
+
+    expect(svg.querySelector('[data-arrow="lastMove"]')).not.toBeNull();
+    // The source hex and the arrow; the target has no halo of its own.
+    expect(svg.querySelectorAll('[data-mark="lastMove"]')).toHaveLength(2);
+  });
+
+  it("highlights a placement instead of drawing an arrow", () => {
+    renderBoard({
+      lastMove: { from: null, to: [2, -1] },
+      proposedMove: { from: null, to: [0, 1] },
+    });
+    const svg = screen.getByRole("group", { name: "Board" });
+
+    expect(svg.querySelector("[data-arrow]")).toBeNull();
+    expect(svg.querySelector('[data-mark="lastMove"]')).not.toBeNull();
+    expect(svg.querySelector('[data-mark="suggestion"]')).not.toBeNull();
+  });
+
+  it("draws a suggested move as an arrow to a double ring", () => {
+    renderBoard({ proposedMove: { from: [2, -1], to: [3, -2] } });
+    const svg = screen.getByRole("group", { name: "Board" });
+
+    expect(svg.querySelector('[data-arrow="suggestion"]')).not.toBeNull();
+    // The faint source hex, the arrow and the double ring.
+    expect(svg.querySelectorAll('[data-mark="suggestion"]')).toHaveLength(3);
+  });
+
+  it("lifts the selected tile", () => {
+    renderBoard({ movable: [[0, 0]], selected: [0, 0] });
+
+    expect(
+      screen
+        .getByRole("button", { name: "White queen at (0, 0)" })
+        .querySelector("[data-lifted]"),
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByRole("img", { name: "Black ant at (2, -1)" })
+        .querySelector("[data-lifted]"),
+    ).toBeNull();
+  });
+
+  describe("transitions", () => {
+    const frames: FrameRequestCallback[] = [];
+    const cancelled: number[] = [];
+
+    beforeEach(() => {
+      frames.length = 0;
+      cancelled.length = 0;
+      vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+        frames.push(callback),
+      );
+      vi.stubGlobal("cancelAnimationFrame", (request: number) => {
+        cancelled.push(request);
+      });
+    });
+
+    const MOVE: BoardTransition = {
+      key: "5:3,-1>2,-1",
+      kind: "move",
+      piece: { piece: "ant", owner: "black" },
+      from: [3, -1],
+      to: [2, -1],
+    };
+
+    function movingTile(): Element | null {
+      return screen.getByRole("group", { name: "Board" }).querySelector("[data-moving]");
+    }
+
+    function runFrame(now: number) {
+      const frame = frames.shift();
+      frame?.(now);
+    }
+
+    it("travels the moved tile from its source and settles it on its target", () => {
+      renderBoard({ transition: MOVE });
+      const tile = movingTile();
+
+      // The ant starts one hex to the right, at its source.
+      expect(tile?.getAttribute("transform")).toMatch(/^translate\(1\.73\d* /);
+
+      runFrame(0);
+      runFrame(MOVE_DURATION_MS / 2);
+
+      expect(tile?.getAttribute("transform")).toMatch(/scale\(1\.\d*[1-9]/);
+
+      runFrame(MOVE_DURATION_MS);
+
+      expect(tile?.hasAttribute("transform")).toBe(false);
+      expect(frames).toHaveLength(0);
+    });
+
+    it("lets a new transition cancel a running one, and never replays one", () => {
+      const props = {
+        board: BOARD,
+        highlights: [],
+        movable: [],
+        selected: null,
+        lastMove: null,
+        proposedMove: null,
+        onHexClick: vi.fn(),
+      };
+      const { rerender } = render(<SvgBoard {...props} transition={{ ...MOVE }} />);
+
+      // A new board with the same transition does not start again.
+      rerender(<SvgBoard {...props} board={[...BOARD]} transition={{ ...MOVE }} />);
+
+      expect(cancelled).toHaveLength(0);
+
+      rerender(
+        <SvgBoard {...props} transition={{ ...MOVE, key: "6:0,0>2,-1", from: [0, 0] }} />,
+      );
+
+      expect(cancelled).toHaveLength(1);
+      expect(movingTile()?.getAttribute("transform")).toMatch(
+        /^translate\(-2\.598\d* 1\.5\) /,
+      );
+    });
+
+    it("puts a cancelled tile to rest when another tile moves", () => {
+      const props = {
+        board: BOARD,
+        highlights: [],
+        movable: [],
+        selected: null,
+        lastMove: null,
+        proposedMove: null,
+        onHexClick: vi.fn(),
+      };
+      const { rerender } = render(<SvgBoard {...props} transition={MOVE} />);
+      const ant = screen.getByRole("img", { name: "Black ant at (2, -1)" });
+
+      expect(ant.querySelector("[transform^='translate(1.73']")).not.toBeNull();
+
+      rerender(
+        <SvgBoard
+          {...props}
+          transition={{
+            key: "6:hand>0,0",
+            kind: "place",
+            piece: { piece: "queen", owner: "white" },
+            from: null,
+            to: [0, 0],
+          }}
+        />,
+      );
+
+      expect(ant.querySelector("[transform^='translate(1.73']")).toBeNull();
+      expect(movingTile()?.getAttribute("transform")).toMatch(/^translate\(0 -0\.35\)/);
+    });
+
+    it("cross-fades with reduced motion", () => {
+      vi.stubGlobal("matchMedia", (query: string) =>
+        Object.assign(new EventTarget(), {
+          matches: query === "(prefers-reduced-motion: reduce)",
+          media: query,
+          onchange: null,
+        }),
+      );
+      renderBoard({ transition: MOVE });
+      const ghost = screen
+        .getByRole("group", { name: "Board" })
+        .querySelector("[data-ghost]");
+
+      expect(movingTile()?.getAttribute("transform")).toBe("translate(0 0) scale(1)");
+      expect(movingTile()?.getAttribute("opacity")).toBe("0");
+      expect(ghost?.getAttribute("opacity")).toBe("1");
+
+      runFrame(0);
+      runFrame(FADE_DURATION_MS);
+
+      expect(movingTile()?.hasAttribute("opacity")).toBe(false);
+      expect(ghost?.getAttribute("opacity")).toBe("0");
+    });
   });
 });
