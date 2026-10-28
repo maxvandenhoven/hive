@@ -130,7 +130,7 @@ function GameScreen({ game, position }: GameScreenProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] xl:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="flex flex-col gap-3 lg:col-start-2 lg:row-start-1">
         <GameHeader game={game} position={position} />
         <GameOverBanner game={game} position={position} />
@@ -138,7 +138,7 @@ function GameScreen({ game, position }: GameScreenProps) {
       </div>
       <div className="flex flex-col gap-2 lg:col-start-1 lg:row-span-2 lg:row-start-1">
         {renderTray(away)}
-        <Card className="relative aspect-square max-h-[65dvh] w-full bg-muted/30 py-0 lg:aspect-auto lg:h-[max(24rem,calc(100dvh-19rem))] lg:max-h-none">
+        <Card className="relative aspect-square max-h-[65dvh] w-full bg-board-surface py-0 lg:aspect-auto lg:h-[max(24rem,calc(100dvh-19rem))] lg:max-h-none">
           <Board
             board={board}
             highlights={interaction.highlights}
