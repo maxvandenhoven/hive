@@ -28,17 +28,21 @@ from hive.api.errors import (
     GameNotActiveError,
     GameNotFoundError,
     MoveNotLegalError,
+    MovePendingError,
     NoMoveToUndoError,
+    NoPendingMoveError,
     PhotoNotFoundError,
     PieceNotMovableError,
     PlyConflictError,
     PlyOutOfRangeError,
+    SetupNotSupportedError,
 )
-from hive.api.players import AgentPlayer
+from hive.api.players import AgentPlayer, BoardLocation
 from hive.api.schemas import (
     GameCreate,
     GamePosition,
     GameUpdate,
+    MoveConfirm,
     MoveCreate,
     PieceTargets,
 )
@@ -87,16 +91,25 @@ class GameService:
             setup=body.setup,
             white_player=body.white,
             black_player=body.black,
+            board_location=body.location,
             moves=[],
             photos=[],
         )
         self.session.add(game)
-        await self.session.commit()
-        # Writes expire the counted `ply_count`, which async sessions cannot load lazily.
-        await self.session.refresh(game, attribute_names=["ply_count"])
+        await self.commit(game)
         logger.info("Created game `%s`.", game.id, extra={"game_id": str(game.id)})
 
         return game
+
+    async def commit(self, game: GameRow) -> None:
+        """Commit the changes of the session and reload what SQL derives from the moves.
+
+        Args:
+            game: The changed game.
+        """
+        await self.session.commit()
+        # Writes expire the column properties, which async sessions cannot load lazily.
+        await self.session.refresh(game, attribute_names=["ply_count", "pending_move"])
 
     async def get_game(self, game_id: uuid.UUID, *, lock: bool = False) -> GameRow:
         """Load a game with its moves.
@@ -152,7 +165,10 @@ class GameService:
         return games.all(), total or 0
 
     async def update_game(self, game_id: uuid.UUID, body: GameUpdate) -> GameRow:
-        """Rename a game or change its status.
+        """Rename a game, change its status or move it between the screen and the table.
+
+        A pending move is confirmed when the game moves to the screen, where agent moves
+        apply at once.
 
         Args:
             game_id: The game ID.
@@ -163,14 +179,25 @@ class GameService:
 
         Raises:
             GameNotFoundError: If there is no game with the ID.
+            SetupNotSupportedError: If the players cannot play at the new board location.
         """
-        game = await self.get_game(game_id)
+        game = await self.get_game(game_id, lock=True)
+
+        if body.board_location is not None:
+            error = body.board_location.setup_error(
+                white=game.white_player, black=game.black_player
+            )
+
+            if error is not None:
+                raise SetupNotSupportedError(error)
+
+            if body.board_location is BoardLocation.SCREEN and game.moves:
+                game.moves[-1].pending = False
 
         for name, value in body.model_dump(exclude_none=True).items():
             setattr(game, name, value)
 
-        await self.session.commit()
-        await self.session.refresh(game, attribute_names=["ply_count"])
+        await self.commit(game)
 
         return game
 
@@ -248,6 +275,7 @@ class GameService:
             GameNotFoundError: If there is no game with the ID.
             PlyConflictError: If the game is not at the expected ply.
             GameNotActiveError: If the game is finished or abandoned.
+            MovePendingError: If the last move waits to be made on the board.
             AgentTurnError: If an agent plays the side to move and the request does not
                 allow entering its move.
             PhotoNotFoundError: If the photo is not a photo of the game.
@@ -262,6 +290,7 @@ class GameService:
             )
 
         self.check_active(game=game, state=state)
+        self.check_no_pending_move(game)
         side = state.current_player
 
         if isinstance(game.player(side), AgentPlayer) and not body.allow_agent_side:
@@ -282,6 +311,18 @@ class GameService:
             source=body.source,
             photo_id=body.photo_id,
         )
+
+    def check_no_pending_move(self, game: GameRow) -> None:
+        """Check that the last move of a game does not wait to be made on the board.
+
+        Args:
+            game: The game, with its moves loaded.
+
+        Raises:
+            MovePendingError: If the last move is pending.
+        """
+        if game.moves and game.moves[-1].pending:
+            raise MovePendingError(game_id=game.id, ply=game.moves[-1].ply)
 
     def check_active(self, game: GameRow, state: GameState) -> None:
         """Check that moves can be played in a game.
@@ -308,6 +349,7 @@ class GameService:
         source: MoveSource,
         photo_id: uuid.UUID | None = None,
         decision: DecisionRecord | None = None,
+        pending: bool = False,
     ) -> GamePosition:
         """Check, store and commit a move, finishing the game if the move ends it.
 
@@ -320,15 +362,18 @@ class GameService:
             source: How the move was entered.
             photo_id: The photo the move was read from, or `None`.
             decision: The decision behind an agent move, or `None`.
+            pending: Whether the move waits for a person to make it on the board.
 
         Returns:
             The position after the move.
 
         Raises:
             GameNotActiveError: If the game is finished or abandoned.
+            MovePendingError: If the last move waits to be made on the board.
             MoveNotLegalError: If the move is not legal.
         """
         self.check_active(game=game, state=state)
+        self.check_no_pending_move(game)
 
         try:
             game.rules.apply_checked_move(state=state, move=move)
@@ -342,6 +387,7 @@ class GameService:
                 source=source,
                 photo_id=photo_id,
                 decision=decision,
+                pending=pending,
             )
         )
         result = GameResult.from_winners(game.rules.winners(state))
@@ -351,8 +397,7 @@ class GameService:
             game.result = result
 
         game.updated_at = utc_now()
-        await self.session.commit()
-        await self.session.refresh(game, attribute_names=["ply_count"])
+        await self.commit(game)
         logger.info(
             "Played `%s` in game `%s` at ply %d.",
             "pass" if move is None else move,
@@ -368,6 +413,9 @@ class GameService:
     ) -> GamePosition:
         """Play the move an agent decided, storing its decision with it.
 
+        In a `table` game the move is pending until a person confirms making it on the
+        board.
+
         Args:
             game_id: The game ID.
             ply: The ply the agent decided at, which the game must still be at.
@@ -380,6 +428,7 @@ class GameService:
             GameNotFoundError: If there is no game with the ID.
             PlyConflictError: If another move was played or undone meanwhile.
             GameNotActiveError: If the game was finished or abandoned meanwhile.
+            MovePendingError: If the last move waits to be made on the board.
             MoveNotLegalError: If the move is not legal, which a decision never is.
         """
         game = await self.get_game(game_id, lock=True)
@@ -393,6 +442,46 @@ class GameService:
             move=decision.move,
             source=MoveSource.AGENT,
             decision=decision,
+            pending=game.board_location is BoardLocation.TABLE,
+        )
+
+    async def confirm_move(self, game_id: uuid.UUID, body: MoveConfirm) -> GamePosition:
+        """Confirm that the pending last move of a game was made on the physical board.
+
+        Args:
+            game_id: The game ID.
+            body: The ply the client expects the game at.
+
+        Returns:
+            The latest position, without a pending move.
+
+        Raises:
+            GameNotFoundError: If there is no game with the ID.
+            PlyConflictError: If the game is not at the expected ply.
+            NoPendingMoveError: If the last move is not pending.
+        """
+        game = await self.get_game(game_id, lock=True)
+
+        if body.expected_ply != len(game.moves):
+            raise PlyConflictError(
+                expected_ply=body.expected_ply, ply_count=len(game.moves)
+            )
+
+        if not game.moves or not game.moves[-1].pending:
+            raise NoPendingMoveError(game_id)
+
+        game.moves[-1].pending = False
+        game.updated_at = utc_now()
+        await self.commit(game)
+        logger.info(
+            "Confirmed ply %d of game `%s` on the board.",
+            len(game.moves) - 1,
+            game.id,
+            extra={"game_id": str(game.id)},
+        )
+
+        return GamePosition.from_state(
+            game=game, state=game.replay(), ply=len(game.moves)
         )
 
     async def undo_move(
@@ -435,8 +524,7 @@ class GameService:
             game.result = None
 
         game.updated_at = utc_now()
-        await self.session.commit()
-        await self.session.refresh(game, attribute_names=["ply_count"])
+        await self.commit(game)
         logger.info(
             "Undid ply %d of game `%s`.",
             move.ply,

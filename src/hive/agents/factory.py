@@ -258,16 +258,7 @@ class AgentSpec(JsonCodec):
         Raises:
             InvalidAgentSpecError: If there is no such preset or the preset is invalid.
         """
-        presets = list_presets()
-
-        if name not in presets:
-            msg = f"Unknown agent preset `{name}`, expected one of: {', '.join(presets)}."
-            raise InvalidAgentSpecError(msg)
-
-        text = files(AGENT_PRESET_PACKAGE).joinpath(f"{name}.yaml").read_text()
-        spec = cls.from_yaml(text=text, source=f"preset `{name}`")
-
-        return spec if spec.label is not None else replace(spec, label=name)
+        return AgentPreset.load(name).spec
 
     @classmethod
     def resolve(cls, value: str) -> "AgentSpec":
@@ -332,6 +323,73 @@ class AgentSpec(JsonCodec):
             raise InvalidAgentSpecError(
                 format_spec_errors(source=source, errors=errors, kind=self.kind)
             ) from e
+
+
+@dataclass(frozen=True, slots=True)
+class AgentPreset(JsonCodec):
+    """A tuned agent shipped in `hive.agents.presets`, offered by name.
+
+    A preset file is a spec in YAML with a `description` next to `kind`, `label` and
+    `params`.
+
+    Attributes:
+        name: The name of the preset, which is its file name without `.yaml`.
+        description: What the agent is like, in one short sentence.
+        spec: The agent, labelled with the preset name unless the file sets a label.
+    """
+
+    name: str
+    description: str
+    spec: AgentSpec
+
+    @classmethod
+    def load(cls, name: str) -> "AgentPreset":
+        """Read and validate a preset.
+
+        Args:
+            name: The name of the preset.
+
+        Returns:
+            The preset.
+
+        Raises:
+            InvalidAgentSpecError: If there is no such preset, it has no description or
+                its spec is invalid.
+        """
+        presets = list_presets()
+
+        if name not in presets:
+            msg = f"Unknown agent preset `{name}`, expected one of: {', '.join(presets)}."
+            raise InvalidAgentSpecError(msg)
+
+        source = f"preset `{name}`"
+        text = files(AGENT_PRESET_PACKAGE).joinpath(f"{name}.yaml").read_text()
+        data = yaml.safe_load(text)
+        description = data.pop("description", None) if isinstance(data, dict) else None
+
+        if not isinstance(description, str):
+            msg = f"The {source} needs a `description` string."
+            raise InvalidAgentSpecError(msg)
+
+        spec = AgentSpec.parse(data=data, source=source)
+
+        return cls(
+            name=name,
+            description=description,
+            spec=spec if spec.label is not None else replace(spec, label=name),
+        )
+
+    @classmethod
+    def load_all(cls) -> list["AgentPreset"]:
+        """Read and validate every shipped preset.
+
+        Returns:
+            The presets, sorted by name.
+
+        Raises:
+            InvalidAgentSpecError: If a preset is invalid.
+        """
+        return [cls.load(name) for name in list_presets()]
 
 
 def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:

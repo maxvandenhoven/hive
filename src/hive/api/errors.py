@@ -36,6 +36,9 @@ class ApiErrorCode(StrEnum):
     COMMIT_NOT_ALLOWED = "commit_not_allowed"
     POOL_BUSY = "pool_busy"
     AGENT_UNAVAILABLE = "agent_unavailable"
+    MOVE_PENDING = "move_pending"
+    NO_PENDING_MOVE = "no_pending_move"
+    SETUP_NOT_SUPPORTED = "setup_not_supported"
 
 
 class ErrorResponse(BaseModel):
@@ -344,6 +347,62 @@ class AgentUnavailableError(ApiError):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     code = ApiErrorCode.AGENT_UNAVAILABLE
     description = "The agent failed to start."
+
+
+class MovePendingError(ApiError):
+    """The last move waits for a person to make it on the physical board.
+
+    Attributes:
+        game_id: The game ID.
+        ply: The ply of the pending move.
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    code = ApiErrorCode.MOVE_PENDING
+    description = "The last move waits to be confirmed on the board."
+
+    def __init__(self, game_id: uuid.UUID, ply: int) -> None:
+        """Create the error.
+
+        Args:
+            game_id: The game ID.
+            ply: The ply of the pending move.
+        """
+        super().__init__(
+            f"The agent move at ply `{ply}` of game `{game_id}` waits to be made on the "
+            "board; confirm or undo it first."
+        )
+        self.game_id = game_id
+        self.ply = ply
+
+
+class NoPendingMoveError(ApiError):
+    """The last move of the game does not wait for confirmation.
+
+    Attributes:
+        game_id: The game ID.
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    code = ApiErrorCode.NO_PENDING_MOVE
+    description = "The last move does not wait to be confirmed."
+
+    def __init__(self, game_id: uuid.UUID) -> None:
+        """Create the error.
+
+        Args:
+            game_id: The game ID.
+        """
+        super().__init__(f"The last move of game `{game_id}` is not pending.")
+        self.game_id = game_id
+
+
+class SetupNotSupportedError(ApiError):
+    """The players and the board location of a game are not a supported setup."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = ApiErrorCode.SETUP_NOT_SUPPORTED
+    description = "The players and the board location are not a supported setup."
 
 
 def error_responses(*error_types: type[ApiError]) -> dict[int | str, dict[str, Any]]:

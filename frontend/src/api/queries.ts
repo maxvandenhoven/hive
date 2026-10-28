@@ -211,6 +211,27 @@ export function usePlayMove(gameId: string) {
   });
 }
 
+/**
+ * Confirm that the pending agent move, the last move at `expectedPly`, was made on the
+ * physical board, returning the new position.
+ */
+export function useConfirmMove(gameId: string) {
+  const storeLatestPosition = useStoreLatestPosition(gameId);
+  const refreshGame = useRefreshGame(gameId);
+
+  return useMutation({
+    mutationFn: async (expectedPly: number) =>
+      unwrap(
+        await api.POST("/api/games/{game_id}/moves/last/confirm", {
+          params: { path: { game_id: gameId } },
+          body: { expected_ply: expectedPly },
+        }),
+      ) as GamePosition,
+    onSuccess: storeLatestPosition,
+    onError: refreshGame,
+  });
+}
+
 interface UndoRequest {
   /** The ply the game must be at, which is the `ply_count` of the position shown. */
   expectedPly: number;

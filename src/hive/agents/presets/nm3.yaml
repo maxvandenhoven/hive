@@ -1,3 +1,4 @@
+description: Negamax searching three plies ahead; slower and stronger.
 kind: negamax
 params:
   depth: 3

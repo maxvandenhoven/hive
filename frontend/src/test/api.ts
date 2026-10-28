@@ -11,7 +11,7 @@ export interface RecordedRequest {
 }
 
 /** A response by status and JSON body, or a whole response such as a stream. */
-type ApiHandler = (
+export type ApiHandler = (
   request: RecordedRequest,
 ) => { status?: number; body?: unknown } | Response;
 

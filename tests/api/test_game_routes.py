@@ -17,6 +17,10 @@ AGENT: dict[str, Any] = {
     "budget_s": 2.5,
 }
 HUMAN = {"type": "human"}
+HINTED: dict[str, Any] = {
+    "type": "human",
+    "hint": {"spec": {"kind": "negamax", "params": {"depth": 1}}, "budget_s": 1.0},
+}
 
 pytestmark = pytest.mark.anyio
 
@@ -68,20 +72,75 @@ class TestCreateGame:
         assert game["name"] == "Game"
         assert game["status"] == "active"
         assert game["result"] is None
-        assert game["white"] == HUMAN
+        assert game["white"] == {**HUMAN, "hint": None}
         assert game["black"] == {**AGENT, "spec": {**AGENT["spec"], "label": None}}
+        assert game["board_location"] == "table"
+        assert (game["current_player"], game["current_player_type"]) == ("white", "human")
+        assert game["pending_move"] is False
         assert game["rules"] == Rules(max_turns=40).to_json()
         assert game["setup"] is None
         assert game["moves"] == []
         assert game["ply_count"] == 0
 
-    async def test_rejects_human_vs_human(self, client: httpx2.AsyncClient) -> None:
+    @pytest.mark.parametrize(
+        ("white", "black", "location"),
+        [
+            (HUMAN, AGENT, "screen"),
+            (AGENT, HUMAN, "table"),
+            (HINTED, HUMAN, "table"),
+            (AGENT, AGENT, "screen"),
+        ],
+    )
+    async def test_creates_every_scenario(
+        self,
+        client: httpx2.AsyncClient,
+        white: dict[str, Any],
+        black: dict[str, Any],
+        location: str,
+    ) -> None:
+        game = await create_game(
+            client=client, white=white, black=black, board_location=location
+        )
+
+        assert game["board_location"] == location
+
+    async def test_stores_hint_agent(self, client: httpx2.AsyncClient) -> None:
+        game = await create_game(client=client, white=HINTED, black=HUMAN)
+        stored = (await client.get(f"/api/games/{game['id']}")).json()
+
+        assert stored["white"]["hint"]["spec"]["params"] == {"depth": 1}
+        assert stored["white"]["hint"]["budget_s"] == 1.0
+        assert stored["black"]["hint"] is None
+        assert stored["board_location"] == "table"
+
+    @pytest.mark.parametrize(
+        ("white", "black", "location", "message"),
+        [
+            (HUMAN, HUMAN, None, "human vs human without hints is not supported"),
+            (HINTED, HUMAN, "screen", "played at the `table`"),
+            (AGENT, AGENT, "table", "played on the `screen`"),
+        ],
+    )
+    async def test_rejects_unsupported_setups(
+        self,
+        client: httpx2.AsyncClient,
+        white: dict[str, Any],
+        black: dict[str, Any],
+        location: str | None,
+        message: str,
+    ) -> None:
         response = await client.post(
-            "/api/games", json={"name": "Game", "white": HUMAN, "black": HUMAN}
+            "/api/games",
+            json={
+                "name": "Game",
+                "white": white,
+                "black": black,
+                "board_location": location,
+            },
         )
 
         assert response.status_code == 422
-        assert "human vs human" in response.text
+        assert message in response.text
 
     async def test_rejects_invalid_agent_spec(self, client: httpx2.AsyncClient) -> None:
         response = await client.post(
@@ -127,6 +186,30 @@ class TestListGames:
 
         assert [game["id"] for game in page["items"]] == [active["id"]]
         assert page["total"] == 1
+
+    async def test_shows_the_next_action(
+        self, client: httpx2.AsyncClient, session: AsyncSession
+    ) -> None:
+        game = await create_game(client=client)
+        await add_moves(session=session, game_id=game["id"], moves=[None])
+        item = (await client.get("/api/games")).json()["items"][0]
+
+        assert item["current_player"] == "black"
+        assert item["current_player_type"] == "agent"
+        assert item["pending_move"] is False
+        assert item["board_location"] == "table"
+
+    async def test_side_to_move_follows_the_setup(
+        self, client: httpx2.AsyncClient
+    ) -> None:
+        setup = {
+            "board": [{"coord": [0, 0], "stack": [{"piece": "queen", "owner": "white"}]}],
+            "current_player": "black",
+        }
+        await create_game(client=client, setup=setup)
+        item = (await client.get("/api/games")).json()["items"][0]
+
+        assert (item["current_player"], item["current_player_type"]) == ("black", "agent")
 
     @pytest.mark.parametrize("params", [{"limit": 0}, {"limit": 101}, {"offset": -1}])
     async def test_rejects_bad_pages(
@@ -180,6 +263,34 @@ class TestUpdateGame:
         assert body["name"] == "Renamed"
         assert body["status"] == "abandoned"
         assert body["updated_at"] > game["updated_at"]
+
+    async def test_moves_game_to_the_screen(self, client: httpx2.AsyncClient) -> None:
+        game = await create_game(client=client)
+        response = await client.patch(
+            f"/api/games/{game['id']}", json={"board_location": "screen"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["board_location"] == "screen"
+
+    @pytest.mark.parametrize(
+        ("white", "black", "location"),
+        [(AGENT, AGENT, "table"), (HINTED, HUMAN, "screen")],
+    )
+    async def test_rejects_unsupported_location(
+        self,
+        client: httpx2.AsyncClient,
+        white: dict[str, Any],
+        black: dict[str, Any],
+        location: str,
+    ) -> None:
+        game = await create_game(client=client, white=white, black=black)
+        response = await client.patch(
+            f"/api/games/{game['id']}", json={"board_location": location}
+        )
+
+        assert response.status_code == 422
+        assert response.json()["code"] == "setup_not_supported"
 
     async def test_rejects_invalid_status(self, client: httpx2.AsyncClient) -> None:
         game = await create_game(client=client)

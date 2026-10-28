@@ -84,6 +84,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Presets
+         * @description List the shipped agent presets, such as `nm2` and `nm3`, with their spec and a short description, to offer as named strengths.
+         */
+        get: operations["list_agent_presets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/games": {
         parameters: {
             query?: never;
@@ -99,7 +119,7 @@ export interface paths {
         put?: never;
         /**
          * Create Game
-         * @description Create a game. At least one side must be an agent.
+         * @description Create a game: human vs agent on the screen or at the table, human vs human with a hint agent on at least one side at the table, or agent vs agent on the screen.
          */
         post: operations["create_game"];
         delete?: never;
@@ -131,7 +151,7 @@ export interface paths {
         head?: never;
         /**
          * Update Game
-         * @description Rename a game or change its status.
+         * @description Rename a game, change its status or move it between the screen and the table. Moving it to the screen confirms a pending move.
          */
         patch: operations["update_game"];
         trace?: never;
@@ -236,6 +256,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/moves/last/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Move
+         * @description Confirm that the pending agent move, the last move of a game at the table, was made on the physical board, so the game can go on.
+         */
+        post: operations["confirm_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/games/{game_id}/think": {
         parameters: {
             query?: never;
@@ -247,7 +287,7 @@ export interface paths {
         put?: never;
         /**
          * Think
-         * @description Let an agent think about the latest position within a time budget, streaming `info` and `candidate` events and ending with the `decision`. With `commit`, the agent playing the side to move plays its decision in the game. Failures after the stream started end it with an `error` event. Closing the stream stops the agent.
+         * @description Let an agent think about the latest position within a time budget, streaming `info` and `candidate` events and ending with the `decision`. Without `agent`, the agent or hint agent of the side to move thinks. With `commit`, the agent playing the side to move plays its decision in the game, pending at the table until it is confirmed. Failures after the stream started end it with an `error` event. Closing the stream stops the agent.
          */
         post: operations["think"];
         delete?: never;
@@ -260,9 +300,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AgentBudget: number;
         /**
          * AgentPlayer
-         * @description A side played by an agent, whose moves a person executes on the board.
+         * @description A side played by an agent, whose moves are applied or made on the board.
          *
          *     Attributes:
          *         spec: The agent. Its params are checked when a game is created, not when a stored
@@ -272,16 +313,32 @@ export interface components {
          */
         AgentPlayer: {
             spec: components["schemas"]["AgentSpec"];
-            /**
-             * Budget S
-             * @default 5
-             */
-            budget_s: number;
+            /** @default 5 */
+            budget_s: components["schemas"]["AgentBudget"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
             type: "agent";
+        };
+        /**
+         * AgentPreset
+         * @description A tuned agent shipped in `hive.agents.presets`, offered by name.
+         *
+         *     A preset file is a spec in YAML with a `description` next to `kind`, `label` and
+         *     `params`.
+         *
+         *     Attributes:
+         *         name: The name of the preset, which is its file name without `.yaml`.
+         *         description: What the agent is like, in one short sentence.
+         *         spec: The agent, labelled with the preset name unless the file sets a label.
+         */
+        AgentPreset: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            spec: components["schemas"]["AgentSpec"];
         };
         /**
          * AgentRegistration
@@ -348,7 +405,7 @@ export interface components {
          * @description The machine-readable code of an error response.
          * @enum {string}
          */
-        ApiErrorCode: "game_not_found" | "game_not_active" | "ply_out_of_range" | "ply_conflict" | "move_not_legal" | "agent_turn" | "photo_not_found" | "coordinate_empty" | "piece_not_movable" | "no_move_to_undo" | "agent_required" | "commit_not_allowed" | "pool_busy" | "agent_unavailable";
+        ApiErrorCode: "game_not_found" | "game_not_active" | "ply_out_of_range" | "ply_conflict" | "move_not_legal" | "agent_turn" | "photo_not_found" | "coordinate_empty" | "piece_not_movable" | "no_move_to_undo" | "agent_required" | "commit_not_allowed" | "pool_busy" | "agent_unavailable" | "move_pending" | "no_pending_move" | "setup_not_supported";
         /**
          * BoardCell
          * @description One occupied cell of a board in the JSON form of `GameBoard`.
@@ -362,6 +419,15 @@ export interface components {
             /** Stack */
             stack: components["schemas"]["Piece"][];
         };
+        /**
+         * BoardLocation
+         * @description Where a game is played.
+         *
+         *     On the `screen` the app is the board, so agent moves apply at once. At the `table` a
+         *     physical board is played on, so a person makes every agent move on it and confirms it.
+         * @enum {string}
+         */
+        BoardLocation: "screen" | "table";
         /**
          * BoardSetup
          * @description A starting position made in the board editor.
@@ -463,7 +529,12 @@ export interface components {
          *     Attributes:
          *         name: The display name.
          *         white: The white side.
-         *         black: The black side. At least one side must be an agent.
+         *         black: The black side.
+         *         board_location: Where the game is played, or `None` for the default of the
+         *             players: `screen` for agent vs agent, otherwise `table`. Human vs agent
+         *             games may be played at either; human vs human games, which need a hint agent
+         *             on at least one side, only at the `table`; agent vs agent games only on the
+         *             `screen`.
          *         rules: The rules; missing fields take their default.
          *         setup: A starting position from the board editor, or `None` for the initial
          *             state.
@@ -473,6 +544,7 @@ export interface components {
             name: string;
             white: components["schemas"]["PlayerConfig"];
             black: components["schemas"]["PlayerConfig"];
+            board_location?: components["schemas"]["BoardLocation"] | null;
             rules?: components["schemas"]["Rules"];
             setup?: components["schemas"]["BoardSetup"] | null;
         };
@@ -497,9 +569,18 @@ export interface components {
             status: components["schemas"]["GameStatus"];
             white: components["schemas"]["PlayerConfig"];
             black: components["schemas"]["PlayerConfig"];
+            board_location: components["schemas"]["BoardLocation"];
             result: components["schemas"]["GameResult"] | null;
             /** Ply Count */
             ply_count: number;
+            /**
+             * Current Player
+             * @enum {string}
+             */
+            current_player: "white" | "black";
+            current_player_type: components["schemas"]["PlayerType"];
+            /** Pending Move */
+            pending_move: boolean;
             /**
              * Created At
              * Format: date-time
@@ -557,6 +638,9 @@ export interface components {
          *             the game ended or without a coordinate to place on.
          *         must_pass: Whether the side to move has no legal move and must pass, by playing
          *             the move `None`.
+         *         pending_move: Whether the last move of the game, not of the position, waits for
+         *             a person to confirm making it on the physical board. No move can be played
+         *             until it is confirmed or undone.
          */
         GamePosition: {
             /** Ply */
@@ -586,6 +670,8 @@ export interface components {
             placeable_piece_types: ("queen" | "beetle" | "grasshopper" | "spider" | "ant")[];
             /** Must Pass */
             must_pass: boolean;
+            /** Pending Move */
+            pending_move: boolean;
         };
         /**
          * GameRecord
@@ -625,8 +711,13 @@ export interface components {
          *         status: Whether the game is still being played.
          *         white: The white side.
          *         black: The black side.
+         *         board_location: Where the game is played: on the screen or at the table.
          *         result: The result, or `None` while there is none.
          *         ply_count: The number of moves played.
+         *         current_player: The side to move after the last move.
+         *         current_player_type: Whether a person or an agent plays the side to move.
+         *         pending_move: Whether the last move waits for a person to confirm making it on
+         *             the physical board.
          *         created_at: When the game was created.
          *         updated_at: When the game was last changed.
          */
@@ -641,9 +732,18 @@ export interface components {
             status: components["schemas"]["GameStatus"];
             white: components["schemas"]["PlayerConfig"];
             black: components["schemas"]["PlayerConfig"];
+            board_location: components["schemas"]["BoardLocation"];
             result: components["schemas"]["GameResult"] | null;
             /** Ply Count */
             ply_count: number;
+            /**
+             * Current Player
+             * @enum {string}
+             */
+            current_player: "white" | "black";
+            current_player_type: components["schemas"]["PlayerType"];
+            /** Pending Move */
+            pending_move: boolean;
             /**
              * Created At
              * Format: date-time
@@ -662,11 +762,14 @@ export interface components {
          *     Attributes:
          *         name: The new display name.
          *         status: The new status.
+         *         board_location: The new board location, which must suit the players as when
+         *             creating the game. Moving a game to the `screen` confirms a pending move.
          */
         GameUpdate: {
             /** Name */
             name?: string | null;
             status?: components["schemas"]["GameStatus"] | null;
+            board_location?: components["schemas"]["BoardLocation"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -676,13 +779,29 @@ export interface components {
         /** @enum {string} */
         HealthCheckResult: "ok" | "failed";
         /**
-         * HumanPlayer
-         * @description A side played by a person at the table.
+         * HintAgent
+         * @description An agent that suggests moves to the person playing a side, on request.
          *
          *     Attributes:
+         *         spec: The agent. Its params are checked when a game is created, not when a stored
+         *             game is read.
+         *         budget_s: The time budget of every hint in seconds.
+         */
+        HintAgent: {
+            spec: components["schemas"]["AgentSpec"];
+            /** @default 5 */
+            budget_s: components["schemas"]["AgentBudget"];
+        };
+        /**
+         * HumanPlayer
+         * @description A side played by a person, who enters every move of the side.
+         *
+         *     Attributes:
+         *         hint: The agent that suggests moves to the person, or `None` for no hints.
          *         type: Always `human`, which tells the player kinds apart in JSON.
          */
         HumanPlayer: {
+            hint?: components["schemas"]["HintAgent"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -746,6 +865,18 @@ export interface components {
             to: components["schemas"]["Coordinate"];
         };
         /**
+         * MoveConfirm
+         * @description The request body that confirms a pending agent move was made on the board.
+         *
+         *     Attributes:
+         *         expected_ply: The `ply_count` of the game the client saw, so the pending move is
+         *             its last move. If a move was undone meanwhile, the confirmation is rejected.
+         */
+        MoveConfirm: {
+            /** Expected Ply */
+            expected_ply: number;
+        };
+        /**
          * MoveCreate
          * @description The request body that plays a move.
          *
@@ -787,6 +918,8 @@ export interface components {
          *         source: How the move was entered.
          *         photo_id: The photo the move was read from, or `None`.
          *         decision: The decision behind an agent move, or `None`.
+         *         pending: Whether the move is an agent move in a `table` game that waits for a
+         *             person to confirm making it on the physical board.
          *         created_at: When the move was played.
          */
         MoveRead: {
@@ -797,6 +930,8 @@ export interface components {
             /** Photo Id */
             photo_id: string | null;
             decision: components["schemas"]["DecisionRecord"] | null;
+            /** Pending */
+            pending: boolean;
             /**
              * Created At
              * Format: date-time
@@ -853,6 +988,8 @@ export interface components {
             targets: components["schemas"]["Coordinate"][];
         };
         PlayerConfig: components["schemas"]["HumanPlayer"] | components["schemas"]["AgentPlayer"];
+        /** @enum {string} */
+        PlayerType: "human" | "agent";
         /**
          * ReadinessReport
          * @description The answer of the readiness probe.
@@ -1007,9 +1144,11 @@ export interface components {
          * @description The request body that lets an agent think about the latest position of a game.
          *
          *     Attributes:
-         *         agent: The agent that thinks, or `None` for the agent playing the side to move.
-         *         budget_s: The time budget in seconds, or `None` for the budget of the side to
-         *             move. Budgets above the maximum of the service are shortened to it.
+         *         agent: The agent that thinks, or `None` for the agent playing the side to move,
+         *             or the hint agent of a person playing it.
+         *         budget_s: The time budget in seconds, or `None` for the budget of the agent or
+         *             hint agent of the side to move, or 5 s without one. Budgets above the
+         *             maximum of the service are shortened to it.
          *         commit: Whether to play the decided move in the game. Only the agent playing the
          *             side to move may commit, so `agent` must be `None` or its spec.
          */
@@ -1136,6 +1275,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentRegistration"][];
+                };
+            };
+        };
+    };
+    list_agent_presets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPreset"][];
                 };
             };
         };
@@ -1318,13 +1477,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The players and the board location are not a supported setup. Or the request is not valid. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1490,7 +1649,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description The game is not at the expected ply. The game is finished or abandoned. An agent plays the side to move. */
+            /** @description The game is not at the expected ply. The game is finished or abandoned. The last move waits to be confirmed on the board. An agent plays the side to move. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1562,6 +1721,59 @@ export interface operations {
             };
         };
     };
+    confirm_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GamePosition"];
+                };
+            };
+            /** @description Game not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The game is not at the expected ply. The last move does not wait to be confirmed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     think: {
         parameters: {
             query?: never;
@@ -1595,7 +1807,7 @@ export interface operations {
                     "text/event-stream": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description The game is finished or abandoned. Only the agent of the side to move may commit its decision. */
+            /** @description The game is finished or abandoned. Only the agent of the side to move may commit its decision. The last move waits to be confirmed on the board. */
             409: {
                 headers: {
                     [name: string]: unknown;

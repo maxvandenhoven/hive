@@ -4,7 +4,12 @@ import { describe, expect, it } from "vitest";
 import type { GameDetail, GamePosition, Move, ThinkEvent } from "@/api/client";
 import { useGamePosition } from "@/api/queries";
 import { agentTurnReducer, useAgentTurns } from "@/components/useAgentTurns";
-import { controlledEventStream, mockApi, type RecordedRequest } from "@/test/api";
+import {
+  type ApiHandler,
+  controlledEventStream,
+  mockApi,
+  type RecordedRequest,
+} from "@/test/api";
 import { gameDetail, gamePosition } from "@/test/fixtures";
 import { renderQueryHook } from "@/test/render";
 
@@ -50,10 +55,13 @@ interface TurnsProps {
 }
 
 /**
- * Serve thinking streams that the test writes to, one per request, and the latest
- * position, which starts as `initial`.
+ * Serve thinking streams that the test writes to, one per request, the latest position,
+ * which starts as `initial`, and any `extra` routes.
  */
-function mockThinking(initial: GamePosition = BLACK_TO_MOVE) {
+function mockThinking(
+  initial: GamePosition = BLACK_TO_MOVE,
+  extra: Record<string, ApiHandler> = {},
+) {
   const streams: ReturnType<typeof controlledEventStream>[] = [];
   const requests = mockApi({
     [THINK]: ({ signal }) => {
@@ -63,6 +71,7 @@ function mockThinking(initial: GamePosition = BLACK_TO_MOVE) {
       return stream.response;
     },
     [`GET ${GAME_PATH}/state`]: () => ({ body: initial }),
+    ...extra,
   });
 
   return { streams, requests };
@@ -131,6 +140,34 @@ describe("useAgentTurns in a human game", () => {
     expect(result.current.awaitingDone).toBe(false);
     expect(result.current.state).toEqual({ type: "idle" });
     expect(thinkRequests(requests)).toHaveLength(1);
+  });
+
+  it("confirms a pending move with Done", async () => {
+    const pending = { ...WHITE_TO_MOVE, pending_move: true };
+    const { streams, requests } = mockThinking(BLACK_TO_MOVE, {
+      [`POST ${GAME_PATH}/moves/last/confirm`]: () => ({ body: WHITE_TO_MOVE }),
+    });
+    const { result } = renderTurns();
+
+    await waitFor(() => {
+      expect(streams).toHaveLength(1);
+    });
+    act(() => {
+      streams[0]?.send(decision(pending));
+    });
+    await waitFor(() => {
+      expect(result.current.awaitingDone).toBe(true);
+    });
+
+    act(() => {
+      result.current.done();
+    });
+
+    await waitFor(() => {
+      expect(requests.filter((request) => request.path.endsWith("/confirm"))).toEqual([
+        expect.objectContaining({ method: "POST", body: { expected_ply: 4 } }),
+      ]);
+    });
   });
 
   it("does not think on a person's turn", () => {

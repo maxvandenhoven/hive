@@ -8,6 +8,7 @@ from pydantic import Field
 from hive.agents import factory
 from hive.agents.base import Agent, TurnContext
 from hive.agents.factory import (
+    AgentPreset,
     AgentRegistration,
     AgentSpec,
     InvalidAgentSpecError,
@@ -211,6 +212,22 @@ class TestPresets:
     def test_rejects_unknown_preset(self) -> None:
         with pytest.raises(InvalidAgentSpecError, match="Unknown agent preset `nope`"):
             AgentSpec.from_preset("nope")
+
+    def test_loads_presets_with_descriptions(self) -> None:
+        presets = AgentPreset.load_all()
+
+        assert [preset.name for preset in presets] == list_presets()
+        assert all(preset.description for preset in presets)
+        assert presets[0].spec == AgentSpec.from_preset(presets[0].name)
+
+    def test_rejects_preset_without_description(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        (tmp_path / "bare.yaml").write_text("kind: random\n")
+        monkeypatch.setattr(factory, "files", lambda package: tmp_path)
+
+        with pytest.raises(InvalidAgentSpecError, match="needs a `description`"):
+            AgentPreset.load("bare")
 
 
 class TestAgentSpecResolve:

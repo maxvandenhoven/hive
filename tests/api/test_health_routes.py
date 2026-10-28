@@ -3,7 +3,7 @@ from typing import Any
 import httpx2
 import pytest
 
-from hive.agents.factory import list_agents
+from hive.agents.factory import list_agents, list_presets
 from hive.api.storage import ObjectStore
 
 pytestmark = pytest.mark.anyio
@@ -58,3 +58,15 @@ async def test_agent_kinds(offline_client: httpx2.AsyncClient) -> None:
     negamax = next(kind for kind in kinds if kind["kind"] == "negamax")
     assert negamax["description"]
     assert "depth" in negamax["params_schema"]["properties"]
+
+
+async def test_agent_presets(offline_client: httpx2.AsyncClient) -> None:
+    response = await offline_client.get("/api/agents/presets")
+    presets: list[dict[str, Any]] = response.json()
+
+    assert response.status_code == 200
+    assert [preset["name"] for preset in presets] == list_presets()
+
+    nm3 = next(preset for preset in presets if preset["name"] == "nm3")
+    assert nm3["description"]
+    assert nm3["spec"] == {"kind": "negamax", "params": {"depth": 3}, "label": "nm3"}

@@ -24,12 +24,15 @@ from hive.api.errors import (
     GameNotActiveError,
     GameNotFoundError,
     MoveNotLegalError,
+    MovePendingError,
     NoMoveToUndoError,
+    NoPendingMoveError,
     PhotoNotFoundError,
     PieceNotMovableError,
     PlyConflictError,
     PlyOutOfRangeError,
     PoolBusyError,
+    SetupNotSupportedError,
     error_responses,
 )
 from hive.api.routes import API_PREFIX
@@ -41,6 +44,7 @@ from hive.api.schemas import (
     GamePosition,
     GameSummary,
     GameUpdate,
+    MoveConfirm,
     MoveCreate,
     PieceTargets,
     ThinkEvent,
@@ -53,10 +57,12 @@ router = APIRouter(prefix=f"{API_PREFIX}/games", tags=["games"])
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    description="Create a game. At least one side must be an agent.",
+    description="Create a game: human vs agent on the screen or at the table, human vs "
+    "human with a hint agent on at least one side at the table, or agent vs agent on the "
+    "screen.",
 )
 async def create_game(body: GameCreate, games: GameServiceDependency) -> GameDetail:
-    """Create a game. At least one side must be an agent.
+    """Create a game in one of the supported setups.
 
     Args:
         body: The name, players, rules and setup of the game, already validated.
@@ -122,13 +128,14 @@ async def read_game(game_id: uuid.UUID, games: GameServiceDependency) -> GameDet
 
 @router.patch(
     "/{game_id}",
-    description="Rename a game or change its status.",
-    responses=GAME_NOT_FOUND_RESPONSES,
+    description="Rename a game, change its status or move it between the screen and the "
+    "table. Moving it to the screen confirms a pending move.",
+    responses=error_responses(GameNotFoundError, SetupNotSupportedError),
 )
 async def update_game(
     game_id: uuid.UUID, body: GameUpdate, games: GameServiceDependency
 ) -> GameDetail:
-    """Rename a game or change its status.
+    """Rename a game, change its status or move it between the screen and the table.
 
     Args:
         game_id: The game ID.
@@ -140,6 +147,7 @@ async def update_game(
 
     Raises:
         GameNotFoundError: If there is no game with the ID.
+        SetupNotSupportedError: If the players cannot play at the new board location.
     """
     return GameDetail.model_validate(await games.update_game(game_id=game_id, body=body))
 
@@ -266,6 +274,7 @@ async def read_piece_targets(
         GameNotFoundError,
         PlyConflictError,
         GameNotActiveError,
+        MovePendingError,
         AgentTurnError,
         PhotoNotFoundError,
         MoveNotLegalError,
@@ -288,6 +297,7 @@ async def play_move(
         GameNotFoundError: If there is no game with the ID.
         PlyConflictError: If the game is not at the expected ply.
         GameNotActiveError: If the game is finished or abandoned.
+        MovePendingError: If the last move waits to be made on the board.
         AgentTurnError: If an agent plays the side to move without `allow_agent_side`.
         PhotoNotFoundError: If the photo is not a photo of the game.
         MoveNotLegalError: If the move is not legal.
@@ -332,17 +342,47 @@ async def undo_move(
 
 
 @router.post(
+    "/{game_id}/moves/last/confirm",
+    description="Confirm that the pending agent move, the last move of a game at the "
+    "table, was made on the physical board, so the game can go on.",
+    responses=error_responses(GameNotFoundError, PlyConflictError, NoPendingMoveError),
+)
+async def confirm_move(
+    game_id: uuid.UUID, body: MoveConfirm, games: GameServiceDependency
+) -> GamePosition:
+    """Confirm that the pending last move of a game was made on the physical board.
+
+    Args:
+        game_id: The game ID.
+        body: The ply the client expects the game at.
+        games: The game service.
+
+    Returns:
+        The latest position, without a pending move.
+
+    Raises:
+        GameNotFoundError: If there is no game with the ID.
+        PlyConflictError: If the game is not at the expected ply.
+        NoPendingMoveError: If the last move is not pending.
+    """
+    return await games.confirm_move(game_id=game_id, body=body)
+
+
+@router.post(
     "/{game_id}/think",
     response_class=EventSourceResponse,
     description="Let an agent think about the latest position within a time budget, "
-    "streaming `info` and `candidate` events and ending with the `decision`. With "
-    "`commit`, the agent playing the side to move plays its decision in the game. "
+    "streaming `info` and `candidate` events and ending with the `decision`. Without "
+    "`agent`, the agent or hint agent of the side to move thinks. With `commit`, the "
+    "agent playing the side to move plays its decision in the game, pending at the "
+    "table until it is confirmed. "
     "Failures after the stream started end it with an `error` event. Closing the "
     "stream stops the agent.",
     responses=error_responses(
         GameNotFoundError,
         GameNotActiveError,
         CommitNotAllowedError,
+        MovePendingError,
         AgentRequiredError,
         PoolBusyError,
         AgentUnavailableError,
@@ -373,7 +413,10 @@ async def think(
         GameNotActiveError: If the game is finished or abandoned.
         CommitNotAllowedError: If the request commits, but no agent plays the side to
             move or the request names another agent.
-        AgentRequiredError: If a person plays the side to move and no agent is named.
+        MovePendingError: If the request commits while the last move waits to be made
+            on the board.
+        AgentRequiredError: If a person without a hint agent plays the side to move and
+            no agent is named.
         PoolBusyError: If every agent worker stayed busy.
         AgentUnavailableError: If the worker of the agent failed to start.
     """

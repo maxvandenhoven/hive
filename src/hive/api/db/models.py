@@ -11,7 +11,17 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, override
 
-from sqlalchemy import DateTime, Dialect, Enum, ForeignKey, MetaData, String, func, select
+from sqlalchemy import (
+    DateTime,
+    Dialect,
+    Enum,
+    ForeignKey,
+    MetaData,
+    String,
+    exists,
+    func,
+    select,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -22,7 +32,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.types import TypeDecorator
 
-from hive.api.players import PlayerConfig
+from hive.api.players import BoardLocation, PlayerConfig, PlayerType
 from hive.engine.codec import json_adapter
 from hive.engine.record import BoardSetup, GameRecord
 from hive.engine.rules import Rules
@@ -215,6 +225,8 @@ class MoveRow(DatabaseBase):
         source: How the move was entered.
         photo_id: The photo the move was read from, or `None`.
         decision: The decision behind an agent move, or `None`.
+        pending: Whether the move is an agent move in a `table` game that a person has
+            not yet confirmed making on the physical board. Only the last move can be.
         created_at: When the move was played.
         game: The game.
     """
@@ -233,6 +245,7 @@ class MoveRow(DatabaseBase):
     decision: Mapped[DecisionRecord | None] = mapped_column(
         TypedJsonb(DecisionRecord | None, none_as_null=True)
     )
+    pending: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now()
     )
@@ -252,11 +265,14 @@ class GameRow(DatabaseBase):
             state.
         white_player: The white player.
         black_player: The black player.
+        board_location: Where the game is played: on the screen or at the table.
         result: The result, or `None` while there is none.
         created_at: When the game was created.
         updated_at: When the game was last changed.
         ply_count: The number of moves played, counted in SQL so listing games does not
             load the moves.
+        pending_move: Whether the last move waits for a person to confirm making it on
+            the physical board, read in SQL so listing games does not load the moves.
         moves: The moves of the game, ordered by ply.
         photos: The photos taken during the game.
     """
@@ -274,6 +290,9 @@ class GameRow(DatabaseBase):
     )
     white_player: Mapped[PlayerConfig] = mapped_column(TypedJsonb(PlayerConfig))
     black_player: Mapped[PlayerConfig] = mapped_column(TypedJsonb(PlayerConfig))
+    board_location: Mapped[BoardLocation] = mapped_column(
+        text_enum(enum=BoardLocation, name="board_location")
+    )
     result: Mapped[GameResult | None] = mapped_column(
         text_enum(enum=GameResult, name="result")
     )
@@ -291,6 +310,9 @@ class GameRow(DatabaseBase):
         .where(MoveRow.game_id == id)
         .correlate_except(MoveRow)
         .scalar_subquery()
+    )
+    pending_move: Mapped[bool] = column_property(
+        exists().where(MoveRow.game_id == id, MoveRow.pending).correlate_except(MoveRow)
     )
 
     moves: Mapped[list[MoveRow]] = relationship(
@@ -312,6 +334,25 @@ class GameRow(DatabaseBase):
     def photo_prefix(self) -> str:
         """The object key prefix of the photos of the game."""
         return f"photos/{self.id}/"
+
+    @property
+    def current_player(self) -> Player:
+        """The side to move after the last move, derived from `ply_count`.
+
+        Every move, including a pass, hands the turn to the other side, so this does not
+        need the moves loaded.
+        """
+        if self.setup is None:
+            starting = self.rules.starting_player
+        else:
+            starting = self.setup.current_player
+
+        return starting.opponent if self.ply_count % 2 else starting
+
+    @property
+    def current_player_type(self) -> PlayerType:
+        """Whether a person or an agent plays the side to move."""
+        return self.player(self.current_player).type
 
     def player(self, side: Player) -> PlayerConfig:
         """Get the player of a side.

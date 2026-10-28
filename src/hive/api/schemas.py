@@ -15,7 +15,7 @@ from hive.agents.base import SearchInfoValue
 from hive.agents.factory import AgentSpec
 from hive.api.db.models import GameResult, GameRow, GameStatus, MoveSource
 from hive.api.errors import ApiErrorCode
-from hive.api.players import AgentPlayer, HumanPlayer, PlayerConfig
+from hive.api.players import AgentPlayer, BoardLocation, PlayerConfig, PlayerType
 from hive.engine.errors import InvalidBoardError
 from hive.engine.grid import Coordinate
 from hive.engine.record import BoardSetup
@@ -36,7 +36,12 @@ class GameCreate(BaseModel):
     Attributes:
         name: The display name.
         white: The white side.
-        black: The black side. At least one side must be an agent.
+        black: The black side.
+        board_location: Where the game is played, or `None` for the default of the
+            players: `screen` for agent vs agent, otherwise `table`. Human vs agent
+            games may be played at either; human vs human games, which need a hint agent
+            on at least one side, only at the `table`; agent vs agent games only on the
+            `screen`.
         rules: The rules; missing fields take their default.
         setup: A starting position from the board editor, or `None` for the initial
             state.
@@ -47,27 +52,39 @@ class GameCreate(BaseModel):
     name: str = Field(min_length=1, max_length=GAME_NAME_MAX_LENGTH)
     white: PlayerConfig
     black: PlayerConfig
+    board_location: BoardLocation | None = None
     rules: Rules = Field(default_factory=Rules)
     setup: BoardSetup | None = None
 
+    @property
+    def location(self) -> BoardLocation:
+        """The board location of the game, with the default of the players filled in."""
+        if self.board_location is not None:
+            return self.board_location
+
+        return BoardLocation.default_for(white=self.white, black=self.black)
+
     @model_validator(mode="after")
     def validate_game(self) -> Self:
-        """Check the players, the agent params and the setup.
+        """Check the players and the board location, the agent params and the setup.
 
         Returns:
             The request.
 
         Raises:
-            ValueError: If both sides are human, an agent spec is invalid, or the setup
-                is not valid under the rules.
+            ValueError: If the players and the board location are not a supported setup,
+                an agent spec is invalid, or the setup is not valid under the rules.
         """
-        if isinstance(self.white, HumanPlayer) and isinstance(self.black, HumanPlayer):
-            msg = "At least one side must be an agent; human vs human is not supported."
-            raise ValueError(msg)
+        error = self.location.setup_error(white=self.white, black=self.black)
+
+        if error is not None:
+            raise ValueError(error)
 
         for player in (self.white, self.black):
             if isinstance(player, AgentPlayer):
                 player.spec.validate_params()
+            elif player.hint is not None:
+                player.hint.spec.validate_params()
 
         if self.setup is not None:
             try:
@@ -85,12 +102,15 @@ class GameUpdate(BaseModel):
     Attributes:
         name: The new display name.
         status: The new status.
+        board_location: The new board location, which must suit the players as when
+            creating the game. Moving a game to the `screen` confirms a pending move.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=GAME_NAME_MAX_LENGTH)
     status: GameStatus | None = None
+    board_location: BoardLocation | None = None
 
 
 class MoveRead(BaseModel):
@@ -102,6 +122,8 @@ class MoveRead(BaseModel):
         source: How the move was entered.
         photo_id: The photo the move was read from, or `None`.
         decision: The decision behind an agent move, or `None`.
+        pending: Whether the move is an agent move in a `table` game that waits for a
+            person to confirm making it on the physical board.
         created_at: When the move was played.
     """
 
@@ -112,6 +134,7 @@ class MoveRead(BaseModel):
     source: MoveSource
     photo_id: uuid.UUID | None
     decision: DecisionRecord | None
+    pending: bool
     created_at: datetime
 
 
@@ -153,6 +176,19 @@ class MoveCreate(BaseModel):
             raise ValueError(msg)
 
         return self
+
+
+class MoveConfirm(BaseModel):
+    """The request body that confirms a pending agent move was made on the board.
+
+    Attributes:
+        expected_ply: The `ply_count` of the game the client saw, so the pending move is
+            its last move. If a move was undone meanwhile, the confirmation is rejected.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_ply: int = Field(ge=0)
 
 
 class MovablePiece(BaseModel):
@@ -202,6 +238,9 @@ class GamePosition(BaseModel):
             the game ended or without a coordinate to place on.
         must_pass: Whether the side to move has no legal move and must pass, by playing
             the move `None`.
+        pending_move: Whether the last move of the game, not of the position, waits for
+            a person to confirm making it on the physical board. No move can be played
+            until it is confirmed or undone.
     """
 
     ply: int
@@ -215,6 +254,7 @@ class GamePosition(BaseModel):
     placeable_coords: list[Coordinate]
     placeable_piece_types: list[PieceType]
     must_pass: bool
+    pending_move: bool
 
     @classmethod
     def from_state(cls, game: GameRow, state: GameState, ply: int) -> Self:
@@ -254,6 +294,7 @@ class GamePosition(BaseModel):
             placeable_coords=sorted({move.target_coord for move in placements}),
             placeable_piece_types=sorted({move.piece_type for move in placements}),
             must_pass=legal_moves == [None],
+            pending_move=bool(game.moves) and game.moves[-1].pending,
         )
 
 
@@ -266,8 +307,13 @@ class GameSummary(BaseModel):
         status: Whether the game is still being played.
         white: The white side.
         black: The black side.
+        board_location: Where the game is played: on the screen or at the table.
         result: The result, or `None` while there is none.
         ply_count: The number of moves played.
+        current_player: The side to move after the last move.
+        current_player_type: Whether a person or an agent plays the side to move.
+        pending_move: Whether the last move waits for a person to confirm making it on
+            the physical board.
         created_at: When the game was created.
         updated_at: When the game was last changed.
     """
@@ -279,8 +325,12 @@ class GameSummary(BaseModel):
     status: GameStatus
     white: PlayerConfig = Field(validation_alias="white_player")
     black: PlayerConfig = Field(validation_alias="black_player")
+    board_location: BoardLocation
     result: GameResult | None
     ply_count: int
+    current_player: Player
+    current_player_type: PlayerType
+    pending_move: bool
     created_at: datetime
     updated_at: datetime
 
@@ -320,9 +370,11 @@ class ThinkRequest(BaseModel):
     """The request body that lets an agent think about the latest position of a game.
 
     Attributes:
-        agent: The agent that thinks, or `None` for the agent playing the side to move.
-        budget_s: The time budget in seconds, or `None` for the budget of the side to
-            move. Budgets above the maximum of the service are shortened to it.
+        agent: The agent that thinks, or `None` for the agent playing the side to move,
+            or the hint agent of a person playing it.
+        budget_s: The time budget in seconds, or `None` for the budget of the agent or
+            hint agent of the side to move, or 5 s without one. Budgets above the
+            maximum of the service are shortened to it.
         commit: Whether to play the decided move in the game. Only the agent playing the
             side to move may commit, so `agent` must be `None` or its spec.
     """
