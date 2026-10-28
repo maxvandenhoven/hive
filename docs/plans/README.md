@@ -25,16 +25,21 @@ self-contained session prompt. The entry point for a session is: *"Implement iss
 ## 1. Vision
 
 A Python Hive engine with strong agents, exposed through a web app that runs on a homelab
-Kubernetes cluster behind Tailscale. At the table, the app tracks a physical game:
+Kubernetes cluster behind Tailscale. The app is the board on screen, or tracks a physical
+game at the table:
 
-- Each side is either a **human** or an **agent**. Supported setups are human vs agent
-  (play against the agent, or follow the agent's advice against a friend) and agent vs
-  agent (watch a match). Human vs human is not a goal.
+- Each side is either a **human** or an **agent**, and a game is played **on screen** (the
+  app is the board) or **at the table** (a physical board the app follows). Three
+  scenarios are supported (D26): play against an agent (on screen or at the table), play a
+  friend with **hints** from an agent for one or both sides (at the table), and watch two
+  agents (on screen). Human vs human without hints is not a goal.
 - Human moves are entered **manually** (tap a tile, tap a target) or with the **camera**:
   a photo is taken, tiles are detected, and the engine infers which legal move was played.
 - Agent moves are computed within a fixed **time budget**, with the search streamed live to
-  the UI, then executed on the physical board by a person.
-- Utilities: which tiles can move, legal targets for a tile, replay and manage past games.
+  the UI. At the table a person then makes them on the physical board and confirms them.
+- Utilities: which tiles can move, legal targets for a tile, replay and manage past games,
+  a 2D and a 2.5D isometric board with animated moves, and in-app help with a rules
+  reference.
 
 Supporting tracks:
 
@@ -66,8 +71,9 @@ Explicitly out of scope for now (documented under [Future work](#10-future-work)
   starting from a known mid-game position.
 - Training on real photos and a labeling pipeline. The schema already stores everything
   needed to add this later.
-- Human vs human games, pondering, cluster-side gauntlet/render/training jobs, a 3D board
-  renderer (the renderer interface allows adding one later), UHP notation export.
+- Human vs human games without hints, pass-and-play on one device, agent vs agent at the
+  table, pondering, cluster-side gauntlet/render/training jobs, a free-orbit 3D board
+  view, UHP notation export.
 
 ## 3. Architecture overview
 
@@ -125,6 +131,10 @@ Each decision has a short rationale. Topic files go into detail.
 | D23 | Agent classes register a kind with `@register_agent`; the param schema is derived from the constructor signature (`Annotated` constraints, docstring descriptions). Specs are `{kind, label, params}` as YAML or JSON, limited to registered kinds; tuned agents are YAML presets shipped in the package. | One source of truth for params, readable validation errors, nested config for future neural agents, and no arbitrary imports from stored or user-supplied specs. |
 | D24 | Agent strength is its own milestone (M7) after the engine speed round (M6). Every change is measured by gauntlets between agents; the bar is beating an experienced human. | Speed and strength are separate concerns with separate acceptance tests (perft nodes/s versus gauntlet results), and deeper search needs a faster engine first. |
 | D25 | One definition per serialized value: values are plain dataclasses, converted to and from JSON by pydantic (`JsonCodec`, annotations for aliases and strict types). No hand-written converters and no parallel API models of engine, agent or match values. | One source of truth for the engine, agents, match records, the database and the OpenAPI client; dataclasses keep the engine fast and free to change representation. |
+| D26 | Three scenarios, told apart by the players and a `screen` or `table` board location: human vs agent (screen or table), human vs human with a hint agent on at least one human side (table), agent vs agent (screen). The new game flow asks for the scenario instead of a player type per side. | Matches what people want to do. Advice is an optional hint for a human side, not an agent side, so ignoring it is a normal move and hints also work against an agent. |
+| D27 | In table games an agent move is stored as pending until a person confirms it on the physical board (Done, or a matching photo from WP 19). | Closing the app must not lose the fact that the physical board is behind; the game list can show "agent's move to make". |
+| D28 | One theme ("Slate & Honey": slate neutrals, one honey accent, no dark mode) with board colour tokens that each have one meaning (movable, target, forbidden, last move, agent suggestion), shared by both renderers, the legend and the help. | Calmer and clearer than the default near-white look; one meaning per colour makes the board explainable. |
+| D29 | The 2.5D board is a React Three Fiber renderer behind the same props as `SvgBoard`: orthographic camera at a fixed isometric tilt, rotation in 60° steps, the same gestures, marks and transition contract, loaded lazily behind a 2D / 2.5D toggle. | Predictable on a phone (taps never become orbits), and the 2D view does not pay for the 3D libraries. |
 
 ## 5. Target repo structure
 
@@ -174,7 +184,7 @@ a test or a script first).
 | Milestone | Goal | Done when |
 |---|---|---|
 | **M1 Foundation** | Tooling, single package, `Rules`, validated entry points, perft parity, agent interface, timed runner, gauntlet CLI | `make check test` is green, perft matches references at the agreed depths, `hive gauntlet` runs a timed round robin and writes a report |
-| **M2 App** | API, Postgres, Garage, frontend with game management, manual moves, agent turns with streaming, agent vs agent | A full game against an agent can be played and replayed in the browser with manual move entry |
+| **M2 App** | API, Postgres, Garage, frontend with game management, manual moves, agent turns with streaming, agent vs agent; then scenario-based setups with hints, the Slate & Honey theme, board animations, a 2.5D isometric board, help and a rules reference | A full game against an agent can be played and replayed in the browser with manual move entry; each scenario can be started and followed on a phone, in 2D and 2.5D, without outside explanation |
 | **M3 Classical vision** | Photo capture, grid fitting, move matching, classical reader, camera flow, evaluation harness | Camera button proposes the correct move on real photos; `hive vision eval` reports metrics for the classical reader |
 | **M4 Synthetic data and YOLO** | Scene generation, Blender rendering with tilesets, dataset export, YOLO training, ONNX reader, comparison report | YOLO reader is selectable in the app and compared against the classical reader on the real test set |
 | **M5 Deployment** | Docker image, CI release, Kustomize manifests, Argo CD, Tailscale ingress, migrations, metrics | Merging to `main` deploys to the homelab and the app is reachable at `https://hive.<tailnet>.ts.net` |
@@ -208,10 +218,10 @@ issue should not be started.
 | 13 | Frontend foundation and game list | M2 | 10 | #24 |
 | 14 | Game page: board renderer and manual moves | M2 | 11, 13 | #25 |
 | 15 | Agent turns, agent vs agent, replay in the UI | M2 | 12, 14 | #26 |
-| 16 | Photo capture and storage | M3 | 14 | #27 |
+| 16 | Photo capture and storage | M3 | 14, 35 | #27 |
 | 17 | Grid fitting and move matching | M3 | 04 | #28 |
 | 18 | Classical board reader | M3 | 17 | #29 |
-| 19 | Camera move flow in the app | M3 | 15, 16, 18 | #30 |
+| 19 | Camera move flow in the app | M3 | 15, 16, 18, 35 | #30 |
 | 20 | Vision evaluation harness | M3 | 18 | #31 |
 | 21 | Scene generation from random valid games | M4 | 04 | #32 |
 | 22 | Blender renderer with tilesets | M4 | 21 | #33 |
@@ -223,6 +233,17 @@ issue should not be started.
 | 28 | Alpha-beta, transposition table and evaluator tuning | M7 | 09, 27, 30 | #39 |
 | 29 | Autoresearch harness for engine speed | M6 | 27 | #40 |
 | 30 | Repetition draws, repetition-aware search and seeded tie-breaking | M7 | 09, 27 | #55 |
+| 31 | Slate and honey theme and board colour tokens | M2 | 15 | #65 |
+| 32 | Board legibility: background grid, clear marks and a legend | M2 | 31 | #66 |
+| 33 | API game setups: board location, hint agents, pending agent moves | M2 | 12 | #67 |
+| 34 | Scenario-based new game flow and game list | M2 | 31, 33 | #68 |
+| 35 | Scenario-aware game page with hints and stored Done | M2 | 32, 33, 34 | #69 |
+| 36 | Board animations and move arrows | M2 | 32, 35 | #70 |
+| 37 | Help page and contextual help | M2 | 35, 36 | #71 |
+| 38 | Rules reference with engine-checked diagrams | M2 | 37 | #72 |
+| 39 | 2.5D isometric board with bakelite tiles | M2 | 35, 37 | #73 |
+| 40 | Animations in the 2.5D board | M2 | 36, 39 | #74 |
+| 41 | Phone and touch audit | M2 | 38, 40 | #75 |
 
 Dependency graph (arrows mean "unblocks"):
 
@@ -239,6 +260,15 @@ flowchart LR
     WP10 --> WP13
     WP11 & WP13 --> WP14
     WP12 & WP14 --> WP15
+    WP15 --> WP31 --> WP32
+    WP12 --> WP33
+    WP31 & WP33 --> WP34
+    WP32 & WP33 & WP34 --> WP35
+    WP32 & WP35 --> WP36
+    WP35 & WP36 --> WP37 --> WP38
+    WP35 & WP37 --> WP39
+    WP36 & WP39 --> WP40
+    WP38 & WP40 --> WP41
   end
   subgraph M3
     WP17 --> WP18 --> WP20
@@ -261,6 +291,7 @@ flowchart LR
   WP06 --> WP10
   WP08 --> WP12
   WP14 --> WP16
+  WP35 --> WP16 & WP19
   WP04 --> WP17
   WP04 --> WP21
   WP12 & WP13 --> WP25
@@ -270,9 +301,11 @@ flowchart LR
 ```
 
 Recommended order (a valid topological order following the milestones):
-01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-24, 25, 26, then 27, 29, 30, 28. M6 (27, 29) can start any time after 05, and M7 (30, 28)
-after 09 and 27.
+01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 31, 32, 33, 34, 35, 36, 37,
+38, 39, 40, 41, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, then 27, 29, 30, 28. The M2 UI
+round (31–41) follows WP 15; the camera work (16, 19) waits for the scenario-aware game
+page (35), while 17, 18, 20 and M4 can be interleaved. M6 (27, 29) can start any time
+after 05, and M7 (30, 28) after 09 and 27.
 
 ## 8. Session workflow
 
@@ -309,7 +342,7 @@ Not planned in any milestone, but the design keeps these possible:
 - Real-photo training data and a labeling pipeline (Label Studio or CVAT, plus
   pseudo-labels from confirmed app photos).
 - Board setup from a single photo (pre-filling the board editor).
-- 3D board renderer with React Three Fiber.
+- Free-orbit 3D board view beyond the planned fixed-isometric 2.5D renderer.
 - Gauntlets, rendering and training as Kubernetes Jobs.
-- UHP notation import/export, hint button on human turns, pondering.
+- UHP notation import/export and pondering.
 - Rust engine core (see `performance.md`, only if profiling and autoresearch fall short).
