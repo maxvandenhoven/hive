@@ -1,7 +1,7 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GamePosition, Move } from "@/api/client";
+import type { GamePosition, MovablePiece, Move } from "@/api/client";
 import {
   resolveHexClick,
   useBoardInteraction,
@@ -226,6 +226,31 @@ describe("resolveHexClick", () => {
     expect(intent).toEqual({
       type: "play",
       move: { piece: "beetle", from: [0, 0], to: [1, 0] },
+    });
+  });
+
+  it("selects the hinted piece from the hint's target", () => {
+    const movablePieces: MovablePiece[] = [{ coord: [0, 0], piece: "queen" }];
+    const context = { selection: null, movablePieces, highlights: [] };
+
+    expect(
+      resolveHexClick(
+        { ...context, hint: { piece: "queen", from: [0, 0], to: [0, 1] } },
+        [0, 1],
+      ),
+    ).toEqual({
+      type: "select",
+      selection: { type: "board", coord: [0, 0], piece: "queen" },
+    });
+    expect(
+      resolveHexClick(
+        { ...context, hint: { piece: "ant", from: null, to: [0, 1] } },
+        [0, 1],
+      ),
+    ).toEqual({ type: "select", selection: { type: "hand", piece: "ant" } });
+    // Elsewhere, or without a hint, the click means what it always does.
+    expect(resolveHexClick({ ...context, hint: null }, [0, 1])).toEqual({
+      type: "clear",
     });
   });
 });

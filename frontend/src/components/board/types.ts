@@ -35,7 +35,10 @@ export interface BoardRendererProps {
   movable: HexCoord[];
   selected: HexCoord | null;
   lastMove: MoveView | null;
-  /** A move to point out, such as an agent's best move or the move to make next. */
+  /**
+   * A move an agent suggests: its best move while thinking, the move to make on the
+   * table or a hint. They share one mark and never show at once, so it has no kind.
+   */
   proposedMove: MoveView | null;
   /** Hexes marked "not allowed", for the rule diagrams; games leave it out. */
   forbidden?: HexCoord[];
