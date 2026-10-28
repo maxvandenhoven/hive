@@ -40,7 +40,10 @@ frontend/src/
 │  │  ├─ SvgBoard.tsx   # first renderer
 │  │  ├─ PieceTile.tsx  # a piece as a tile (board) or icon (trays, lists); insects.ts
 │  │  ├─ boardMarks.ts  # mark kinds, legend labels, which marks props show
-│  │  ├─ marks.tsx      # the mark components and legend swatches
+│  │  ├─ marks.tsx      # the mark components, move arrows and legend swatches
+│  │  ├─ transition.ts  # the transition contract: which move to animate (WP 36)
+│  │  ├─ arrows.ts      # move arcs and arrow geometry, bent away from the hive
+│  │  ├─ motion.ts      # SVG transition frames and their playback, reduced motion
 │  │  ├─ BoardLegend.tsx # the Key button and legend, shared by renderers and help
 │  │  ├─ grid.ts        # the background hex grid cells in view
 │  │  ├─ colors.ts      # raw values of the board colour tokens, for non-CSS renderers
@@ -79,6 +82,7 @@ interface BoardRendererProps {
   lastMove: MoveView | null;     // from (null for a placement) and to
   proposedMove: MoveView | null; // an agent's best move, the move to make on the table, a hint
   forbidden?: HexCoord[];        // "not allowed" hexes for the rule diagrams; games omit it
+  transition?: BoardTransition | null; // the move to animate (WP 36)
   onHexClick: (coord: HexCoord) => void;
 }
 ```
@@ -124,12 +128,62 @@ apart by shape, dash or fill so it reads without colour:
 | Selected | `selected` | Solid wide halo behind the tile (`--board-movable`) |
 | Can go here | `highlights`, empty hex | Dashed hex with a dot (`--board-target`) |
 | Can climb on top | `highlights`, occupied hex | Dashed ring with a dot on the tile (`--board-target`) |
-| Last move | `lastMove` | Dotted outline with a light fill on from, stronger on to (`--board-last-move`) |
-| Agent suggestion | `proposedMove` | Arrow to a double ring (`--board-suggestion`) |
+| Last move | `lastMove` | A curved arrow from a faint dotted source hex; a placement gets a stronger dotted outline instead (`--board-last-move`) |
+| Agent suggestion | `proposedMove` | A curved arrow from a faint dotted source hex to a double ring; a placement gets only the ring (`--board-suggestion`) |
 | Not allowed | `forbidden` | Hex with a cross (`--board-forbidden`), for the rule diagrams of WP 38 |
 
 The hand trays use the same components: a placeable piece is raised with a ring, the
-selected one has the halo.
+selected one has the halo. A selected tile, on the board or in a tray, also lifts a little
+(`SelectionLift`), and targets fade in.
+
+**Move arrows (WP 36).** One component, `MoveArrow`, draws every move arrow: the last
+move and an agent suggestion (its best move while thinking, the move to make on the
+table, a hint). It is a quadratic curve on a light casing, so it reads over tiles of both
+colours, drawn above the tiles. `moveArc` in `arrows.ts` bends it away from the centre of
+the hive (to the left, seen along the move, when the centre is on the line), by a fifth
+of its length within 0.3 to 1.2 hexes; `moveArrow` starts it 0.25 off the source centre
+and puts its tip 0.8 from the target centre, at the edge of the tile there, so the head
+stays visible. Placements get a highlight, not an arrow. While a move waits to be made on
+the table, the page passes it only as `proposedMove`, not also as `lastMove`; its faint
+source hex shows where the piece still stands on the table.
+
+**Transitions (WP 36).** What to animate is described apart from the renderer, so the
+2.5D board (WP 40) implements the same contract:
+
+```ts
+interface BoardTransition {
+  key: string;                // the ply and the move; a new key starts a new animation
+  kind: "place" | "move" | "climb";
+  piece: Piece;               // the moved piece, on top of `to`
+  from: HexCoord | null;      // null for a placement
+  to: HexCoord;
+}
+```
+
+`useBoardTransition` (`transition.ts`) follows the ply of the position shown: when it
+advances by exactly one (a live move, a committed agent move, a replay step forward), the
+transition is the move that led to it (`boardTransitionOf`); any other change of ply (a
+jump, a step back, undo) clears it, so the new position shows without travel. The first
+position shown has none, and the transition stays the same while the ply does, so a
+refetch never replays it. A pass has nothing to animate. Renderers get the board after
+the move with the transition and must follow these rules:
+
+- **Placement:** the tile drops onto its hex from slightly above, larger and with a soft
+  shadow, and settles with an ease-out (300 ms, no bounce).
+- **Move:** the tile lifts, travels along the arc of its arrow (`moveArc`, so it follows
+  the last-move arrow) and settles (450 ms, ease-in-out with a lift in the middle). A
+  climb ends on top of the stack; the pieces below stay where they are.
+- **Reduced motion** (`prefers-reduced-motion`): the tile fades in on its target while a
+  copy fades out at the source (200 ms). Arrows stay.
+- **Input first:** an animation never delays input or a state change. The board already
+  shows the new position, so the next piece can be selected at once, and a new key
+  cancels a running animation.
+
+`SvgBoard` plays it with `requestAnimationFrame` (`useTransitionAnimation` in
+`motion.ts`): `transitionFrame` is a pure function from the progress to the tile's offset,
+scale and opacity and its shadow, applied to the `transform` attribute of the moved tile,
+which is drawn last so it travels over the others. The selection lift is a separate CSS
+transform, so the two never fight.
 
 **Legend.** `BoardLegend` is a Key button with a small panel that lists the marks on the
 board now first (`boardMarksShown(props)`), then the rest, each with a swatch drawn by
@@ -314,7 +368,7 @@ the time left of the side's budget (counted from when the stream opened), depth,
 (`Win in 3 plies` for forced results), nodes and nodes/s, and the best move so far, which
 the board draws as `proposedMove` (an arrow from its source and a double ring on its
 target). When the decision arrives with its position, the move is stored. On the screen
-play continues at once (WP 36 animates the move in). At the table the API stores the move
+play continues at once and the board animates the move in (WP 36). At the table the API stores the move
 as pending (D27): the prompt asks to make it on the table with **Done**, the board keeps
 pointing at it, and the person cannot play until Done calls
 `POST /moves/last/confirm`. Both follow `pending_move` of the stored position, so the
