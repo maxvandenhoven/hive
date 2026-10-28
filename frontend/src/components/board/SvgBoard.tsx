@@ -18,7 +18,7 @@ import {
   axialToPixel,
   formatHex,
   hexKey,
-  hexPoints,
+  roundedHexPath,
   pixelToAxial,
   sameHex,
 } from "@/components/board/hex";
@@ -27,7 +27,7 @@ import {
   LastMoveMark,
   MovableRing,
   MovableShadow,
-  SelectedHalo,
+  SelectedOutline,
   SuggestionMark,
   TargetMark,
 } from "@/components/board/marks";
@@ -66,7 +66,7 @@ const ZOOM_STEP = 1.25;
 /** How far each piece below the top one peeks out of a stack. */
 const STACK_OFFSET = 0.08;
 
-const RING_POINTS = hexPoints({ x: 0, y: 0 }, TILE_RADIUS);
+const TILE_PATH = roundedHexPath(TILE_RADIUS);
 
 function describePiece(piece: Piece): string {
   return `${SIDE_TITLES[piece.owner]} ${PIECE_NAMES[piece.piece].toLowerCase()}`;
@@ -85,9 +85,9 @@ function StackLayers({ pieces }: { pieces: Piece[] }) {
     .map((piece, index) => ({ piece, depth: index + 1 }))
     .reverse()
     .map(({ piece, depth }) => (
-      <polygon
+      <path
         key={depth}
-        points={RING_POINTS}
+        d={TILE_PATH}
         transform={`translate(${depth * STACK_OFFSET} ${depth * STACK_OFFSET})`}
         strokeWidth={0.04}
         className={cn(TILE_FILL_CLASSES[piece.owner], "stroke-tile-stroke")}
@@ -363,7 +363,7 @@ export function SvgBoard({
           )}
           {selected !== null && (
             <g transform={translate(selected)}>
-              <SelectedHalo />
+              <SelectedOutline />
             </g>
           )}
           {board.map(renderStack)}

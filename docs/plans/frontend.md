@@ -111,7 +111,7 @@ apart by shape, dash or fill so it reads without colour:
 | Mark | Prop | Drawing |
 |---|---|---|
 | Can move | `movable` | Solid ring on the tile, which is raised by a shadow (`--board-movable`) |
-| Selected | `selected` | Solid wide halo behind the tile (`--board-movable`) |
+| Selected | `selected` | Narrow unfilled outline around the rounded tile (`--board-movable`) |
 | Can go here | `highlights`, empty hex | Dashed hex with a dot (`--board-target`) |
 | Can climb on top | `highlights`, occupied hex | Dashed ring with a dot on the tile (`--board-target`) |
 | Last move | `lastMove` | Dotted outline with a light fill on from, stronger on to (`--board-last-move`) |
@@ -119,7 +119,7 @@ apart by shape, dash or fill so it reads without colour:
 | Not allowed | `forbidden` | Hex with a cross (`--board-forbidden`), for the rule diagrams of WP 38 |
 
 The hand trays use the same components: a placeable piece is raised with a ring, the
-selected one has the halo.
+selected one has an unfilled outline.
 
 **Legend.** `BoardLegend` is a Key button with a small panel that lists the marks on the
 board now first (`boardMarksShown(props)`), then the rest, each with a swatch drawn by

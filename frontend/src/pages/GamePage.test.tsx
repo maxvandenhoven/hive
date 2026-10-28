@@ -387,6 +387,30 @@ describe("GamePage", () => {
     expect(screen.getByRole("button", { name: "Place white ant, 2 left" })).toBeEnabled();
   });
 
+  it("lets the person play immediately after an on-screen agent move", async () => {
+    const requests = mockGameApi(
+      { game: gameDetail({ board_location: "screen" }), position: AFTER_ANT },
+      {
+        [`POST ${GAME_PATH}/think`]: () =>
+          new Response(
+            serverSentEvents([
+              { type: "decision", decision: decisionRecord(), position: AFTER_AGENT },
+            ]),
+            { headers: { "Content-Type": "text/event-stream" } },
+          ),
+      },
+    );
+    renderGamePage();
+
+    expect(
+      await screen.findByRole("img", { name: "Black spider at (2, 0)" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Done" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Make this move on the board")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Place white ant, 2 left" })).toBeEnabled();
+    expect(requests.some((request) => request.path.endsWith("/confirm"))).toBe(false);
+  });
+
   it("offers to try again when the agent could not think", async () => {
     let attempts = 0;
     mockGameApi(
