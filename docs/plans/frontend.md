@@ -36,6 +36,7 @@ frontend/src/
 │  │  ├─ types.ts       # BoardRendererProps, view models
 │  │  ├─ SvgBoard.tsx   # first renderer
 │  │  ├─ PieceTile.tsx  # a piece as a tile (board) or icon (trays, lists); insects.ts
+│  │  ├─ colors.ts      # raw values of the board colour tokens, for non-CSS renderers
 │  │  ├─ hex.ts         # axial ↔ pixel math (ported from hive/plotting/svg/geometry.py)
 │  │  ├─ viewBox.ts     # fitting, panning and zooming the SVG viewBox
 │  │  ├─ useViewGestures.ts     # drag to pan, pinch and wheel to zoom
@@ -88,10 +89,10 @@ and placements, so only legal moves are sent. The selection belongs to a ply and
 dropped when the position changes or the board is disabled (agent turn, game over, a move
 being sent).
 
-`SvgBoard` draws tiles (owner colours as in the Python plots, the insect graphic, the
+`SvgBoard` draws tiles (owner colours, the insect graphic, the
 pieces below the top one peeking out, a stack height badge), movable outlines, the
 selected tile, the targets (dashed hexes with a dot, or a ring on an occupied hex) and the
-last move (amber halos on its from and to hexes). Interactive parts are SVG elements with
+last move (halos on its from and to hexes), all in the board colours of [Theme](#theme). Interactive parts are SVG elements with
 `role="button"` and keyboard activation. The view is the SVG `viewBox` in board units, so
 fitting needs no measuring: it fits the stacks plus every neighbouring hex (where all
 targets lie, so the view stays steady while selecting), with a minimum size. Dragging pans
@@ -103,6 +104,58 @@ The insect graphics are imported from `src/hive/assets/svg/` through the `@insec
 alias (`server.fs.allow` admits the folder in dev), so the Python plots and the app share
 one copy. The frontend build therefore needs that folder next to `frontend/`, including in
 the Docker build stage (WP 25).
+
+## Theme
+
+One theme, "Slate & Honey" (D28): cool slate neutrals, a dark slate header and one honey
+accent. No dark mode and no theme switch, so `ui/` has no `dark:` classes and there is no
+`next-themes`. It should feel calm and a bit premium: no illustrations, no bouncy UI.
+
+The tokens live in `frontend/src/index.css` as CSS variables, exposed as Tailwind colours
+(`bg-card`, `ring-board-movable`, `fill-tile-white`). App components style only through
+these tokens and the `ui/` variants, never with one-off colours. Values were adjusted from
+the mockup where WCAG AA needed it (marked *).
+
+| Token | Value | Use |
+|---|---|---|
+| `--background` | `#e8ecf0` | Page |
+| `--foreground` | `#1c2530` | Text (13:1 on the page) |
+| `--muted-foreground` | `#536070`* | Secondary text (≥ 4.5:1 on page, card and secondary) |
+| `--card`, `--popover` | `#f7f9fb` | Cards (`--border` ring and a faint shadow), popovers |
+| `--border` | `#d3dae1` | Card and table borders |
+| `--input` | `#7b8896`* | Input, select and checkbox borders (3:1 on the page) |
+| `--secondary`, `--muted`, `--accent` | `#dfe5eb` | Secondary buttons, finished badges, hovers |
+| `--primary` / `--primary-foreground` | `#e0a526` / `#1c2530` | Primary buttons, active and "your turn" badges, the hand of the side to move |
+| `--ring` | `#a8740c`* | Focus rings: a deeper honey, ≥ 3:1 on page and card |
+| `--destructive` | `#b42828`* | Errors and delete actions (5:1 on the page) |
+| `--header` / `--header-foreground` | `#1c2530` / `#f3f5f7` | App header with the honey hexagon logo |
+
+Honey is for fills, never for text on light surfaces (2:1). Links are foreground text with
+a honey underline. Status badges: active is primary (honey), finished secondary, abandoned
+outline.
+
+**Board colours.** Each board colour has one meaning, shared by the 2D board, the 2.5D
+board (WP 39), the legend (WP 32) and the help. CSS can use the classes; renderers that
+cannot (Three.js) read the same values from `components/board/colors.ts`, which a test
+keeps equal to `index.css`. The Python plots keep their own colours.
+
+| Token | Value | Meaning |
+|---|---|---|
+| `--board-surface` | `#d5dde5` | The board background (the board card) |
+| `--board-grid` | `rgb(28 37 48 / 16%)` | The background hex grid (WP 32) |
+| `--tile-white` / `--tile-black` / `--tile-stroke` | `#f6f1e6` / `#2a2f36` / `#4a5562` | Tiles of each side and their outline |
+| `--board-movable` | `#2b7fd6` | Tiles that can move, and the selection (also the selected hand piece) |
+| `--board-target` | `#2f9e6b` | Where the selection can go; "allowed" in rule diagrams |
+| `--board-forbidden` | `#d64545` | "Not allowed" in rule diagrams |
+| `--board-last-move` | `#e0a526` | The last move |
+| `--board-suggestion` | `#8b5cf6` | A move suggested by an agent: its best move while thinking, the move to make on the table, a hint |
+
+The stack height badge is neutral (card fill, foreground text), since a stack has no
+board meaning of its own.
+
+**Frame.** The header and the page share one frame: up to 96 rem wide on a desktop, one
+column with 16 px gutters on a phone. The right of the header is kept for actions (Help
+arrives in WP 37).
 
 ## Flows
 
