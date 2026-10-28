@@ -36,6 +36,10 @@ frontend/src/
 │  │  ├─ types.ts       # BoardRendererProps, view models
 │  │  ├─ SvgBoard.tsx   # first renderer
 │  │  ├─ PieceTile.tsx  # a piece as a tile (board) or icon (trays, lists); insects.ts
+│  │  ├─ boardMarks.ts  # mark kinds, legend labels, which marks props show
+│  │  ├─ marks.tsx      # the mark components and legend swatches
+│  │  ├─ BoardLegend.tsx # the Key button and legend, shared by renderers and help
+│  │  ├─ grid.ts        # the background hex grid cells in view
 │  │  ├─ colors.ts      # raw values of the board colour tokens, for non-CSS renderers
 │  │  ├─ hex.ts         # axial ↔ pixel math (ported from hive/plotting/svg/geometry.py)
 │  │  ├─ viewBox.ts     # fitting, panning and zooming the SVG viewBox
@@ -65,10 +69,11 @@ props (`const Board: BoardRenderer = SvgBoard`):
 interface BoardRendererProps {
   board: BoardView;              // stacks per hex, top piece first
   highlights: HexCoord[];        // where a click plays a move: targets or placements
-  movable: HexCoord[];           // tiles that may move (outlined)
+  movable: HexCoord[];           // tiles that may move (ringed and raised)
   selected: HexCoord | null;
   lastMove: MoveView | null;     // from (null for a placement) and to
   proposedMove: MoveView | null; // an agent's best move, or the move to make on the board
+  forbidden?: HexCoord[];        // "not allowed" hexes for the rule diagrams; games omit it
   onHexClick: (coord: HexCoord) => void;
 }
 ```
@@ -89,12 +94,39 @@ and placements, so only legal moves are sent. The selection belongs to a ply and
 dropped when the position changes or the board is disabled (agent turn, game over, a move
 being sent).
 
-`SvgBoard` draws tiles (owner colours, the insect graphic, the
-pieces below the top one peeking out, a stack height badge), movable outlines, the
-selected tile, the targets (dashed hexes with a dot, or a ring on an occupied hex) and the
-last move (halos on its from and to hexes), all in the board colours of [Theme](#theme). Interactive parts are SVG elements with
-`role="button"` and keyboard activation. The view is the SVG `viewBox` in board units, so
-fitting needs no measuring: it fits the stacks plus every neighbouring hex (where all
+`SvgBoard` draws a background hex grid (`--board-grid` on `--board-surface`), then tiles
+(owner colours, the insect graphic, the pieces below the top one peeking out, a stack
+height badge) and the marks, all in the board colours of [Theme](#theme). The grid is one
+path of the hexes that overlap the visible part of the board (`gridCells` in `grid.ts`),
+recomputed from the `viewBox` and the SVG's measured size (`visibleViewBox`, since a
+`meet` viewBox shows more along the longer side), with a non-scaling 1.25 px stroke so it
+reads at every zoom level.
+
+**Marks.** One mark per meaning (`marks.tsx`, kinds in `boardMarks.ts`), each also told
+apart by shape, dash or fill so it reads without colour:
+
+| Mark | Prop | Drawing |
+|---|---|---|
+| Can move | `movable` | Solid ring on the tile, which is raised by a shadow (`--board-movable`) |
+| Selected | `selected` | Solid wide halo behind the tile (`--board-movable`) |
+| Can go here | `highlights`, empty hex | Dashed hex with a dot (`--board-target`) |
+| Can climb on top | `highlights`, occupied hex | Dashed ring with a dot on the tile (`--board-target`) |
+| Last move | `lastMove` | Dotted outline with a light fill on from, stronger on to (`--board-last-move`) |
+| Agent suggestion | `proposedMove` | Arrow to a double ring (`--board-suggestion`) |
+| Not allowed | `forbidden` | Hex with a cross (`--board-forbidden`), for the rule diagrams of WP 38 |
+
+The hand trays use the same components: a placeable piece is raised with a ring, the
+selected one has the halo.
+
+**Legend.** `BoardLegend` is a Key button with a small panel that lists the marks on the
+board now first (`boardMarksShown(props)`), then the rest, each with a swatch drawn by
+`MarkSwatch` from the mark components themselves, so they always match. Whether it is
+open is remembered per device (`localStorage`). A renderer places it on the board (the 2D
+board at the bottom left); the 2.5D board (WP 39) and the help (WP 37) reuse it and
+`MarkSwatch`. On a phone the panel leaves out the one-line descriptions.
+
+Interactive parts are SVG elements with `role="button"` and keyboard activation. The view
+is the SVG `viewBox` in board units, so fitting needs no measuring: it fits the stacks plus every neighbouring hex (where all
 targets lie, so the view stays steady while selecting), with a minimum size. Dragging pans
 (after a 6 px threshold, so taps stay clicks), two pointers pinch to zoom, the mouse wheel
 and the buttons zoom; the view then stays put until the fit button. The SVG has
