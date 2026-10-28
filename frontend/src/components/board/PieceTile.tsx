@@ -1,6 +1,7 @@
 import type { Piece } from "@/api/client";
 import { hexPoints } from "@/components/board/hex";
-import { INSECT_IMAGE_URLS, TILE_COLORS, TILE_STROKE } from "@/components/board/insects";
+import { TILE_FILL_CLASSES } from "@/components/board/colors";
+import { INSECT_IMAGE_URLS } from "@/components/board/insects";
 import { cn } from "@/lib/utils";
 
 /** The radius of a tile, a little smaller than its hex so neighbours stay apart. */
@@ -15,9 +16,8 @@ export function PieceTile({ piece }: { piece: Piece }) {
     <g>
       <polygon
         points={TILE_POINTS}
-        fill={TILE_COLORS[piece.owner]}
-        stroke={TILE_STROKE}
         strokeWidth={0.04}
+        className={cn(TILE_FILL_CLASSES[piece.owner], "stroke-tile-stroke")}
       />
       <image
         href={INSECT_IMAGE_URLS[piece.piece]}

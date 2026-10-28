@@ -3,8 +3,6 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: "Geist Variable", sans-serif;
@@ -39,6 +37,18 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+  --color-board-surface: var(--board-surface);
+  --color-board-grid: var(--board-grid);
+  --color-tile-white: var(--tile-white);
+  --color-tile-black: var(--tile-black);
+  --color-tile-stroke: var(--tile-stroke);
+  --color-board-movable: var(--board-movable);
+  --color-board-target: var(--board-target);
+  --color-board-forbidden: var(--board-forbidden);
+  --color-board-last-move: var(--board-last-move);
+  --color-board-suggestion: var(--board-suggestion);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,77 +59,58 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Slate & Honey, see the Theme section of docs/plans/frontend.md. */
+  --background: #e8ecf0;
+  --foreground: #1c2530;
+  --card: #f7f9fb;
+  --card-foreground: #1c2530;
+  --popover: #f7f9fb;
+  --popover-foreground: #1c2530;
+  --primary: #e0a526;
+  --primary-foreground: #1c2530;
+  --secondary: #dfe5eb;
+  --secondary-foreground: #1c2530;
+  --muted: #dfe5eb;
+  --muted-foreground: #536070;
+  --accent: #dfe5eb;
+  --accent-foreground: #1c2530;
+  --destructive: #b42828;
+  --border: #d3dae1;
+  --input: #7b8896;
+  --ring: #a8740c;
+  --chart-1: #e0a526;
+  --chart-2: #2b7fd6;
+  --chart-3: #2f9e6b;
+  --chart-4: #8b5cf6;
+  --chart-5: #5d6b7a;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  --sidebar: #1c2530;
+  --sidebar-foreground: #f3f5f7;
+  --sidebar-primary: #e0a526;
+  --sidebar-primary-foreground: #1c2530;
+  --sidebar-accent: #2a3542;
+  --sidebar-accent-foreground: #f3f5f7;
+  --sidebar-border: #2a3542;
+  --sidebar-ring: #e0a526;
+  --header: #1c2530;
+  --header-foreground: #f3f5f7;
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Board colours, one meaning each; mirrored in components/board/colors.ts. */
+  --board-surface: #d5dde5;
+  --board-grid: rgb(28 37 48 / 16%);
+  --tile-white: #f6f1e6;
+  --tile-black: #2a2f36;
+  --tile-stroke: #4a5562;
+  --board-movable: #2b7fd6;
+  --board-target: #2f9e6b;
+  --board-forbidden: #d64545;
+  --board-last-move: #e0a526;
+  --board-suggestion: #8b5cf6;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
