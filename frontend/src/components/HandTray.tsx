@@ -33,8 +33,8 @@ export function HandTray({
     <section
       aria-label={`${SIDE_TITLES[side]} hand`}
       className={cn(
-        "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 ring-1 ring-foreground/10",
-        toMove && "bg-muted/60 ring-foreground/25",
+        "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-card px-3 py-2 ring-1 ring-border",
+        toMove && "ring-2 ring-primary",
       )}
     >
       <div className="flex min-w-24 flex-col text-sm leading-tight">
@@ -57,7 +57,7 @@ export function HandTray({
                   "h-11 gap-1 px-1.5 tabular-nums",
                   // Only pieces that cannot be placed on this turn look disabled.
                   placeable.length === 0 && "disabled:opacity-100",
-                  selected === piece && "ring-2 ring-sky-500",
+                  selected === piece && "ring-2 ring-board-movable",
                 )}
                 onClick={() => {
                   onSelect(piece);

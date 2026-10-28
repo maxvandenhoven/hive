@@ -17,7 +17,7 @@ import {
   pixelToAxial,
   sameHex,
 } from "@/components/board/hex";
-import { TILE_COLORS, TILE_STROKE } from "@/components/board/insects";
+import { TILE_FILL_CLASSES } from "@/components/board/colors";
 import { PieceIcon, PieceTile, TILE_RADIUS } from "@/components/board/PieceTile";
 import type {
   BoardRendererProps,
@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/popover";
 import { PIECE_NAMES } from "@/lib/moves";
 import { SIDE_TITLES } from "@/lib/players";
+import { cn } from "@/lib/utils";
 
 /** The narrowest view, about two hexes across. */
 const MIN_VIEW_WIDTH = 4;
@@ -81,9 +82,8 @@ function StackLayers({ pieces }: { pieces: Piece[] }) {
         key={depth}
         points={RING_POINTS}
         transform={`translate(${depth * STACK_OFFSET} ${depth * STACK_OFFSET})`}
-        fill={TILE_COLORS[piece.owner]}
-        stroke={TILE_STROKE}
         strokeWidth={0.04}
+        className={cn(TILE_FILL_CLASSES[piece.owner], "stroke-tile-stroke")}
       />
     ));
 }
@@ -91,13 +91,13 @@ function StackLayers({ pieces }: { pieces: Piece[] }) {
 function StackBadge({ height }: { height: number }) {
   return (
     <g transform="translate(0.52 -0.56)" aria-hidden="true">
-      <circle r={0.25} fill="white" stroke="#CC4444" strokeWidth={0.04} />
+      <circle r={0.25} strokeWidth={0.04} className="fill-card stroke-foreground" />
       <text
         fontSize={0.3}
         fontWeight="bold"
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#CC4444"
+        className="fill-foreground"
       >
         {height}
       </text>
@@ -125,7 +125,7 @@ function ProposedMove({ move, arrowId }: { move: MoveView; arrowId: string }) {
         strokeWidth={0.14}
         strokeLinecap="round"
         markerEnd={`url(#${arrowId})`}
-        className="stroke-violet-500"
+        className="stroke-board-suggestion"
       />
     );
   }
@@ -142,7 +142,7 @@ function ProposedMove({ move, arrowId }: { move: MoveView; arrowId: string }) {
           markerHeight="3"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" className="fill-violet-500" />
+          <path d="M 0 0 L 10 5 L 0 10 z" className="fill-board-suggestion" />
         </marker>
       </defs>
       {arrow}
@@ -151,7 +151,7 @@ function ProposedMove({ move, arrowId }: { move: MoveView; arrowId: string }) {
         transform={`translate(${to.x} ${to.y})`}
         fill="none"
         strokeWidth={0.12}
-        className="stroke-violet-500"
+        className="stroke-board-suggestion"
       />
     </g>
   );
@@ -302,7 +302,7 @@ export function SvgBoard({
             points={RING_POINTS}
             fill="none"
             strokeWidth={0.08}
-            className="stroke-sky-500"
+            className="stroke-board-movable"
           />
         )}
         {height > 1 && <StackBadge height={height} />}
@@ -331,17 +331,17 @@ export function SvgBoard({
           <polygon
             points={RING_POINTS}
             strokeWidth={0.12}
-            className="fill-emerald-500/20 stroke-emerald-500"
+            className="fill-board-target/20 stroke-board-target"
           />
         ) : (
           <polygon
             points={TARGET_POINTS}
             strokeWidth={0.05}
             strokeDasharray="0.15 0.1"
-            className="fill-emerald-500/15 stroke-emerald-600"
+            className="fill-board-target/15 stroke-board-target"
           />
         )}
-        <circle r={0.16} className="fill-emerald-600" />
+        <circle r={0.16} className="fill-board-target" />
       </g>
     );
   };
@@ -369,21 +369,21 @@ export function SvgBoard({
             <polygon
               points={HALO_POINTS}
               transform={translate(lastMove.from)}
-              className="fill-amber-400/35"
+              className="fill-board-last-move/35"
             />
           )}
           {lastMove !== null && (
             <polygon
               points={HALO_POINTS}
               transform={translate(lastMove.to)}
-              className="fill-amber-400/70"
+              className="fill-board-last-move/70"
             />
           )}
           {selected !== null && (
             <polygon
               points={HALO_POINTS}
               transform={translate(selected)}
-              className="fill-sky-500"
+              className="fill-board-movable"
             />
           )}
           {board.map(renderStack)}

@@ -143,7 +143,7 @@ export function ThinkingPanel({ game, position, turns }: ThinkingPanelProps) {
       size="sm"
       role="region"
       aria-label="Agent thinking"
-      className={turns.awaitingDone ? "ring-2 ring-violet-500" : undefined}
+      className={turns.awaitingDone ? "ring-2 ring-board-suggestion" : undefined}
     >
       <CardHeader>
         <CardTitle>
