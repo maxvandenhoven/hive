@@ -35,6 +35,8 @@ export interface BoardRendererProps {
   movable: HexCoord[];
   selected: HexCoord | null;
   lastMove: MoveView | null;
+  /** A move to point out, such as an agent's best move or the move to make next. */
+  proposedMove: MoveView | null;
   onHexClick: (coord: HexCoord) => void;
 }
 

@@ -26,6 +26,7 @@ function renderBoard(props: Partial<BoardRendererProps> = {}) {
       movable={[]}
       selected={null}
       lastMove={null}
+      proposedMove={null}
       onHexClick={onHexClick}
       {...props}
     />,
@@ -128,6 +129,7 @@ describe("SvgBoard", () => {
         movable={[]}
         selected={null}
         lastMove={null}
+        proposedMove={null}
         onHexClick={vi.fn()}
       />,
     );
@@ -140,6 +142,7 @@ describe("SvgBoard", () => {
         movable={[]}
         selected={null}
         lastMove={null}
+        proposedMove={null}
         onHexClick={vi.fn()}
       />,
     );

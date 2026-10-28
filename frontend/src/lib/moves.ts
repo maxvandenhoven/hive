@@ -1,4 +1,4 @@
-import type { BoardCell, GameDetail, Move, MoveRead, PieceType } from "@/api/client";
+import type { BoardCell, GameDetail, Move, PieceType } from "@/api/client";
 import { formatHex } from "@/components/board/hex";
 import type { BoardView, MoveView } from "@/components/board/types";
 import type { PlayerSide } from "@/lib/players";
@@ -51,11 +51,7 @@ export function toBoardView(cells: BoardCell[]): BoardView {
   return cells.map((cell) => ({ coord: cell.coord, pieces: [...cell.stack].reverse() }));
 }
 
-/** The move to mark on the board, or `null` at the start and after a pass. */
-export function toMoveView(move: MoveRead | null): MoveView | null {
-  if (move?.move == null) {
-    return null;
-  }
-
-  return { from: move.move.from, to: move.move.to };
+/** The move to mark on the board, or `null` for none, such as after a pass. */
+export function toMoveView(move: Move | null | undefined): MoveView | null {
+  return move == null ? null : { from: move.from, to: move.to };
 }

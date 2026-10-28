@@ -1,5 +1,12 @@
 import { ScanIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react";
-import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 
 import type { Piece } from "@/api/client";
 import {
@@ -12,7 +19,12 @@ import {
 } from "@/components/board/hex";
 import { TILE_COLORS, TILE_STROKE } from "@/components/board/insects";
 import { PieceIcon, PieceTile, TILE_RADIUS } from "@/components/board/PieceTile";
-import type { BoardRendererProps, BoardStack, HexCoord } from "@/components/board/types";
+import type {
+  BoardRendererProps,
+  BoardStack,
+  HexCoord,
+  MoveView,
+} from "@/components/board/types";
 import { screenToBoard, useViewGestures } from "@/components/board/useViewGestures";
 import {
   fitViewBox,
@@ -93,6 +105,58 @@ function StackBadge({ height }: { height: number }) {
   );
 }
 
+/** An arrow from where a proposed move starts and a ring where it ends. */
+function ProposedMove({ move, arrowId }: { move: MoveView; arrowId: string }) {
+  const to = axialToPixel(move.to);
+  let arrow = null;
+
+  if (move.from !== null) {
+    const from = axialToPixel(move.from);
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+    // End the line at the ring, so the arrowhead stays visible.
+    const end = length > 0 ? (length - TILE_RADIUS * 0.75) / length : 0;
+
+    arrow = (
+      <line
+        x1={from.x}
+        y1={from.y}
+        x2={from.x + (to.x - from.x) * end}
+        y2={from.y + (to.y - from.y) * end}
+        strokeWidth={0.14}
+        strokeLinecap="round"
+        markerEnd={`url(#${arrowId})`}
+        className="stroke-violet-500"
+      />
+    );
+  }
+
+  return (
+    <g pointerEvents="none" opacity={0.9} aria-hidden="true">
+      <defs>
+        <marker
+          id={arrowId}
+          viewBox="0 0 10 10"
+          refX="5"
+          refY="5"
+          markerWidth="3"
+          markerHeight="3"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" className="fill-violet-500" />
+        </marker>
+      </defs>
+      {arrow}
+      <polygon
+        points={RING_POINTS}
+        transform={`translate(${to.x} ${to.y})`}
+        fill="none"
+        strokeWidth={0.12}
+        className="stroke-violet-500"
+      />
+    </g>
+  );
+}
+
 /** The SVG attributes that make a part of the board a button. */
 function buttonProps(
   label: string,
@@ -127,9 +191,11 @@ export function SvgBoard({
   movable,
   selected,
   lastMove,
+  proposedMove,
   onHexClick,
 }: BoardRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const arrowId = useId();
   const fitted = useMemo(() => fitViewBox(board.map((stack) => stack.coord)), [board]);
   const limits = useMemo(
     () => ({
@@ -322,6 +388,9 @@ export function SvgBoard({
           )}
           {board.map(renderStack)}
           {highlights.map(renderTarget)}
+          {proposedMove !== null && (
+            <ProposedMove move={proposedMove} arrowId={arrowId} />
+          )}
           {openStack !== undefined && (
             <PopoverAnchor asChild>
               <circle

@@ -27,7 +27,8 @@ frontend/src/
 ├─ api/                 # schema.ts (generated), client.ts, queries.ts (TanStack hooks),
 │                       # queryClient.ts (failed mutations become toasts), sse.ts
 ├─ lib/                 # agentParams.ts (param forms from JSON schema), players.ts, time.ts,
-│                       # moves.ts (move descriptions, side at a ply, board view models)
+│                       # moves.ts (move descriptions, side at a ply, board view models),
+│                       # search.ts (search info summaries and formatting)
 ├─ test/                # setup.ts (jsdom polyfills for Radix), fixtures, fetch mock, render
 ├─ components/
 │  ├─ ui/               # shadcn/ui primitives: Button, Dialog, Field, Popover, Sonner, ...
@@ -40,9 +41,10 @@ frontend/src/
 │  │  ├─ useViewGestures.ts     # drag to pan, pinch and wheel to zoom
 │  │  └─ useBoardInteraction.ts # selection → targets → move
 │  ├─ HandTray.tsx  MoveList.tsx  GameHeader.tsx  GameOverBanner.tsx
+│  ├─ useAgentTurns.ts  ThinkingPanel.tsx  MatchControls.tsx  ReplayControls.tsx
 │  ├─ PlayerSetup.tsx  AgentPicker.tsx  AgentParamInput.tsx  GameStatusBadge.tsx
 │  ├─ NewGameDialog.tsx  RenameGameDialog.tsx  DeleteGameDialog.tsx  GamesTable.tsx
-│  ├─ ThinkingPanel.tsx  CameraCapture.tsx  MatchCandidates.tsx  ReplayControls.tsx
+│  ├─ CameraCapture.tsx  MatchCandidates.tsx
 ├─ pages/               # GamesPage.tsx, GamePage.tsx, NotFoundPage.tsx
 ├─ App.tsx              # router (`/`, `/games/:gameId`) and query client
 └─ main.tsx
@@ -65,6 +67,7 @@ interface BoardRendererProps {
   movable: HexCoord[];           // tiles that may move (outlined)
   selected: HexCoord | null;
   lastMove: MoveView | null;     // from (null for a placement) and to
+  proposedMove: MoveView | null; // an agent's best move, or the move to make on the board
   onHexClick: (coord: HexCoord) => void;
 }
 ```
@@ -122,10 +125,13 @@ desktop the header, actions and moves sit in a side panel. Manual entry by tappi
 described under "Board rendering"; a **Pass** button appears when the API reports
 `must_pass`. Moves are sent with `expected_ply` set to the `ply_count` of the position
 shown and undo with `?expected_ply=`, so a stale page cannot overwrite a newer game: the
-409 is shown as a toast and the game is refetched. A move or undo stores the returned
-position as the latest, drops cached targets and refreshes the game and the game list.
-Agent sides are read-only (their turns come with WP 15). A game over banner shows the
-result (undo reopens the game); abandoned games are read-only.
+409 is shown as a toast and the game is refetched. A move, undo or committed agent
+decision stores the returned position as the latest, drops cached targets and stored
+positions from that ply on, and refreshes the game and the game list. In a human vs agent
+game, undo takes back to the person's last turn (two moves when the agent answered), so
+the agent does not replay its answer at once; several plies are undone in one mutation.
+A game over banner shows the result (undo reopens the game); abandoned games are
+read-only.
 
 Query notes: positions (`["games", "detail", id, "position", ply | "latest"]`) and targets
 live under the game's key, so refreshing a game refreshes them. Queries whose `meta` sets
@@ -133,17 +139,35 @@ live under the game's key, so refreshing a game refreshes them. Queries whose `m
 click). openapi-fetch reads tuples such as `Coordinate` as plain arrays, so responses with
 coordinates are cast to their schema types in `queries.ts`.
 
-**Game page, agent turn (WP 15).** The page calls `POST /think` with `commit=true`; the
-`ThinkingPanel` shows depth, score, nodes/s and the current best move live. Once committed,
-the move is highlighted on the board with a "Make this move on the board" prompt and a
-**Done** button (from WP 19, alternatively the camera to verify).
+**Game page, agent turn (WP 15).** `useAgentTurns` starts `POST /think` with
+`commit=true` whenever an agent is to move in an active game and no other write is under
+way. `api/sse.ts` reads the stream from `fetch` (`EventSource` only supports GET):
+`ServerSentEventParser` turns chunks into event data, `streamThinkEvents` yields the typed
+events and throws an `ApiRequestError` for an error response. The `ThinkingPanel` shows
+the time left of the side's budget (counted from when the stream opened), depth, score
+(`Win in 3 plies` for forced results), nodes and nodes/s, and the best move so far, which
+the board draws as `proposedMove` (an arrow from its source and a ring on its target).
+When the decision arrives with its position, the move is stored and, in a human vs agent
+game, the panel asks to "Make this move on the board" with a **Done** button (from WP 19,
+alternatively the camera to verify); the board keeps pointing at the move and the person
+cannot play until Done. A failed request or an `error` event (for example `ply_conflict`)
+is shown as a toast and in the panel with **Try again**, and the game is refetched. The
+stream is aborted, which stops the agent without committing, when the page closes,
+another write starts (undo while the agent thinks) or a match pauses. The Done prompt
+lives in the page only, so reloading skips it.
 
-**Agent vs agent (WP 15).** Play/pause toggle and step button; the frontend drives the
-loop by calling `think` with `commit=true` for whichever side is to move. Optional delay
-between moves.
+**Agent vs agent (WP 15).** `MatchControls`: **Play**/**Pause**, **Step** (one move while
+paused) and a delay between moves (none, 1, 2 or 5 s, default 1 s). The page drives the
+loop by calling `think` with `commit=true` for whichever side is to move. Matches do not
+wait for Done, since they are watched on the screen; Step plays one move at a time for
+following on a physical board. A match starts paused, and undo pauses it.
 
-**Replay (WP 15).** `ReplayControls` scrub through plies using `GET /state?ply=N`; works for
-finished and active games.
+**Replay (WP 15).** `ReplayControls` (first, previous, next, live and a slider) and the
+move list (a move shows the position after it) set the ply shown, loaded with
+`GET /state?ply=N`; the position shown before stays while the next one loads. The last ply
+is the live position, which follows new moves; a replayed ply past the last move (after
+an undo) shows the live one. Replayed positions are read-only and marked on the board,
+while agent turns carry on in the live game.
 
 **Camera (WP 16, WP 19).** A camera button on human turns opens `CameraCapture`
 (`<input type="file" accept="image/*" capture="environment">` first; a `getUserMedia`

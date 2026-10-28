@@ -1,4 +1,5 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import {
   api,
@@ -27,6 +28,7 @@ export const queryKeys = {
   gamePages: ["games", "page"] as const,
   gamePage: (limit: number, offset: number) => ["games", "page", limit, offset] as const,
   game: (gameId: string) => ["games", "detail", gameId] as const,
+  gamePositions: (gameId: string) => ["games", "detail", gameId, "position"] as const,
   gamePosition: (gameId: string, ply: number | null) =>
     ["games", "detail", gameId, "position", ply ?? "latest"] as const,
   gameTargets: (gameId: string) => ["games", "detail", gameId, "targets"] as const,
@@ -104,7 +106,12 @@ export function useDeleteGame() {
   });
 }
 
-/** The position of a game after `ply` moves, or the latest position for `null`. */
+/**
+ * The position of a game after `ply` moves, or the latest position for `null`.
+ *
+ * While another ply of the same game loads, the position shown before stays, so
+ * scrubbing through a replay does not flash.
+ */
 export function useGamePosition(gameId: string, ply: number | null = null) {
   return useQuery({
     queryKey: queryKeys.gamePosition(gameId, ply),
@@ -114,6 +121,8 @@ export function useGamePosition(gameId: string, ply: number | null = null) {
           params: { path: { game_id: gameId }, query: ply === null ? {} : { ply } },
         }),
       ) as GamePosition,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2] === gameId ? previous : undefined,
   });
 }
 
@@ -143,30 +152,45 @@ export function usePieceTargets(gameId: string, ply: number, coord: Coordinate |
 }
 
 /**
- * Keep the position a move or undo returned as the latest one.
+ * Keep a position the API returned after a write (a move, an undo or a committed agent
+ * decision) as the latest one.
  *
- * Targets of earlier positions are dropped, since the position at a ply changes when a
- * move is undone and another one played. The game and the game list are refreshed for
- * the moves, status and ply count.
+ * Targets and stored positions from this ply on are dropped, since the position at a
+ * ply changes when a move is undone and another one played. The game and the game list
+ * are refreshed for the moves, status and ply count.
  */
-function useStoreLatestPosition(gameId: string) {
+export function useStoreLatestPosition(gameId: string) {
   const queryClient = useQueryClient();
 
-  return async (position: GamePosition) => {
-    queryClient.setQueryData(queryKeys.gamePosition(gameId, null), position);
-    queryClient.removeQueries({ queryKey: queryKeys.gameTargets(gameId) });
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.game(gameId), exact: true }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.gamePages }),
-    ]);
-  };
+  return useCallback(
+    async (position: GamePosition) => {
+      queryClient.setQueryData(queryKeys.gamePosition(gameId, null), position);
+      queryClient.removeQueries({ queryKey: queryKeys.gameTargets(gameId) });
+      queryClient.removeQueries({
+        queryKey: queryKeys.gamePositions(gameId),
+        predicate: ({ queryKey }) => {
+          const ply = queryKey[4];
+
+          return typeof ply === "number" && ply >= position.ply_count;
+        },
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.game(gameId), exact: true }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.gamePages }),
+      ]);
+    },
+    [queryClient, gameId],
+  );
 }
 
 /** Refresh everything about a game, after a write failed because it changed. */
-function useRefreshGame(gameId: string) {
+export function useRefreshGame(gameId: string) {
   const queryClient = useQueryClient();
 
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.game(gameId) });
+  return useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.game(gameId) }),
+    [queryClient, gameId],
+  );
 }
 
 /** Play a move entered by hand at the expected ply, returning the new position. */
@@ -187,18 +211,40 @@ export function usePlayMove(gameId: string) {
   });
 }
 
-/** Undo the last move if the game is at the expected ply, returning the new position. */
+interface UndoRequest {
+  /** The ply the game must be at, which is the `ply_count` of the position shown. */
+  expectedPly: number;
+  /** How many moves to take back, one after another. */
+  plies: number;
+}
+
+/**
+ * Undo the last moves if the game is at the expected ply, returning the new position.
+ *
+ * Several plies are undone in one mutation, so nothing reacts to the positions between.
+ */
 export function useUndoMove(gameId: string) {
   const storeLatestPosition = useStoreLatestPosition(gameId);
   const refreshGame = useRefreshGame(gameId);
 
   return useMutation({
-    mutationFn: async (expectedPly: number) =>
-      unwrap(
-        await api.DELETE("/api/games/{game_id}/moves/last", {
-          params: { path: { game_id: gameId }, query: { expected_ply: expectedPly } },
-        }),
-      ) as GamePosition,
+    mutationFn: async ({ expectedPly, plies }: UndoRequest) => {
+      let position: GamePosition | null = null;
+
+      for (let ply = expectedPly; ply > expectedPly - plies; ply--) {
+        position = unwrap(
+          await api.DELETE("/api/games/{game_id}/moves/last", {
+            params: { path: { game_id: gameId }, query: { expected_ply: ply } },
+          }),
+        ) as GamePosition;
+      }
+
+      if (position === null) {
+        throw new Error("There is no move to undo.");
+      }
+
+      return position;
+    },
     onSuccess: storeLatestPosition,
     onError: refreshGame,
   });
