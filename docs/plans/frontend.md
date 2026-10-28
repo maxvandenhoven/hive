@@ -29,7 +29,8 @@ frontend/src/
 ├─ lib/                 # agentParams.ts (param forms from JSON schema), players.ts
 │                       # (player, scenario and next action descriptions), newGame.ts
 │                       # (new game choices, requests, remembered choices), time.ts,
-│                       # moves.ts (move descriptions, side at a ply, board view models),
+│                       # moves.ts (move descriptions by neighbouring pieces, side at a
+│                       # ply, board view models), turnPrompt.ts (the turn prompt text),
 │                       # search.ts (search info summaries and formatting)
 ├─ test/                # setup.ts (jsdom polyfills for Radix), fixtures, fetch mock, render
 ├─ components/
@@ -47,8 +48,9 @@ frontend/src/
 │  │  ├─ viewBox.ts     # fitting, panning and zooming the SVG viewBox
 │  │  ├─ useViewGestures.ts     # drag to pan, pinch and wheel to zoom
 │  │  └─ useBoardInteraction.ts # selection → targets → move
-│  ├─ HandTray.tsx  MoveList.tsx  GameHeader.tsx  GameOverBanner.tsx
+│  ├─ HandTray.tsx  MoveList.tsx  GameHeader.tsx  TurnPrompt.tsx
 │  ├─ useAgentTurns.ts  ThinkingPanel.tsx  MatchControls.tsx  ReplayControls.tsx
+│  ├─ useHint.ts  HintButton.tsx  useSecondsLeft.ts
 │  ├─ AgentChoiceField.tsx  AgentPicker.tsx  AgentParamInput.tsx  GameStatusBadge.tsx
 │  ├─ NewGameDialog.tsx  ChoiceCards.tsx  scenarioIcons.ts
 │  ├─ RenameGameDialog.tsx  DeleteGameDialog.tsx  GamesTable.tsx
@@ -75,11 +77,17 @@ interface BoardRendererProps {
   movable: HexCoord[];           // tiles that may move (ringed and raised)
   selected: HexCoord | null;
   lastMove: MoveView | null;     // from (null for a placement) and to
-  proposedMove: MoveView | null; // an agent's best move, or the move to make on the board
+  proposedMove: MoveView | null; // an agent's best move, the move to make on the table, a hint
   forbidden?: HexCoord[];        // "not allowed" hexes for the rule diagrams; games omit it
   onHexClick: (coord: HexCoord) => void;
 }
 ```
+
+`proposedMove` carries every move an agent suggests: its best move while it thinks, a
+pending move to make on the table and a hint (WP 35). They share one mark and one colour
+(`--board-suggestion`), and at most one is shown at a time (hints only on a person's
+turn, the others only on an agent's), so renderers need no kind; the turn prompt says
+which it is.
 
 Renderers know nothing about the game: every hex reports clicks, also empty ones, and the
 interaction code decides what a click means. Showing the contents of a stack is part of
@@ -92,7 +100,9 @@ else, closes it.
 targets (`GET /targets`) → click a target → play the move. Selecting a piece type in the
 `HandTray` highlights `placeable_coords` instead. Clicking the selection again, or a hex
 that is neither movable nor highlighted, clears it. A highlight wins over a movable tile
-on the same hex (a beetle climbing onto it). Moves are only built from the API's targets
+on the same hex (a beetle climbing onto it). With a hint shown and nothing selected,
+tapping the hint's target selects the hinted piece, like tapping the piece itself, so
+following a hint takes two taps. Moves are only built from the API's targets
 and placements, so only legal moves are sent. The selection belongs to a ply and is
 dropped when the position changes or the board is disabled (agent turn, game over, a move
 being sent).
@@ -237,20 +247,20 @@ string enums, each optionally nullable (an empty input is `null`); other schemas
 as JSON. Inputs hold drafts that are checked live against the schema bounds, and params left
 at their default are not sent, so specs keep following the agent defaults.
 
-**Game page, human turn (WP 14).** Header (name, status, players, whose turn and the
-ply), the board between the two hand trays (the side a person plays below), undo, export
-and the move list. On a phone the parts stack in one column with a square board; on a
-desktop the header, actions and moves sit in a side panel. Manual entry by tapping as
-described under "Board rendering"; a **Pass** button appears when the API reports
-`must_pass`. Moves are sent with `expected_ply` set to the `ply_count` of the position
-shown and undo with `?expected_ply=`, so a stale page cannot overwrite a newer game: the
-409 is shown as a toast and the game is refetched. A move, undo or committed agent
-decision stores the returned position as the latest, drops cached targets and stored
-positions from that ply on, and refreshes the game and the game list. In a human vs agent
-game, undo takes back to the person's last turn (two moves when the agent answered), so
-the agent does not replay its answer at once; several plies are undone in one mutation.
-A game over banner shows the result (undo reopens the game); abandoned games are
-read-only.
+**Game page (WP 14, WP 35).** Header (name, status, players, whose turn and the ply),
+the turn prompt, the board between the two hand trays, undo, export and the move list.
+Against an agent the person's side is drawn at the bottom; in a hints game and a match,
+white is. On a phone the parts stack in one column with a square board; on a desktop the
+header, the thinking panel, actions and moves sit in a side panel. Manual entry by
+tapping as described under "Board rendering". Moves are sent with `expected_ply` set to
+the `ply_count` of the position shown and undo with `?expected_ply=`, so a stale page
+cannot overwrite a newer game: the 409 is shown as a toast and the game is refetched. A
+move, undo, confirmation or committed agent decision stores the returned position as the
+latest, drops cached targets and stored positions from that ply on, and refreshes the
+game and the game list. In a human vs agent game, undo takes back to the person's last
+turn (two moves when the agent answered, also when its answer is still pending, so the
+person takes both back on the table), so the agent does not replay its answer at once;
+several plies are undone in one mutation. Abandoned games are read-only.
 
 Query notes: positions (`["games", "detail", id, "position", ply | "latest"]`) and targets
 live under the game's key, so refreshing a game refreshes them. Queries whose `meta` sets
@@ -258,28 +268,68 @@ live under the game's key, so refreshing a game refreshes them. Queries whose `m
 click). openapi-fetch reads tuples such as `Coordinate` as plain arrays, so responses with
 coordinates are cast to their schema types in `queries.ts`.
 
-**Game page, agent turn (WP 15).** `useAgentTurns` starts `POST /think` with
+**Turn prompt (WP 35).** `TurnPrompt` is a strip above the board with one sentence on
+what to do now and only the actions that fit (`describeTurnPrompt` in `lib/turnPrompt.ts`
+picks the sentence from the scenario, the board location and the state):
+
+| State | On screen | At the table |
+|---|---|---|
+| Your turn | *Your turn: tap a piece on the board or in your hand* | *Your turn: make your move on the table, then enter it here* |
+| Hints game | – | *White's turn: make the move on the table and enter it*, **Hint** for a side with a hint agent |
+| No legal move | *Your turn: no move is possible, so pass* with **Pass** | Same |
+| Agent thinking | *nm3 is thinking…*, with the thinking panel | Same |
+| Agent failed | *nm3 could not move* with **Try again** | Same |
+| Agent decided | The move is applied and play continues | *Make this move on the table: ant moves next to the white queen* with **Done** |
+| Watching | *Watching nm3 vs nm2* with the match controls | – |
+| Game over | *You won after 23 moves* (*nm3 won*, *White won*, *Draw*) with **Undo** and **New game** | Same |
+| Abandoned | *This game was abandoned* with **New game** | Same |
+| Replay | *Showing the position after move 7: go live to play on* with **Go live** | Same |
+
+A pending move comes before the result, since an agent's last move can be pending. Moves
+are described by the pieces they touch (`describeMoveOnBoard` in `lib/moves.ts`): *place
+spider next to the black queen*, *ant moves next to the white queen and the black
+beetle*, *beetle climbs onto the black queen*, *beetle climbs down next to …*,
+*grasshopper jumps over the white queen*; a piece with a twin of the same kind and owner
+is told apart by where it stands (*ant beside the black spider moves …*, or its
+coordinate as a last resort). These read the same from any side of a table and in any
+rotation of the 2.5D board. The move list keeps coordinates.
+
+**Hints (WP 35).** On the turn of a side with a hint agent, a **Hint** button sits in the
+prompt and on that side's hand tray. `useHint` keeps hints hidden until asked for, then
+starts `POST /think` with `commit=false`, which uses the side's hint agent and budget. The
+prompt shows a compact indicator with the time left, then the move as a sentence (*Hint:
+grasshopper jumps over the white queen*) and the board draws it as `proposedMove`.
+Pressing **Hint** again hides it (asking once more shows the same hint without thinking
+again; a failed hint is asked for again). Tapping the hinted piece, or the hint's target,
+selects the piece, so following a hint takes two taps. A hint belongs to one position:
+any move or undo clears it. Hiding it, a move or leaving the page aborts a search under
+way. Hints are never applied by themselves.
+
+**Game page, agent turn (WP 15, WP 35).** `useAgentTurns` starts `POST /think` with
 `commit=true` whenever an agent is to move in an active game and no other write is under
 way. `api/sse.ts` reads the stream from `fetch` (`EventSource` only supports GET):
 `ServerSentEventParser` turns chunks into event data, `streamThinkEvents` yields the typed
 events and throws an `ApiRequestError` for an error response. The `ThinkingPanel` shows
 the time left of the side's budget (counted from when the stream opened), depth, score
 (`Win in 3 plies` for forced results), nodes and nodes/s, and the best move so far, which
-the board draws as `proposedMove` (an arrow from its source and a ring on its target).
-When the decision arrives with its position, the move is stored and, in a human vs agent
-game, the panel asks to "Make this move on the board" with a **Done** button (from WP 19,
-alternatively the camera to verify); the board keeps pointing at the move and the person
-cannot play until Done. A failed request or an `error` event (for example `ply_conflict`)
-is shown as a toast and in the panel with **Try again**, and the game is refetched. The
-stream is aborted, which stops the agent without committing, when the page closes,
-another write starts (undo while the agent thinks) or a match pauses. The Done prompt
-lives in the page only, so reloading skips it.
+the board draws as `proposedMove` (an arrow from its source and a double ring on its
+target). When the decision arrives with its position, the move is stored. On the screen
+play continues at once (WP 36 animates the move in). At the table the API stores the move
+as pending (D27): the prompt asks to make it on the table with **Done**, the board keeps
+pointing at it, and the person cannot play until Done calls
+`POST /moves/last/confirm`. Both follow `pending_move` of the stored position, so the
+prompt is the same after a reload or when coming back from the game list. A failed
+request or an `error` event (for example `ply_conflict`) is shown as a toast, in the panel
+and the prompt with **Try again**, and the game is refetched. The stream is aborted, which
+stops the agent without committing, when the page closes, another write starts (undo
+while the agent thinks) or a match pauses.
 
-**Agent vs agent (WP 15).** `MatchControls`: **Play**/**Pause**, **Step** (one move while
-paused) and a delay between moves (none, 1, 2 or 5 s, default 1 s). The page drives the
-loop by calling `think` with `commit=true` for whichever side is to move. Matches do not
-wait for Done, since they are watched on the screen; Step plays one move at a time for
-following on a physical board. A match starts paused, and undo pauses it.
+**Agent vs agent (WP 15).** `MatchControls`, in the turn prompt: **Play**/**Pause**,
+**Step** (one move while paused) and a delay between moves (none, 1, 2 or 5 s, default
+1 s). The page drives the loop by calling `think` with `commit=true` for whichever side is
+to move, and the thinking panel shows the search and then the move just played. Matches
+do not wait for Done, since they are watched on the screen; Step plays one move at a time
+for following on a physical board. A match starts paused, and undo pauses it.
 
 **Replay (WP 15).** `ReplayControls` (first, previous, next, live and a slider) and the
 move list (a move shows the position after it) set the ply shown, loaded with
