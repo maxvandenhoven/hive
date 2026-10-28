@@ -1,3 +1,4 @@
+description: Negamax searching two plies ahead; quick and easy to beat.
 kind: negamax
 params:
   depth: 2

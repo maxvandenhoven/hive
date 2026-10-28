@@ -200,6 +200,7 @@ class TestReadState:
             "placeable_coords": [[0, 0]],
             "placeable_piece_types": ["queen", "beetle", "grasshopper", "spider", "ant"],
             "must_pass": False,
+            "pending_move": False,
         }
 
     async def test_lists_movable_pieces(self, client: httpx2.AsyncClient) -> None:

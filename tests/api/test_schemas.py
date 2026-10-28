@@ -4,12 +4,13 @@ import pytest
 from pydantic import ValidationError
 
 from hive.api.db.models import GameStatus
-from hive.api.players import AgentPlayer
+from hive.api.players import AgentPlayer, BoardLocation, HumanPlayer
 from hive.api.schemas import GameCreate, GameUpdate
 from hive.engine.rules import Rules
 
 AGENT = {"type": "agent", "spec": {"kind": "random"}, "budget_s": 1.0}
 HUMAN = {"type": "human"}
+HINTED = {"type": "human", "hint": {"spec": {"kind": "random"}, "budget_s": 2.0}}
 
 
 def game_create(**fields: Any) -> GameCreate:
@@ -37,10 +38,36 @@ class TestGameCreate:
         body = game_create(white=AGENT)
 
         assert isinstance(body.white, AgentPlayer)
+        assert body.board_location is None
+        assert body.location is BoardLocation.SCREEN
 
-    def test_rejects_human_vs_human(self) -> None:
+    def test_human_vs_agent_defaults_to_table(self) -> None:
+        assert game_create().location is BoardLocation.TABLE
+
+    def test_keeps_given_board_location(self) -> None:
+        assert game_create(board_location="screen").location is BoardLocation.SCREEN
+
+    def test_human_vs_human_with_hint(self) -> None:
+        body = game_create(white=HINTED, black=HUMAN)
+
+        assert isinstance(body.white, HumanPlayer)
+        assert body.white.hint is not None
+        assert body.white.hint.budget_s == 2.0
+        assert body.location is BoardLocation.TABLE
+
+    def test_rejects_human_vs_human_without_hint(self) -> None:
         with pytest.raises(ValidationError, match="human vs human"):
             game_create(black=HUMAN)
+
+    def test_rejects_unsupported_location(self) -> None:
+        with pytest.raises(ValidationError, match="played on the `screen`"):
+            game_create(white=AGENT, board_location="table")
+
+    def test_rejects_invalid_hint_spec(self) -> None:
+        hint = {"type": "human", "hint": {"spec": {"kind": "nope"}}}
+
+        with pytest.raises(ValidationError, match="Unknown agent kind `nope`"):
+            game_create(white=hint)
 
     @pytest.mark.parametrize(
         ("spec", "message"),
@@ -101,3 +128,8 @@ class TestGameUpdate:
 
         assert body.name is None
         assert body.status is GameStatus.FINISHED
+        assert body.board_location is None
+
+    def test_rejects_unknown_board_location(self) -> None:
+        with pytest.raises(ValidationError, match="board_location"):
+            GameUpdate.model_validate({"board_location": "garden"})

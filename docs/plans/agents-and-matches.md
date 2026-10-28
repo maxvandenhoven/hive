@@ -196,7 +196,8 @@ def list_agents() -> list[AgentRegistration]: ...   # kind, description, params 
 
 Tuned agents are stored as spec files in `src/hive/agents/presets/<name>.yaml`, inside the
 package so they ship with the wheel and the Docker image (loaded with
-`importlib.resources`). The file name is the preset name and the default label. The
+`importlib.resources`). The file name is the preset name and the default label; a
+`description` key next to the spec says what the agent is like (`AgentPreset`, WP 33). The
 gauntlet CLI resolves `--agent VALUE` as a path to a YAML file, then a preset name, then
 inline YAML (`random` or `{kind: negamax, params: {depth: 2}}`). The API lists presets
 next to `list_agents()`, so the agent picker offers "nm3 (preset)" as well as a custom
@@ -374,9 +375,10 @@ Implementation notes (WP 09):
 - `hive gauntlet` defaults to two games per pair, `jobs = cpu_count` and
   `reports/gauntlet-<timestamp>.json` (git-ignored). `hive replay` needs a report written
   with `--replays`; `--plot-dir DIR` writes one SVG per ply with `hive.plotting.svg`.
-- Presets: `AgentSpec.from_preset(name)`, `list_presets()` and `AgentSpec.resolve(value)`
-  (file, then preset, then inline YAML) live in `agents/factory.py`. Shipped presets:
-  `nm2` and `nm3` (negamax at depth 2 and 3).
+- Presets: `AgentPreset.load(name)`, `AgentPreset.load_all()`,
+  `AgentSpec.from_preset(name)`, `list_presets()` and `AgentSpec.resolve(value)` (file,
+  then preset, then inline YAML) live in `agents/factory.py`. Shipped presets: `nm2` and
+  `nm3` (negamax at depth 2 and 3).
 
 ## Observability
 

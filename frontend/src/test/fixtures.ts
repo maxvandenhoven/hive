@@ -55,8 +55,12 @@ export function gameSummary(overrides: Partial<GameSummary> = {}): GameSummary {
     status: "active",
     white: { type: "human" },
     black: { type: "agent", spec: { kind: "negamax", params: {} }, budget_s: 5 },
+    board_location: "table",
     result: null,
     ply_count: 12,
+    current_player: "white",
+    current_player_type: "human",
+    pending_move: false,
     created_at: "2026-10-26T20:00:00Z",
     updated_at: "2026-10-26T21:00:00Z",
     ...overrides,
@@ -81,6 +85,7 @@ export function moveRead(overrides: Partial<MoveRead> = {}): MoveRead {
     source: "manual",
     photo_id: null,
     decision: null,
+    pending: false,
     created_at: "2026-10-26T20:01:00Z",
     ...overrides,
   };
@@ -132,6 +137,7 @@ export function gamePosition(overrides: Partial<GamePosition> = {}): GamePositio
     ],
     placeable_piece_types: ["beetle", "grasshopper", "spider", "ant"],
     must_pass: false,
+    pending_move: false,
     ...overrides,
   };
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useState } from "react";
 import { toast } from "sonner";
 
 import type { AgentPlayer, GameDetail, GamePosition, Move } from "@/api/client";
-import { useRefreshGame, useStoreLatestPosition } from "@/api/queries";
+import { useConfirmMove, useRefreshGame, useStoreLatestPosition } from "@/api/queries";
 import { streamThinkEvents } from "@/api/sse";
 import type { ThinkInfo } from "@/lib/search";
 
@@ -107,7 +107,10 @@ export interface AgentTurns {
   setDelayS: (delayS: number) => void;
   /** Let the agent to move in a paused match play one move. */
   step: () => void;
-  /** Confirm that the committed move was made on the board. */
+  /**
+   * Confirm that the committed move was made on the board, which the API stores for a
+   * pending move.
+   */
   done: () => void;
   /** Think again after a failure. */
   retry: () => void;
@@ -125,6 +128,7 @@ export interface AgentTurns {
 export function useAgentTurns({ game, position, idle }: AgentTurnsOptions): AgentTurns {
   const storeLatestPosition = useStoreLatestPosition(game.id);
   const refreshGame = useRefreshGame(game.id);
+  const confirmMove = useConfirmMove(game.id);
   const [state, dispatch] = useReducer(agentTurnReducer, { type: "idle" });
   const [autoplay, setAutoplay] = useState(false);
   const [stepPending, setStepPending] = useState(false);
@@ -247,6 +251,14 @@ export function useAgentTurns({ game, position, idle }: AgentTurnsOptions): Agen
     },
     done: () => {
       dispatch({ type: "continued" });
+
+      if (position.pending_move) {
+        confirmMove.mutate(ply, {
+          onError: (error) => {
+            toast.error(error.message);
+          },
+        });
+      }
     },
     retry: () => {
       dispatch({ type: "continued" });

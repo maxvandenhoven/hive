@@ -8,9 +8,12 @@ import anyio
 import httpx2
 import pytest
 from fastapi import FastAPI
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.types import Message
 
 from hive.agents.factory import AgentSpec
+from hive.api.db.models import MoveRow
 from hive.api.pool import AgentPool
 from hive.engine.rules import Rules
 from hive.match.records import DecisionRecord
@@ -30,12 +33,22 @@ def agent(budget_s: float = BUDGET_S, **spec: Any) -> dict[str, Any]:
     return {"type": "agent", "spec": {"kind": "negamax", **spec}, "budget_s": budget_s}
 
 
+def hinted(**spec: Any) -> dict[str, Any]:
+    """Build a human player with a hint agent, by default a labelled random agent."""
+    hint_spec = spec or {"kind": "random", "label": "hint"}
+
+    return {"type": "human", "hint": {"spec": hint_spec, "budget_s": 0.25}}
+
+
 async def create_game(
-    client: httpx2.AsyncClient, white: dict[str, Any], black: dict[str, Any]
+    client: httpx2.AsyncClient,
+    white: dict[str, Any],
+    black: dict[str, Any],
+    **fields: Any,
 ) -> str:
-    """Create a game with the given players and return its ID."""
+    """Create a game with the given players and fields and return its ID."""
     response = await client.post(
-        "/api/games", json={"name": "Game", "white": white, "black": black}
+        "/api/games", json={"name": "Game", "white": white, "black": black, **fields}
     )
     assert response.status_code == 201, response.text
 
@@ -233,6 +246,196 @@ class TestCommit:
 
         assert response.status_code == 409
         assert error_code(response) == "commit_not_allowed"
+
+
+class TestHints:
+    async def test_defaults_to_the_hint_agent(self, client: httpx2.AsyncClient) -> None:
+        game_id = await create_game(client=client, white=hinted(), black=HUMAN)
+
+        response = await think(client=client, game_id=game_id)
+        decision = parse_events(response.text)[-1]["decision"]
+        game = (await client.get(f"/api/games/{game_id}")).json()
+
+        assert response.status_code == 200
+        assert decision["agent_label"] == "hint"
+        assert decision["budget_s"] == 0.25
+        assert game["ply_count"] == 0
+
+    async def test_request_overrides_the_hint_agent(
+        self, client: httpx2.AsyncClient
+    ) -> None:
+        game_id = await create_game(client=client, white=hinted(), black=agent())
+
+        response = await think(
+            client=client,
+            game_id=game_id,
+            agent={"kind": "random", "label": "other"},
+            budget_s=0.5,
+        )
+        decision = parse_events(response.text)[-1]["decision"]
+
+        assert (decision["agent_label"], decision["budget_s"]) == ("other", 0.5)
+
+    async def test_side_without_hint_needs_an_agent(
+        self, client: httpx2.AsyncClient
+    ) -> None:
+        game_id = await create_game(client=client, white=HUMAN, black=hinted())
+
+        response = await think(client=client, game_id=game_id)
+
+        assert response.status_code == 422
+        assert error_code(response) == "agent_required"
+
+    async def test_hint_cannot_commit(self, client: httpx2.AsyncClient) -> None:
+        game_id = await create_game(client=client, white=hinted(), black=HUMAN)
+
+        response = await think(client=client, game_id=game_id, commit=True)
+
+        assert response.status_code == 409
+        assert error_code(response) == "commit_not_allowed"
+
+
+class TestPendingMoves:
+    async def commit_agent_move(self, client: httpx2.AsyncClient, game_id: str) -> None:
+        """Let the agent to move commit a quick decision."""
+        response = await think(client=client, game_id=game_id, commit=True)
+        assert parse_events(response.text)[-1]["type"] == "decision", response.text
+
+    async def play_first_legal_move(
+        self, client: httpx2.AsyncClient, game_id: str, expected_ply: int
+    ) -> httpx2.Response:
+        """Play the first legal move of the latest position by hand."""
+        position = (await client.get(f"/api/games/{game_id}/state")).json()
+        move = {"piece": position["placeable_piece_types"][0], "from": None}
+        move["to"] = position["placeable_coords"][0]
+
+        return await client.post(
+            f"/api/games/{game_id}/moves",
+            json={"move": move, "expected_ply": expected_ply},
+        )
+
+    async def test_lifecycle_at_the_table(self, client: httpx2.AsyncClient) -> None:
+        game_id = await create_game(
+            client=client, white=agent(budget_s=0.1), black=HUMAN, board_location="table"
+        )
+        await self.commit_agent_move(client=client, game_id=game_id)
+        game = (await client.get(f"/api/games/{game_id}")).json()
+        summary = (await client.get("/api/games")).json()["items"][0]
+        position = (await client.get(f"/api/games/{game_id}/state")).json()
+
+        assert game["moves"][0]["pending"] is True
+        assert game["pending_move"] is True
+        assert summary["pending_move"] is True
+        assert (summary["current_player"], summary["current_player_type"]) == (
+            "black",
+            "human",
+        )
+        assert position["pending_move"] is True
+        assert position["last_move"]["pending"] is True
+
+        blocked = await self.play_first_legal_move(
+            client=client, game_id=game_id, expected_ply=1
+        )
+
+        assert blocked.status_code == 409
+        assert error_code(blocked) == "move_pending"
+
+        confirmed = await client.post(
+            f"/api/games/{game_id}/moves/last/confirm", json={"expected_ply": 1}
+        )
+
+        assert confirmed.status_code == 200, confirmed.text
+        assert confirmed.json()["pending_move"] is False
+        assert confirmed.json()["last_move"]["pending"] is False
+
+        played = await self.play_first_legal_move(
+            client=client, game_id=game_id, expected_ply=1
+        )
+
+        assert played.status_code == 201, played.text
+        assert played.json()["last_move"]["pending"] is False
+
+    async def test_undoes_a_pending_move(self, client: httpx2.AsyncClient) -> None:
+        game_id = await create_game(client=client, white=agent(budget_s=0.1), black=HUMAN)
+        await self.commit_agent_move(client=client, game_id=game_id)
+
+        response = await client.delete(
+            f"/api/games/{game_id}/moves/last", params={"expected_ply": 1}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["ply_count"] == 0
+        assert response.json()["pending_move"] is False
+
+    async def test_never_pending_on_the_screen(self, client: httpx2.AsyncClient) -> None:
+        game_id = await create_game(
+            client=client, white=agent(budget_s=0.1), black=HUMAN, board_location="screen"
+        )
+        await self.commit_agent_move(client=client, game_id=game_id)
+        game = (await client.get(f"/api/games/{game_id}")).json()
+
+        assert game["moves"][0]["pending"] is False
+        assert game["pending_move"] is False
+
+    async def test_moving_to_the_screen_confirms(
+        self, client: httpx2.AsyncClient
+    ) -> None:
+        game_id = await create_game(client=client, white=agent(budget_s=0.1), black=HUMAN)
+        await self.commit_agent_move(client=client, game_id=game_id)
+
+        response = await client.patch(
+            f"/api/games/{game_id}", json={"board_location": "screen"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["pending_move"] is False
+        assert response.json()["moves"][0]["pending"] is False
+
+    async def test_blocks_committing_a_decision(
+        self, client: httpx2.AsyncClient, session: AsyncSession
+    ) -> None:
+        game_id = await create_game(client=client, white=HUMAN, black=agent())
+        played = await self.play_first_legal_move(
+            client=client, game_id=game_id, expected_ply=0
+        )
+        assert played.status_code == 201, played.text
+        # Only agent moves become pending; marking this one tests the guard on commits.
+        await session.execute(
+            update(MoveRow)
+            .where(MoveRow.game_id == uuid.UUID(game_id))
+            .values(pending=True)
+        )
+        await session.commit()
+
+        response = await think(client=client, game_id=game_id, commit=True)
+
+        assert response.status_code == 409
+        assert error_code(response) == "move_pending"
+
+    async def test_rejects_confirming_without_pending_move(
+        self, client: httpx2.AsyncClient
+    ) -> None:
+        game_id = await create_game(client=client, white=agent(budget_s=0.1), black=HUMAN)
+
+        nothing = await client.post(
+            f"/api/games/{game_id}/moves/last/confirm", json={"expected_ply": 0}
+        )
+        await self.commit_agent_move(client=client, game_id=game_id)
+        stale = await client.post(
+            f"/api/games/{game_id}/moves/last/confirm", json={"expected_ply": 0}
+        )
+
+        assert nothing.status_code == 409
+        assert error_code(nothing) == "no_pending_move"
+        assert stale.status_code == 409
+        assert error_code(stale) == "ply_conflict"
+
+    async def test_confirming_a_missing_game(self, client: httpx2.AsyncClient) -> None:
+        response = await client.post(
+            f"/api/games/{uuid.uuid4()}/moves/last/confirm", json={"expected_ply": 0}
+        )
+
+        assert response.status_code == 404
 
 
 class TestRejected:

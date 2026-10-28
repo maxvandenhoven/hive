@@ -102,8 +102,10 @@ class ThinkingPlan:
             GameNotActiveError: If the game is finished or abandoned.
             CommitNotAllowedError: If the request commits, but no agent plays the side to
                 move or the request names another agent.
-            AgentRequiredError: If a person plays the side to move and the request names
-                no agent.
+            MovePendingError: If the request commits while the last move waits to be
+                made on the board.
+            AgentRequiredError: If a person without a hint agent plays the side to move
+                and the request names no agent.
         """
         game = await games.get_game(game_id)
         state = game.replay()
@@ -121,13 +123,17 @@ class ThinkingPlan:
             )
             raise CommitNotAllowedError(msg)
 
-        spec = body.agent or (side_agent.spec if side_agent is not None else None)
+        if body.commit:
+            games.check_no_pending_move(game)
+
+        default = player if isinstance(player, AgentPlayer) else player.hint
+        spec = body.agent or (default.spec if default is not None else None)
 
         if spec is None:
             raise AgentRequiredError(side)
 
         budget_s = body.budget_s or (
-            side_agent.budget_s if side_agent is not None else DEFAULT_AGENT_BUDGET_S
+            default.budget_s if default is not None else DEFAULT_AGENT_BUDGET_S
         )
 
         return cls(
