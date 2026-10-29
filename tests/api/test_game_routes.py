@@ -72,7 +72,7 @@ class TestCreateGame:
         assert game["name"] == "Game"
         assert game["status"] == "active"
         assert game["result"] is None
-        assert game["white"] == {**HUMAN, "hint": None}
+        assert game["white"] == {**HUMAN, "hint": None, "name": None}
         assert game["black"] == {**AGENT, "spec": {**AGENT["spec"], "label": None}}
         assert game["board_location"] == "table"
         assert (game["current_player"], game["current_player_type"]) == ("white", "human")
