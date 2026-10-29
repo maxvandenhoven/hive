@@ -71,6 +71,12 @@ api-client: frontend/node_modules
 	@rm frontend/openapi.json
 
 
+# Writes the rule diagrams of the help, with their targets checked against the engine.
+.PHONY: rules-diagrams
+rules-diagrams:
+	@uv run python scripts/rules_diagrams.py
+
+
 .env:
 	@cp .env.example .env
 

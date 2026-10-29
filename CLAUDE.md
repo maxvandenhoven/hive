@@ -40,6 +40,7 @@ make test           # pytest with coverage, excluding `slow` tests; vitest
 make test-slow      # pytest -m slow
 make perft          # perft speed benchmark (start position, depth 6)
 make api-client     # regenerate frontend/src/api/schema.ts after API changes
+make rules-diagrams # regenerate the engine-checked rule diagrams of the help
 make dev            # .env, Postgres + Garage, migrate, API on :8000, vite on :5173
 make dev-services   # only the compose services and the migration
 make install-hooks  # install pre-commit hooks (including commit-msg)

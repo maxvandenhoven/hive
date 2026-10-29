@@ -5,6 +5,7 @@ import type { GameSummary } from "@/api/client";
 import { useGamePage } from "@/api/queries";
 import { DeleteGameDialog } from "@/components/DeleteGameDialog";
 import { GamesTable } from "@/components/GamesTable";
+import { HelpCards } from "@/components/help/HelpCards";
 import { NewGameDialog } from "@/components/NewGameDialog";
 import { RenameGameDialog } from "@/components/RenameGameDialog";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,10 @@ function readPageNumber(value: string | null): number {
   return Number.isInteger(page) && page > 1 ? page : 1;
 }
 
-/** The game list, newest first, with the new game dialog and the game actions. */
+/**
+ * The game list, newest first, with the new game dialog, the game actions and the links
+ * to the rules and to how the app works.
+ */
 export function GamesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageNumber = readPageNumber(searchParams.get("page"));
@@ -38,6 +42,7 @@ export function GamesPage() {
         <h1 className="font-heading text-2xl font-semibold">Games</h1>
         <NewGameDialog />
       </div>
+      <HelpCards />
       <Card className="py-0">
         <CardContent className="px-0">
           {gamePage.isPending && (
