@@ -141,3 +141,25 @@ def get_flanking_coords(
         add(coord=source_coord, direction=get_anti_clockwise_direction(direction)),
         add(coord=source_coord, direction=get_clockwise_direction(direction)),
     )
+
+
+@cache
+def get_neighbor_flanks(
+    coord: Coordinate,
+) -> tuple[tuple[Coordinate, Coordinate, Coordinate], ...]:
+    """Get every neighbor of a coordinate with the two coordinates flanking the step.
+
+    Move generation checks the flanking coordinates of every step, so they are looked up
+    here instead of computed. The result is cached indefinitely, like `get_neighbors`.
+
+    Args:
+        coord: The axial coordinate `(q, r)` to step from.
+
+    Returns:
+        One `(neighbor, anti_clockwise, clockwise)` triple per neighbor, in the order of
+        `get_neighbors`, with the flanking coordinates of `get_flanking_coords`.
+    """
+    return tuple(
+        (neighbor, *get_flanking_coords(source_coord=coord, target_coord=neighbor))
+        for neighbor in get_neighbors(coord)
+    )

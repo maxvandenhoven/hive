@@ -5,6 +5,7 @@ from hive.engine.grid import (
     get_clockwise_direction,
     get_direction,
     get_flanking_coords,
+    get_neighbor_flanks,
     get_neighbors,
 )
 
@@ -126,3 +127,25 @@ class TestGetFlankingCoords:
             ):
                 assert flanking_coord in get_neighbors(source_coord)
                 assert flanking_coord in get_neighbors(target_coord)
+
+
+class TestGetNeighborFlanks:
+    """Test the `get_neighbor_flanks` lookup table."""
+
+    def test_matches_flanking_coords(self) -> None:
+        """Test that every neighbor comes with its flanks, in the order of neighbors."""
+        source_coord = (2, -3)
+
+        assert get_neighbor_flanks(source_coord) == tuple(
+            (
+                target_coord,
+                *get_flanking_coords(
+                    source_coord=source_coord, target_coord=target_coord
+                ),
+            )
+            for target_coord in get_neighbors(source_coord)
+        )
+
+    def test_cached(self) -> None:
+        """Test that the table of a coordinate is built once."""
+        assert get_neighbor_flanks((0, 0)) is get_neighbor_flanks((0, 0))

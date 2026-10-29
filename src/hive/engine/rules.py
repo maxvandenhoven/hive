@@ -11,7 +11,7 @@ from hive.engine.grid import (
     HEX_DIRECTIONS,
     Coordinate,
     add,
-    get_flanking_coords,
+    get_neighbor_flanks,
     get_neighbors,
 )
 from hive.engine.state import GameBoard, GameState, Move, PieceType, Player
@@ -663,24 +663,19 @@ class Rules(JsonCodec):
         Returns:
             The neighboring coordinates that satisfy all sliding constraints.
         """
+        # This runs for every step of every sliding piece, so it reads the board directly
+        # instead of through `GameState.can_slide`. Exactly one flanking coordinate must
+        # be occupied: two form a gate, and none leave the piece without hive contact.
+        board = state.board
+        neighbor_flanks = get_neighbor_flanks(coord)
         slideable_neighbors: list[Coordinate] = []
 
-        for neighbor_coord in get_neighbors(coord):
-            if state.is_occupied(neighbor_coord):
+        for neighbor_coord, anti_clockwise_coord, clockwise_coord in neighbor_flanks:
+            if neighbor_coord in board:
                 continue
 
-            if not state.can_slide(source_coord=coord, target_coord=neighbor_coord):
-                continue
-
-            if not any(
-                state.is_occupied(flanking_coord)
-                for flanking_coord in get_flanking_coords(
-                    source_coord=coord, target_coord=neighbor_coord
-                )
-            ):
-                continue
-
-            slideable_neighbors.append(neighbor_coord)
+            if (anti_clockwise_coord in board) != (clockwise_coord in board):
+                slideable_neighbors.append(neighbor_coord)
 
         return slideable_neighbors
 
@@ -721,17 +716,17 @@ class Rules(JsonCodec):
                 else self.slideable_neighbors(state=state, coord=coord)
             )
 
-            for neighbor_coord in get_neighbors(coord):
+            neighbor_flanks = get_neighbor_flanks(coord)
+
+            for neighbor_coord, anti_clockwise_coord, clockwise_coord in neighbor_flanks:
                 height = max(source_height, state.get_stack_height(neighbor_coord))
 
                 if height == 0:
                     continue
 
-                if all(
-                    state.get_stack_height(flanking_coord) > height
-                    for flanking_coord in get_flanking_coords(
-                        source_coord=coord, target_coord=neighbor_coord
-                    )
+                if (
+                    state.get_stack_height(anti_clockwise_coord) > height
+                    and state.get_stack_height(clockwise_coord) > height
                 ):
                     continue
 
