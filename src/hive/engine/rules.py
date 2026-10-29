@@ -405,7 +405,8 @@ class Rules(JsonCodec):
         Both are sorted, so the order depends only on the position: placements first, then
         movements. Without sorting, the order follows the board dict, which move
         generation and `undo_move` reorder, and seeded agents that pick moves by index
-        would not be reproducible.
+        would not be reproducible. The moves are generated in sorted order, which is
+        cheaper than sorting them afterwards.
 
         Args:
             state: The current game state.
@@ -435,19 +436,13 @@ class Rules(JsonCodec):
             All legal placement moves, sorted by piece type and target coordinate. Each
             move has `source_coord` set to `None`.
         """
-        placeable_piece_types = self.placeable_piece_types(state)
+        placeable_coords = sorted(self.placeable_coords(state))
 
-        moves: list[Move] = []
-
-        for coord in self.placeable_coords(state):
-            for piece_type in placeable_piece_types:
-                moves.append(
-                    Move(piece_type=piece_type, source_coord=None, target_coord=coord)
-                )
-
-        moves.sort(key=lambda move: (move.piece_type, move.target_coord))
-
-        return moves
+        return [
+            Move(piece_type=piece_type, source_coord=None, target_coord=coord)
+            for piece_type in sorted(self.placeable_piece_types(state))
+            for coord in placeable_coords
+        ]
 
     def movement_moves(self, state: GameState) -> list[Move]:
         """Get all legal movement moves for the current player.
@@ -460,9 +455,14 @@ class Rules(JsonCodec):
             piece type, source and target coordinate.
         """
         moves: list[Move] = []
+        movable_pieces = sorted(
+            self.movable_pieces(state), key=lambda piece: (piece[1], piece[0])
+        )
 
-        for coord, piece_type in self.movable_pieces(state):
-            for target_coord in self.PIECE_TARGET_COORDS[piece_type](self, state, coord):
+        for coord, piece_type in movable_pieces:
+            target_coords = self.PIECE_TARGET_COORDS[piece_type](self, state, coord)
+
+            for target_coord in sorted(target_coords):
                 moves.append(
                     Move(
                         piece_type=piece_type,
@@ -470,10 +470,6 @@ class Rules(JsonCodec):
                         target_coord=target_coord,
                     )
                 )
-
-        moves.sort(
-            key=lambda move: (move.piece_type, move.source_coord, move.target_coord)
-        )
 
         return moves
 
