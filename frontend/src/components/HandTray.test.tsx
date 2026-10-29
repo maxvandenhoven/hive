@@ -10,7 +10,7 @@ function marksOf(name: string): string[] {
 }
 
 describe("HandTray", () => {
-  it("marks placeable and selected pieces as the board does", () => {
+  it("marks placeable, selected and suggested pieces as the board does", () => {
     render(
       <HandTray
         side="white"
@@ -18,12 +18,18 @@ describe("HandTray", () => {
         hand={{ queen: 1, ant: 3, beetle: 2 }}
         placeable={["queen", "ant"]}
         selected="ant"
+        suggested="queen"
+        suggestionShown={false}
         toMove
         onSelect={vi.fn()}
       />,
     );
 
-    expect(marksOf("Place white queen, 1 left")).toEqual(["movable", "movable"]);
+    expect(marksOf("Place white queen, 1 left")).toEqual([
+      "movable",
+      "movable",
+      "suggestion",
+    ]);
     expect(marksOf("Place white ant, 3 left")).toEqual([
       "selected",
       "movable",

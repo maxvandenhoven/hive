@@ -47,7 +47,7 @@ describe("describeTurnPrompt", () => {
     });
     expect(prompt(AT_TABLE)).toEqual({
       kind: "turn",
-      text: "Your turn: make your move on the table, then enter it here",
+      text: "Your turn: tap a piece on the board or in your hand",
     });
     expect(prompt(HINTS, BLACK_TO_MOVE)).toEqual({
       kind: "turn",

@@ -131,7 +131,7 @@ describe("GamePage", () => {
     mockGameApi();
     renderGamePage();
 
-    expect(await screen.findByRole("status")).toHaveTextContent("White to move");
+    expect(await screen.findByRole("status")).toHaveTextContent("Your turn");
     expect(screen.getByRole("heading", { name: /Evening game/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "White queen at (0, 0)" }),
@@ -242,7 +242,7 @@ describe("GamePage", () => {
     await user.click(await screen.findByRole("button", { name: "Undo" }));
 
     expect(await screen.findByText("Undid the last move.")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("White to move");
+    expect(screen.getByRole("status")).toHaveTextContent("Your turn");
     expect(requests.find((request) => request.method === "DELETE")?.search).toBe(
       "?expected_ply=3",
     );
@@ -432,7 +432,7 @@ describe("GamePage", () => {
 
     expect(
       await within(prompt).findByText(
-        "Your turn: make your move on the table, then enter it here",
+        "Your turn: tap a piece on the board or in your hand",
       ),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Place white ant, 2 left" })).toBeEnabled();
@@ -458,7 +458,7 @@ describe("GamePage", () => {
 
     expect(
       await within(prompt).findByText(
-        "Your turn: make your move on the table, then enter it here",
+        "Your turn: tap a piece on the board or in your hand",
       ),
     ).toBeVisible();
     expect(requests.some((request) => request.path.endsWith("/think"))).toBe(false);
@@ -538,7 +538,7 @@ describe("GamePage", () => {
     expect(
       requests.filter((request) => request.method === "DELETE").map((r) => r.search),
     ).toEqual(["?expected_ply=4", "?expected_ply=3"]);
-    expect(screen.getByRole("status")).toHaveTextContent("White to move");
+    expect(screen.getByRole("status")).toHaveTextContent("Your turn");
   });
 
   it("replays earlier positions and returns to the live one", async () => {

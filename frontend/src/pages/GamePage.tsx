@@ -26,20 +26,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { playerAtPly, toBoardView, toMoveView } from "@/lib/moves";
-import { gameScenario, type PlayerSide } from "@/lib/players";
+import { ownSide, type PlayerSide } from "@/lib/players";
 import { describeTurnPrompt } from "@/lib/turnPrompt";
 
 /** The board renderer; a 3D renderer can take its place behind the same props. */
 const Board: BoardRenderer = SvgBoard;
 
 /**
- * The side drawn below the board: against an agent the person's side, in a hints game
- * and a match white.
+ * The side drawn below the board: the side of the person using the app, else white.
  */
 function homeSide(game: GameDetail): PlayerSide {
-  return gameScenario(game) === "agent" && game.black.type === "human"
-    ? "black"
-    : "white";
+  return ownSide(game) ?? "white";
 }
 
 /**
@@ -124,7 +121,13 @@ function GameScreen({ game, position }: GameScreenProps) {
   const board = useMemo(() => toBoardView(shown.board), [shown.board]);
   const liveBoard = useMemo(() => toBoardView(position.board), [position.board]);
   const lastMove = useMemo(() => toMoveView(shown.last_move?.move), [shown.last_move]);
-  const proposed = live ? toMoveView(proposedMove(turns, hint, position)) : null;
+  const proposedFull = live ? proposedMove(turns, hint, position) : null;
+  const proposed = toMoveView(proposedFull);
+  // A pending move is already in the game, so its piece is no longer in hand.
+  const suggestedPiece =
+    proposedFull != null && proposedFull.from === null && !turns.awaitingDone
+      ? proposedFull.piece
+      : null;
   const prompt = describeTurnPrompt({
     game,
     position,
@@ -143,6 +146,8 @@ function GameScreen({ game, position }: GameScreenProps) {
       hand={shown.hands[side] ?? {}}
       placeable={side === sideToMove && canPlay ? position.placeable_piece_types : []}
       selected={side === sideToMove ? selectedPiece : null}
+      suggested={side === sideToMove ? suggestedPiece : null}
+      suggestionShown={proposed !== null}
       toMove={live && active && side === sideToMove}
       action={
         side === sideToMove && prompt.kind === "turn" && hint.agent !== null ? (

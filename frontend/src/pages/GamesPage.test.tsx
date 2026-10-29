@@ -133,12 +133,12 @@ describe("GamesPage", () => {
     await screen.findByRole("link", { name: "On screen" });
 
     const expected = [
-      ["On screen", "vs agent · on screen", "Your turn"],
-      ["Pending", "vs agent · at the table", "Agent's move to make"],
-      ["Agent thinks", "vs agent · at the table", "nm3 to move"],
+      ["On screen", "vs agent", "Your turn"],
+      ["Pending", "vs agent", "Agent's move to make"],
+      ["Agent thinks", "vs agent", "nm3 to move"],
       ["Hints", "hints game", "Black to move"],
       ["Watching", "watching", "nm3 to move"],
-      ["Over", "vs agent · at the table", "Black won"],
+      ["Over", "vs agent", "Black won"],
     ];
 
     for (const [name, scenario, next] of expected) {
@@ -248,7 +248,7 @@ describe("GamesPage", () => {
     expect(await screen.findByText("Game not found.")).toBeInTheDocument();
   });
 
-  it("plays against an agent on the screen by default and opens the game", async () => {
+  it("plays against an agent by default and opens the game", async () => {
     const requests = mockNewGame();
     const user = userEvent.setup();
     renderPage(<GamesPage />);
@@ -258,7 +258,6 @@ describe("GamesPage", () => {
       within(dialog).getByRole("button", { name: /Play against an agent/ }),
     );
 
-    expect(within(dialog).getByRole("radio", { name: /On this screen/ })).toBeChecked();
     expect(within(dialog).getByRole("radio", { name: "White" })).toBeChecked();
     expect(within(dialog).getByRole("combobox", { name: "Opponent" })).toHaveTextContent(
       "nm3",
@@ -278,7 +277,7 @@ describe("GamesPage", () => {
     });
   });
 
-  it("plays against an agent at the table as black with hints", async () => {
+  it("plays against an agent as black with hints", async () => {
     const requests = mockNewGame();
     const user = userEvent.setup();
     renderPage(<GamesPage />);
@@ -287,7 +286,6 @@ describe("GamesPage", () => {
     await user.click(
       within(dialog).getByRole("button", { name: /Play against an agent/ }),
     );
-    await user.click(within(dialog).getByRole("radio", { name: /At the table/ }));
     await user.click(within(dialog).getByRole("radio", { name: "Black" }));
     await choose(user, within(dialog).getByRole("combobox", { name: "Opponent" }), "nm2");
     await user.click(within(dialog).getByRole("checkbox", { name: /Hints for you/ }));
@@ -298,12 +296,12 @@ describe("GamesPage", () => {
         name: "You vs nm2",
         white: { type: "agent", spec: NM2_SPEC, budget_s: 5 },
         black: { type: "human", hint: { spec: NM3_SPEC, budget_s: 5 } },
-        board_location: "table",
+        board_location: "screen",
       });
     });
   });
 
-  it("plays a friend with hints for one side", async () => {
+  it("plays a friend with hints only for the person", async () => {
     const requests = mockNewGame();
     const user = userEvent.setup();
     renderPage(<GamesPage />);
@@ -312,7 +310,11 @@ describe("GamesPage", () => {
     await user.click(
       within(dialog).getByRole("button", { name: /Play a friend with hints/ }),
     );
-    await user.click(within(dialog).getByRole("radio", { name: "White" }));
+    await user.click(within(dialog).getByRole("radio", { name: "Black" }));
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "Opponent's name" }),
+      "Sam",
+    );
     await choose(
       user,
       within(dialog).getByRole("combobox", { name: "Hint strength" }),
@@ -322,9 +324,9 @@ describe("GamesPage", () => {
 
     await waitFor(() => {
       expect(postedGame(requests)).toEqual({
-        name: "Hints game",
-        white: { type: "human", hint: { spec: NM2_SPEC, budget_s: 5 } },
-        black: { type: "human" },
+        name: "You vs Sam",
+        white: { type: "human", name: "Sam" },
+        black: { type: "human", hint: { spec: NM2_SPEC, budget_s: 5 } },
         board_location: "table",
       });
     });

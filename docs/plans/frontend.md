@@ -87,13 +87,15 @@ interface BoardRendererProps {
 pending move to make on the table and a hint (WP 35). They share one mark and one colour
 (`--board-suggestion`), and at most one is shown at a time (hints only on a person's
 turn, the others only on an agent's), so renderers need no kind; the turn prompt says
-which it is.
+which it is. While one is shown, the "can move" marks are hidden on the board and in the
+hand trays, so the suggestion's rings are the only rings; tapping still works.
 
 Renderers know nothing about the game: every hex reports clicks, also empty ones, and the
 interaction code decides what a click means. Showing the contents of a stack is part of
 drawing, so the renderer owns it: tapping a stack of two or more pieces that is not a
 highlight opens a popover listing its pieces from the top; tapping it again, or anywhere
-else, closes it.
+else, closes it. While a mouse pointer is near the popover it fades out and lets clicks
+through, so the tiles below it stay reachable.
 
 `useBoardInteraction` owns the selection and maps clicks to intents (`resolveHexClick`,
 `resolveHandClick`, pure and tested on their own): select a movable tile → fetch its
@@ -125,7 +127,7 @@ apart by shape, dash or fill so it reads without colour:
 | Can go here | `highlights`, empty hex | Dashed hex with a dot (`--board-target`) |
 | Can climb on top | `highlights`, occupied hex | Dashed ring with a dot on the tile (`--board-target`) |
 | Last move | `lastMove` | Dotted outline with a light fill on from, stronger on to (`--board-last-move`) |
-| Agent suggestion | `proposedMove` | Arrow to a double ring (`--board-suggestion`) |
+| Agent suggestion | `proposedMove` | Rounded ring around the piece to move (on the board, or in the hand tray for a placement), an arrow, and a rounded double ring on the target, all inside the hex with a gap around the tile (`--board-suggestion`) |
 | Not allowed | `forbidden` | Hex with a cross (`--board-forbidden`), for the rule diagrams of WP 38 |
 
 The hand trays use the same components: a placeable piece is raised with a ring, the
@@ -208,8 +210,8 @@ arrives in WP 37).
 
 **Games page (WP 13, WP 34).** List games, paged by `?page=N`; open, rename, export and
 delete from a row menu. Each row shows the name with the scenario under it (an icon and
-*vs agent · on screen*, *vs agent · at the table*, *hints game* or *watching*), the next
-action rather than only the status (*Your turn*, *White to move* in a hints game, *Agent's
+*vs agent*, *hints game* or *watching*), the next action rather than only the status
+(*Your turn*, *Sam to move* for the opponent in a hints game, *Agent's
 move to make* for a pending move, *nm3 to move*, *White won*), the players (wide screens),
 the ply and when it changed. `lib/players.ts` derives both from the `GameSummary`
 (`gameScenario`, `describeGameScenario`, `describeNextAction`), without loading moves.
@@ -221,13 +223,13 @@ have a back button from the setup to the scenarios.
 1. *Choose a scenario*: three large cards with an icon and one sentence: *Play against an
    agent*, *Play a friend with hints*, *Watch two agents*.
 2. *Set it up*:
-   - Against an agent: where to play (*On this screen* or *At the table*, each with one
-     line on what it means), your colour (white, black or random, drawn when the game
-     starts), the opponent, and hints for yourself (off by default) with a hint strength.
-   - A friend with hints: who gets hints (white, black or both) and the hint strength.
-     Always at the table.
+   - Against an agent: your colour (white, black or random, drawn when the game starts),
+     the opponent, and hints for yourself (off by default) with a hint strength. Always
+     on the screen.
+   - A friend with hints: your colour, the opponent's name (default *Opponent*) and the
+     hint strength. Only you get hints. Always at the table.
    - Watch two agents: the white and the black agent. Always on the screen.
-   - An optional name, defaulting from the scenario (`You vs nm3`, `Hints game`,
+   - An optional name, defaulting from the scenario (`You vs nm3`, `You vs Sam`,
      `nm3 vs nm2`).
 
 Agents are picked by `AgentChoiceField` from `GET /agents/presets` as named strengths with
@@ -249,8 +251,9 @@ at their default are not sent, so specs keep following the agent defaults.
 
 **Game page (WP 14, WP 35).** Header (name, status, players, whose turn and the ply),
 the turn prompt, the board between the two hand trays, undo, export and the move list.
-Against an agent the person's side is drawn at the bottom; in a hints game and a match,
-white is. On a phone the parts stack in one column with a square board; on a desktop the
+The side of the person using the app (`ownSide`: the human side against an agent, the
+unnamed side in a hints game) is drawn at the bottom; otherwise white is. Turns and
+results name the sides as *You*, the opponent's name or the agent (`sideName`). On a phone the parts stack in one column with a square board; on a desktop the
 header, the thinking panel, actions and moves sit in a side panel. Manual entry by
 tapping as described under "Board rendering". Moves are sent with `expected_ply` set to
 the `ply_count` of the position shown and undo with `?expected_ply=`, so a stale page
@@ -274,8 +277,8 @@ picks the sentence from the scenario, the board location and the state):
 
 | State | On screen | At the table |
 |---|---|---|
-| Your turn | *Your turn: tap a piece on the board or in your hand* | *Your turn: make your move on the table, then enter it here* |
-| Hints game | – | *White's turn: make the move on the table and enter it*, **Hint** for a side with a hint agent |
+| Your turn | *Your turn: tap a piece on the board or in your hand* | Only older games against an agent |
+| Hints game | – | *Your turn* or *Sam's turn: make the move on the table and enter it*, **Hint** on your turn |
 | No legal move | *Your turn: no move is possible, so pass* with **Pass** | Same |
 | Agent thinking | *nm3 is thinking…*, with the thinking panel | Same |
 | Agent failed | *nm3 could not move* with **Try again** | Same |

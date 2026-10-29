@@ -9,7 +9,6 @@ import type {
   AgentPlayer,
   AgentPreset,
   AgentRegistration,
-  BoardLocation,
   GameCreate,
   HumanPlayer,
   PlayerConfig,
@@ -29,6 +28,12 @@ import {
 /** The longest game name the API accepts. */
 export const GAME_NAME_MAX_LENGTH = 100;
 
+/** The longest player name the API accepts. */
+export const PLAYER_NAME_MAX_LENGTH = 40;
+
+/** The name of the opponent at the table when none is entered. */
+export const OPPONENT_DEFAULT_NAME = "Opponent";
+
 /** Where the flow remembers the last choices, per device. */
 export const NEW_GAME_STORAGE_KEY = "hive.new-game.choices";
 
@@ -39,19 +44,17 @@ export type AgentChoice =
 /** The colour a person plays against an agent; `random` is drawn when the game starts. */
 export type ColourChoice = PlayerSide | "random";
 
-/** The sides that get hints in a hints game. */
-export type HintSidesChoice = PlayerSide | "both";
-
 export interface AgentGameChoices {
-  location: BoardLocation;
   colour: ColourChoice;
   opponent: AgentChoice;
   hints: boolean;
   hint: AgentChoice;
 }
 
+/** A game against a friend at the table, where only the person using the app gets hints. */
 export interface HintsGameChoices {
-  sides: HintSidesChoice;
+  colour: ColourChoice;
+  opponentName: string;
   hint: AgentChoice;
 }
 
@@ -106,13 +109,12 @@ export function defaultNewGameChoices(agents: NewGameAgents): NewGameChoices | n
   return {
     scenario: "agent",
     agentGame: {
-      location: "screen",
       colour: "white",
       opponent: strongest,
       hints: false,
       hint: strongest,
     },
-    hintsGame: { sides: "both", hint: strongest },
+    hintsGame: { colour: "white", opponentName: "", hint: strongest },
     watchGame: { white: strongest, black: weakest },
   };
 }
@@ -201,12 +203,12 @@ export function buildNewGameRequest({
     return result.ok ? result.agent : null;
   };
   let players: { white: PlayerConfig; black: PlayerConfig };
-  let location: BoardLocation;
+  let location: GameCreate["board_location"];
   let defaultName: string;
 
   switch (choices.scenario) {
     case "agent": {
-      const { colour, hints, location: agentLocation } = choices.agentGame;
+      const { colour, hints } = choices.agentGame;
       const opponent = resolve(choices.agentGame.opponent);
       const hint = hints ? resolve(choices.agentGame.hint) : null;
 
@@ -220,24 +222,31 @@ export function buildNewGameRequest({
         side === "white"
           ? { white: person, black: opponent }
           : { white: opponent, black: person };
-      location = agentLocation;
+      location = "screen";
       defaultName = `You vs ${agentName(opponent.spec)}`;
       break;
     }
     case "hints": {
-      const { sides } = choices.hintsGame;
+      const { colour } = choices.hintsGame;
       const hint = resolve(choices.hintsGame.hint);
 
       if (hint === null) {
         return null;
       }
 
-      players = {
-        white: humanPlayer(sides === "black" ? null : hint),
-        black: humanPlayer(sides === "white" ? null : hint),
+      const side = colour === "random" ? (random() < 0.5 ? "white" : "black") : colour;
+      const opponentName = choices.hintsGame.opponentName.trim() || OPPONENT_DEFAULT_NAME;
+      const person = humanPlayer(hint);
+      const opponent: HumanPlayer = {
+        type: "human",
+        name: opponentName.slice(0, PLAYER_NAME_MAX_LENGTH),
       };
+      players =
+        side === "white"
+          ? { white: person, black: opponent }
+          : { white: opponent, black: person };
       location = "table";
-      defaultName = "Hints game";
+      defaultName = `You vs ${opponentName}`;
       break;
     }
     case "watch": {
@@ -342,11 +351,6 @@ export function readNewGameChoices(
   return {
     scenario: readOption(stored.scenario, GAME_SCENARIOS, defaults.scenario),
     agentGame: {
-      location: readOption<BoardLocation>(
-        agentGame.location,
-        ["screen", "table"],
-        defaults.agentGame.location,
-      ),
       colour: readOption<ColourChoice>(
         agentGame.colour,
         ["white", "black", "random"],
@@ -358,11 +362,15 @@ export function readNewGameChoices(
       hint: readAgentChoice(agentGame.hint, defaults.agentGame.hint, agents),
     },
     hintsGame: {
-      sides: readOption<HintSidesChoice>(
-        hintsGame.sides,
-        ["white", "black", "both"],
-        defaults.hintsGame.sides,
+      colour: readOption<ColourChoice>(
+        hintsGame.colour,
+        ["white", "black", "random"],
+        defaults.hintsGame.colour,
       ),
+      opponentName:
+        typeof hintsGame.opponentName === "string"
+          ? hintsGame.opponentName.slice(0, PLAYER_NAME_MAX_LENGTH)
+          : defaults.hintsGame.opponentName,
       hint: readAgentChoice(hintsGame.hint, defaults.hintsGame.hint, agents),
     },
     watchGame: {

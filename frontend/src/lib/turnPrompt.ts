@@ -1,7 +1,7 @@
 import type { GameDetail, GamePosition } from "@/api/client";
 import type { AgentTurnState } from "@/components/useAgentTurns";
 import { boardBeforeMove, describeMoveOnBoard, toBoardView } from "@/lib/moves";
-import { agentName, gameScenario, SIDE_TITLES } from "@/lib/players";
+import { agentName, describeTurnOf, gameScenario, sideName } from "@/lib/players";
 
 /**
  * What the game waits for now, which decides the actions of the turn prompt.
@@ -39,7 +39,7 @@ interface TurnPromptOptions {
   shownPly: number | null;
 }
 
-/** The result of a finished game, naming the person and the agent against an agent. */
+/** The result of a finished game, naming the winner. */
 function describeResult(game: GameDetail, position: GamePosition): string {
   const moves = `after ${position.ply_count} ${position.ply_count === 1 ? "move" : "moves"}`;
 
@@ -47,21 +47,13 @@ function describeResult(game: GameDetail, position: GamePosition): string {
     return `Draw ${moves}`;
   }
 
-  const winner = game[position.result];
-
-  if (gameScenario(game) === "agent") {
-    return `${winner.type === "agent" ? agentName(winner.spec) : "You"} won ${moves}`;
-  }
-
-  return `${SIDE_TITLES[position.result]} won ${moves}`;
+  return `${sideName(game, position.result)} won ${moves}`;
 }
 
-/** What a person whose turn it is does, by scenario and board location. */
+/** What a person whose turn it is does, by scenario. */
 function describePersonTurn(game: GameDetail, position: GamePosition): string {
   const againstAgent = gameScenario(game) === "agent";
-  const turn = againstAgent
-    ? "Your turn"
-    : `${SIDE_TITLES[position.current_player]}'s turn`;
+  const turn = describeTurnOf(game, position.current_player);
 
   if (position.must_pass) {
     return `${turn}: no move is possible, so pass`;
@@ -71,9 +63,7 @@ function describePersonTurn(game: GameDetail, position: GamePosition): string {
     return `${turn}: make the move on the table and enter it`;
   }
 
-  return game.board_location === "screen"
-    ? `${turn}: tap a piece on the board or in your hand`
-    : `${turn}: make your move on the table, then enter it here`;
+  return `${turn}: tap a piece on the board or in your hand`;
 }
 
 /**

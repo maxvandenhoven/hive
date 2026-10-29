@@ -143,7 +143,7 @@ describe("SvgBoard", () => {
     );
   });
 
-  it("draws each mark and lists it in the key with its label", async () => {
+  it("draws each mark but movable with a suggestion, and lists it in the key", async () => {
     const { user } = renderBoard({
       movable: [[0, 0]],
       selected: [0, 0],
@@ -157,8 +157,9 @@ describe("SvgBoard", () => {
     });
     const svg = screen.getByRole("group", { name: "Board" });
 
+    expect(svg.querySelector('[data-mark="movable"]')).toBeNull();
+
     for (const kind of [
-      "movable",
       "selected",
       "target",
       "climb",
@@ -176,7 +177,6 @@ describe("SvgBoard", () => {
         .getAllByRole("listitem")
         .map((item) => item.querySelector(".font-medium")?.textContent),
     ).toEqual([
-      "Can move",
       "Selected",
       "Can go here",
       "Can climb on top",

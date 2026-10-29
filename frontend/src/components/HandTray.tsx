@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 
 import type { PieceType, PlayerConfig } from "@/api/client";
-import { MovableRing, MovableShadow, SelectedOutline } from "@/components/board/marks";
+import {
+  MovableRing,
+  MovableShadow,
+  SelectedOutline,
+  SuggestionSourceRing,
+} from "@/components/board/marks";
 import { PieceTile } from "@/components/board/PieceTile";
 import { Button } from "@/components/ui/button";
 import { PIECE_NAMES, PIECE_TYPES } from "@/lib/moves";
@@ -16,6 +21,10 @@ interface HandTrayProps {
   /** The piece types that may be selected now; empty unless a person places here. */
   placeable: PieceType[];
   selected: PieceType | null;
+  /** The piece an agent suggests to place, marked with a ring, or `null` for none. */
+  suggested: PieceType | null;
+  /** Whether an agent suggests a move, which hides the placeable marks. */
+  suggestionShown: boolean;
   toMove: boolean;
   /** An action of the side, such as the Hint button on its turn. */
   action?: ReactNode;
@@ -27,16 +36,21 @@ interface TrayPieceProps {
   side: PlayerSide;
   placeable: boolean;
   selected: boolean;
+  suggested: boolean;
 }
 
-/** A piece in hand with the board's marks: raised when placeable, an outline when selected. */
-function TrayPiece({ piece, side, placeable, selected }: TrayPieceProps) {
+/**
+ * A piece in hand with the board's marks: raised when placeable, an outline when selected
+ * and a ring when an agent suggests placing it.
+ */
+function TrayPiece({ piece, side, placeable, selected, suggested }: TrayPieceProps) {
   return (
-    <svg viewBox="-1.1 -1.1 2.25 2.25" aria-hidden="true" className="size-9 shrink-0">
+    <svg viewBox="-1.1 -1.1 2.25 2.25" aria-hidden="true" className="size-14 shrink-0">
       {selected && <SelectedOutline />}
       {placeable && <MovableShadow />}
       <PieceTile piece={{ piece, owner: side }} />
       {placeable && <MovableRing />}
+      {suggested && <SuggestionSourceRing />}
     </svg>
   );
 }
@@ -48,6 +62,8 @@ export function HandTray({
   hand,
   placeable,
   selected,
+  suggested,
+  suggestionShown,
   toMove,
   action,
   onSelect,
@@ -79,7 +95,7 @@ export function HandTray({
                 aria-label={`Place ${SIDE_TITLES[side].toLowerCase()} ${PIECE_NAMES[piece].toLowerCase()}, ${count} left`}
                 disabled={!placeable.includes(piece)}
                 className={cn(
-                  "h-11 gap-1 px-1 tabular-nums",
+                  "h-16 gap-1 px-1 tabular-nums",
                   // Only pieces that cannot be placed on this turn look disabled.
                   placeable.length === 0 && "disabled:opacity-100",
                 )}
@@ -90,8 +106,9 @@ export function HandTray({
                 <TrayPiece
                   piece={piece}
                   side={side}
-                  placeable={placeable.includes(piece)}
+                  placeable={placeable.includes(piece) && !suggestionShown}
                   selected={selected === piece}
+                  suggested={suggested === piece}
                 />
                 <span className="text-muted-foreground">×{count}</span>
               </Button>

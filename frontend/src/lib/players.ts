@@ -138,7 +138,65 @@ export function describePlayer(player: PlayerConfig): string {
     return describeAgent(player);
   }
 
-  return player.hint ? `Human · ${describeHintAgent(player.hint)}` : "Human";
+  const name = player.name ?? "Human";
+
+  return player.hint ? `${name} · ${describeHintAgent(player.hint)}` : name;
+}
+
+/**
+ * The side the person using the app plays, or `null` when it is unknown.
+ *
+ * Against an agent it is the human side. At the table it is the side without a name
+ * when the opponent has one; older hints games named neither side.
+ */
+export function ownSide(game: Pick<GameSummary, "white" | "black">): PlayerSide | null {
+  const humans = PLAYER_SIDES.filter((side) => game[side].type === "human");
+
+  if (humans.length === 1) {
+    return humans[0] ?? null;
+  }
+
+  const unnamed = PLAYER_SIDES.filter((side) => {
+    const player = game[side];
+
+    return player.type === "human" && !player.name;
+  });
+
+  return humans.length === 2 && unnamed.length === 1 ? (unnamed[0] ?? null) : null;
+}
+
+/** Who plays a side: `You`, the opponent's name, the agent's name or the colour. */
+export function sideName(
+  game: Pick<GameSummary, "white" | "black">,
+  side: PlayerSide,
+): string {
+  const player = game[side];
+
+  if (ownSide(game) === side) {
+    return "You";
+  }
+
+  if (player.type === "agent") {
+    return agentName(player.spec);
+  }
+
+  return player.name ?? SIDE_TITLES[side];
+}
+
+/** Whose turn it is, such as `Your turn` or `Sam's turn`. */
+export function describeTurnOf(
+  game: Pick<GameSummary, "white" | "black">,
+  side: PlayerSide,
+): string {
+  return ownSide(game) === side ? "Your turn" : `${sideName(game, side)}'s turn`;
+}
+
+/** Who is to move, short, such as `Your turn` or `Sam to move`. */
+export function describeMover(
+  game: Pick<GameSummary, "white" | "black">,
+  side: PlayerSide,
+): string {
+  return ownSide(game) === side ? "Your turn" : `${sideName(game, side)} to move`;
 }
 
 /**
@@ -162,7 +220,7 @@ export const GAME_SCENARIO_INFO: Record<
   },
   hints: {
     title: "Play a friend with hints",
-    description: "Two people play at the table, and an agent suggests moves on request.",
+    description: "You play a friend at the table, and an agent suggests moves to you.",
   },
   watch: {
     title: "Watch two agents",
@@ -181,15 +239,11 @@ export function gameScenario(game: Pick<GameSummary, "white" | "black">): GameSc
   return humans.length === 1 ? "agent" : "hints";
 }
 
-/** The short label of a game's scenario in the list, such as `vs agent · on screen`. */
-export function describeGameScenario(
-  game: Pick<GameSummary, "white" | "black" | "board_location">,
-): string {
+/** The short label of a game's scenario in the list, such as `vs agent`. */
+export function describeGameScenario(game: Pick<GameSummary, "white" | "black">): string {
   switch (gameScenario(game)) {
     case "agent":
-      return game.board_location === "screen"
-        ? "vs agent · on screen"
-        : "vs agent · at the table";
+      return "vs agent";
     case "hints":
       return "hints game";
     case "watch":
@@ -245,7 +299,5 @@ export function describeNextAction(
     return { label: `${agentName(player.spec)} to move`, waitsForPerson: false };
   }
 
-  return gameScenario(game) === "agent"
-    ? { label: "Your turn", waitsForPerson: true }
-    : { label: `${SIDE_TITLES[game.current_player]} to move`, waitsForPerson: true };
+  return { label: describeMover(game, game.current_player), waitsForPerson: true };
 }

@@ -64,7 +64,7 @@ game
   status        text      -- active | finished | abandoned
   rules         jsonb     -- Rules
   setup         jsonb null -- BoardSetup from the editor, or null for the initial state
-  white_player  jsonb     -- {"type": "human", "hint": null | {"spec": AgentSpec, "budget_s": 5.0}}
+  white_player  jsonb     -- {"type": "human", "hint": null | {...}, "name": null | "Sam"}
                           -- or {"type": "agent", "spec": AgentSpec, "budget_s": 5.0}
   black_player  jsonb
   board_location text     -- screen | table (WP 33)
@@ -110,6 +110,9 @@ The players and the board location tell the supported setups apart (D26), checke
 A create request without `board_location` gets `screen` for agent vs agent and `table`
 otherwise, as migration `0002` did for existing games. A hint agent (`HintAgent`, a spec
 and a budget on `HumanPlayer`) only answers `think` requests; hints are not stored.
+`HumanPlayer.name` (optional, at most 40 characters) names a friend at the table; the
+person using the app is the unnamed side. The new game flow creates games against an
+agent on the `screen` only; the API still accepts `table` for them.
 
 In a `table` game, a committed agent move is stored with `pending = true` (D27): the
 physical board is behind until a person makes the move and confirms it with
