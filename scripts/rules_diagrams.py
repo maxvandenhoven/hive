@@ -253,8 +253,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
     RulesDiagram(
         id="placement-own-colour",
         caption=(
-            "After that a new piece touches only pieces of its own colour. White may "
-            "place on the green hexes, never next to a black piece."
+            "After that a new piece may only touch pieces of its own colour, so white "
+            "may place on the green hexes but never next to a black piece."
         ),
         cells={(0, 0): "wG", (1, 0): "bG", (-1, 0): "wA", (2, 0): "bA"},
         current_player=Player.WHITE,
@@ -265,7 +265,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
         id="placement-queen",
         caption=(
             "The queen must be on the board by your fourth turn. White has not placed "
-            "it in three turns, so now only the queen may be placed."
+            "it in its first three turns, so the queen is now the only piece white may "
+            "place."
         ),
         cells={
             (0, 0): "wG",
@@ -281,8 +282,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
     RulesDiagram(
         id="placement-no-moves",
         caption=(
-            "Pieces may only move once their queen is placed. White has no queen yet, "
-            "so the ant cannot move."
+            "Pieces may only move once their queen is placed, so the white ant cannot "
+            "move while white has no queen on the board."
         ),
         cells={(0, 0): "wG", (1, 0): "bQ", (-1, 0): "wA", (2, 0): "bA"},
         current_player=Player.WHITE,
@@ -293,9 +294,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
     RulesDiagram(
         id="one-hive-split",
         caption=(
-            "The pieces always form one hive. Taking the white ant away would split it "
-            "in two, so the ant cannot move, not even to a hex where the hive would join "
-            "up again."
+            "Taking the white ant away would split the hive in two, so the ant cannot "
+            "move, not even to a hex where the hive would join up again."
         ),
         cells={(0, 0): "wQ", (1, 0): "wA", (2, 0): "bQ", (3, 0): "bA"},
         current_player=Player.WHITE,
@@ -316,9 +316,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
     RulesDiagram(
         id="freedom-gate",
         caption=(
-            "Pieces slide over the table. The empty hex in the middle is enclosed and "
-            "its one opening is a gate too narrow to slide through, so the ant cannot "
-            "get in."
+            "The empty hex in the middle is enclosed, and its only opening is a gate "
+            "too narrow to slide through, so the ant cannot get in."
         ),
         cells={
             (1, 0): "wQ",
@@ -358,8 +357,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
     RulesDiagram(
         id="beetle-pin",
         caption=(
-            "A beetle on top pins the piece below it. The black ant under the white "
-            "beetle cannot move until the beetle leaves."
+            "The white beetle on top pins the black ant below it, so the ant cannot "
+            "move until the beetle leaves."
         ),
         cells={(0, 0): "wQ", (1, 0): "bA wB", (2, 0): "bQ", (3, 0): "bA"},
         current_player=Player.BLACK,
@@ -370,8 +369,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
     RulesDiagram(
         id="beetle-colour",
         caption=(
-            "A stack counts as the colour of its top piece. With the white beetle on "
-            "top, black may not place next to the stack."
+            "A stack counts as the colour of its top piece, so with the white beetle "
+            "on top black may not place next to the stack."
         ),
         cells={(0, 0): "wQ", (1, 0): "bA wB", (2, 0): "bQ", (3, 0): "bA"},
         current_player=Player.BLACK,
@@ -382,7 +381,7 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
         id="grasshopper",
         caption=(
             "The grasshopper jumps in a straight line over one or more pieces to the "
-            "first empty hex. It cannot walk or jump over a gap."
+            "first empty hex, but it cannot walk to a hex next to it or jump over a gap."
         ),
         cells={(0, 0): "wG", (1, 0): "bA", (2, 0): "bQ", (0, 1): "wQ"},
         current_player=Player.WHITE,
@@ -407,7 +406,8 @@ RULES_DIAGRAMS: tuple[RulesDiagram, ...] = (
     RulesDiagram(
         id="ant",
         caption=(
-            "The ant slides any number of hexes around the hive, to any hex it can reach."
+            "The ant slides any number of hexes around the hive, so it can reach every "
+            "green hex."
         ),
         cells={(-1, 0): "wA", (0, 0): "wQ", (1, 0): "bQ", (2, 0): "bA"},
         current_player=Player.WHITE,

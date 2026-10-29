@@ -1,6 +1,8 @@
 import { ArrowLeftIcon } from "lucide-react";
 import { Link } from "react-router";
 
+import type { PieceType } from "@/api/client";
+import { PieceIcon } from "@/components/board/PieceTile";
 import { HelpSection } from "@/components/help/HelpSection";
 import { RulesDiagram } from "@/components/help/RulesDiagram";
 import { SearchableSections } from "@/components/help/SearchableSections";
@@ -10,6 +12,55 @@ import { RULES_SECTIONS, type RulesSection } from "@/lib/help";
 const TITLES = Object.fromEntries(
   RULES_SECTIONS.map(({ id, title }) => [id, title]),
 ) as Record<RulesSection, string>;
+
+const PIECES: readonly {
+  piece: PieceType;
+  name: string;
+  count: string;
+  moves: string;
+}[] = [
+  { piece: "queen", name: "Queen bee", count: "1", moves: "slides one hex per turn." },
+  {
+    piece: "beetle",
+    name: "Beetle",
+    count: "2",
+    moves: "moves one hex per turn and may climb on top of other pieces.",
+  },
+  {
+    piece: "grasshopper",
+    name: "Grasshopper",
+    count: "3",
+    moves: "jumps in a straight line over a row of pieces.",
+  },
+  {
+    piece: "spider",
+    name: "Spider",
+    count: "2",
+    moves: "slides exactly three hexes around the hive.",
+  },
+  {
+    piece: "ant",
+    name: "Soldier ant",
+    count: "3",
+    moves: "slides any number of hexes around the hive.",
+  },
+];
+
+function PieceList() {
+  return (
+    <ul className="flex flex-col gap-3">
+      {PIECES.map(({ piece, name, count, moves }) => (
+        <li key={piece} className="flex items-center gap-3">
+          <PieceIcon piece={{ piece, owner: "white" }} className="size-9" />
+          <span>
+            <span className="font-medium">{name}</span>
+            <span className="text-muted-foreground"> ({count} per player)</span> {moves}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function Diagrams({ ids }: { ids: string[] }) {
   return (
@@ -43,15 +94,22 @@ export function RulesPage() {
         against the engine of this app.
       </p>
       <SearchableSections label="Search the rules">
+        <HelpSection id="pieces" title={TITLES.pieces}>
+          <p>
+            Each player has the same eleven pieces in their own colour, white or black.
+            Every kind of piece moves in its own way, and the sections further down show
+            each of them with a diagram.
+          </p>
+          <PieceList />
+        </HelpSection>
         <HelpSection id="goal" title={TITLES.goal}>
           <p>
-            Each player has eleven pieces. One queen bee, two beetles, three grasshoppers,
-            two spiders and three soldier ants. There is no board, the pieces themselves
-            form the hive. White starts.
+            The game has no board. Instead the pieces form the hive as they are placed,
+            and white always makes the first move.
           </p>
           <p>
-            You win by surrounding the queen of your opponent on all six sides. Pieces of
-            both colours count.
+            You win by surrounding the queen bee of your opponent on all six sides, and
+            pieces of both colours count towards surrounding it.
           </p>
           <Diagrams ids={["goal"]} />
         </HelpSection>
@@ -63,12 +121,12 @@ export function RulesPage() {
           </p>
           <p>
             From then on a new piece must touch at least one piece of your own colour and
-            no piece of the opponent. Once on the board, a piece is never taken back into
-            your hand.
+            no piece of the opponent. A placed piece stays on the board for the rest of
+            the game and is never taken back into your hand.
           </p>
           <p>
-            Your queen must be placed by your fourth turn. Until it is on the board, none
-            of your pieces may move.
+            Your queen must be placed by your fourth turn at the latest, and until it is
+            on the board none of your pieces may move.
           </p>
           <Diagrams
             ids={[
@@ -97,24 +155,26 @@ export function RulesPage() {
           <Diagrams ids={["freedom-gate"]} />
         </HelpSection>
         <HelpSection id="queen" title={TITLES.queen}>
-          <p>The queen bee moves one hex per turn.</p>
+          <p>The queen bee slides one hex per turn, to an empty hex next to it.</p>
           <Diagrams ids={["queen"]} />
         </HelpSection>
         <HelpSection id="beetle" title={TITLES.beetle}>
           <p>
-            The beetle moves one hex per turn, and it may climb on top of the hive and
-            move along it, also down into a gap. Only the top piece of a stack can move.
+            The beetle moves one hex per turn like the queen, but it may also climb on top
+            of the hive, move along the top and climb down into a gap.
           </p>
           <p>
-            A piece with a beetle on top cannot move, and the stack counts as the colour
-            of the beetle when placing new pieces.
+            Only the top piece of a stack can move, so a piece with a beetle on top stays
+            where it is until the beetle leaves. While the beetle is on top, the stack
+            counts as the colour of the beetle when new pieces are placed.
           </p>
           <Diagrams ids={["beetle-climb", "beetle-pin", "beetle-colour"]} />
         </HelpSection>
         <HelpSection id="grasshopper" title={TITLES.grasshopper}>
           <p>
             The grasshopper jumps in a straight line over at least one piece and lands on
-            the first empty hex. It ignores gates.
+            the first empty hex behind them. Because it jumps instead of sliding, gates do
+            not stop it.
           </p>
           <Diagrams ids={["grasshopper"]} />
         </HelpSection>
@@ -134,16 +194,17 @@ export function RulesPage() {
         </HelpSection>
         <HelpSection id="passing" title={TITLES.passing}>
           <p>
-            When you can neither place nor move a piece, you must pass. You may only pass
-            when no move is possible.
+            When you can neither place nor move a piece, you must pass your turn. Passing
+            is only allowed when no move is possible.
           </p>
           <Diagrams ids={["pass"]} />
         </HelpSection>
         {/* Repetition draws belong here once WP 30 adds them to the engine. */}
         <HelpSection id="end" title={TITLES.end}>
           <p>
-            A player whose queen is surrounded on all six sides loses. When a move
-            surrounds both queens at once, the game is a draw.
+            The game ends as soon as a queen is surrounded on all six sides, and the
+            player whose queen is surrounded loses. When one move surrounds both queens at
+            once, the game is a draw.
           </p>
           <Diagrams ids={["draw"]} />
         </HelpSection>

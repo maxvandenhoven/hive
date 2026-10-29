@@ -1,7 +1,7 @@
 /*
  * The two help pages linked from the game list, how the app works and the rules, and
- * their sections. The pages give each section an element with its id for the section
- * links at their top, and a test checks that every id here has one.
+ * their sections. The pages give each section an element with its id, and a test checks
+ * that every id here has one.
  */
 
 /** The path of the page on how the app works. */
@@ -21,6 +21,7 @@ export const HELP_SECTIONS: readonly { id: HelpSection; title: string }[] = [
 
 /** A section of the rules reference. */
 export type RulesSection =
+  | "pieces"
   | "goal"
   | "placement"
   | "one-hive"
@@ -35,7 +36,8 @@ export type RulesSection =
 
 /** The sections of the rules reference, in page order, with their headings. */
 export const RULES_SECTIONS: readonly { id: RulesSection; title: string }[] = [
-  { id: "goal", title: "Pieces and goal" },
+  { id: "pieces", title: "The pieces" },
+  { id: "goal", title: "Goal of the game" },
   { id: "placement", title: "Turns and placing pieces" },
   { id: "one-hive", title: "One hive" },
   { id: "freedom", title: "Freedom to move" },
