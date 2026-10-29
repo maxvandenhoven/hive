@@ -553,22 +553,36 @@ class Rules(JsonCodec):
         if state.current_ply == 1:
             return get_neighbors((0, 0))
 
-        placeable_coords = set()
+        # Each candidate is checked once, even if it neighbors several of the player's
+        # pieces. A candidate is placeable if every occupied neighbor is topped by the
+        # player, which reads the board directly instead of collecting the owners.
+        board = state.board
+        player = state.current_player
+        checked_coords: set[Coordinate] = set()
+        placeable_coords: list[Coordinate] = []
 
-        for coord in state.get_occupied_coords():
-            top_piece = state.get_top_piece(coord)
-
-            if top_piece.owner != state.current_player:
+        for coord, stack in board.items():
+            if stack[-1].owner is not player:
                 continue
 
-            for neighbor in get_neighbors(coord):
-                if state.is_occupied(neighbor):
+            for candidate_coord in get_neighbors(coord):
+                if candidate_coord in board or candidate_coord in checked_coords:
                     continue
 
-                if state.get_adjacent_players(neighbor) == {state.current_player}:
-                    placeable_coords.add(neighbor)
+                checked_coords.add(candidate_coord)
 
-        return list(placeable_coords)
+                for neighbor_coord in get_neighbors(candidate_coord):
+                    neighbor_stack = board.get(neighbor_coord)
+
+                    if (
+                        neighbor_stack is not None
+                        and neighbor_stack[-1].owner is not player
+                    ):
+                        break
+                else:
+                    placeable_coords.append(candidate_coord)
+
+        return placeable_coords
 
     def placeable_piece_types(self, state: GameState) -> list[PieceType]:
         """Get all piece types the current player may place.
