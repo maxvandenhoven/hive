@@ -364,6 +364,29 @@ class TestGameStateIsSurrounded:
         assert state.is_surrounded((0, 0))
 
 
+class TestGameStateCountOccupiedNeighbors:
+    """Test the `count_occupied_neighbors` count."""
+
+    def test_no_neighbors(self, default_state: GameState) -> None:
+        """Test that an empty board has no occupied neighbors."""
+        assert default_state.count_occupied_neighbors((0, 0)) == 0
+
+    def test_line(self, line_3_state: GameState) -> None:
+        """Test the counts along a line, where a stack counts once."""
+        state = line_3_state
+        state.apply_placement(
+            Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(1, 0))
+        )
+
+        assert state.count_occupied_neighbors((0, 0)) == 2
+        assert state.count_occupied_neighbors((1, 0)) == 1
+        assert state.count_occupied_neighbors((0, 1)) == 2
+
+    def test_ring(self, ring_6_state: GameState) -> None:
+        """Test that the center of a ring has six occupied neighbors."""
+        assert ring_6_state.count_occupied_neighbors((0, 0)) == 6
+
+
 class TestGameStateGetQueenCoord:
     """Test the `get_queen_coord` query."""
 

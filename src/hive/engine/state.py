@@ -278,13 +278,33 @@ class GameState:
         Returns:
             True if the coordinate to check has six occupied neighbors, otherwise False.
         """
-        occupied_neighbor_count = 0
+        # This runs for both queens at every node of a search, and most queens have a
+        # free neighbor, so the check stops at the first one.
+        board = self.board
 
         for neighbor_coord in get_neighbors(coord):
-            if self.is_occupied(neighbor_coord):
-                occupied_neighbor_count += 1
+            if neighbor_coord not in board:
+                return False
 
-        return occupied_neighbor_count == 6
+        return True
+
+    def count_occupied_neighbors(self, coord: Coordinate) -> int:
+        """Count the occupied coordinates that directly neighbor a coordinate.
+
+        Args:
+            coord: The axial coordinate `(q, r)` to check.
+
+        Returns:
+            The number of occupied neighbors, from zero to six.
+        """
+        board = self.board
+        count = 0
+
+        for neighbor_coord in get_neighbors(coord):
+            if neighbor_coord in board:
+                count += 1
+
+        return count
 
     def is_occupied(self, coord: Coordinate) -> bool:
         """Check if a coordinate on the game board is occupied (has a piece) or not.
