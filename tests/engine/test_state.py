@@ -763,6 +763,14 @@ class TestIsConnectedAfterRemoving:
         for coord in state.get_occupied_coords():
             assert state.is_connected_after_removing(coord)
 
+    def test_removing_only_piece(self, default_state: GameState) -> None:
+        """Test that removing the only piece leaves an empty, connected board."""
+        state = default_state
+        state.apply_placement(
+            Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
+        )
+        assert state.is_connected_after_removing((0, 0))
+
     def test_stacked_piece_always_connected(self, line_3_state: GameState) -> None:
         """Test that removing from a stack always stays connected."""
         state = line_3_state

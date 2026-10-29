@@ -512,6 +512,10 @@ class GameState:
         occupied_coords = self.get_occupied_coords()
         occupied_coords.remove(coord)
 
+        # Removing the only piece leaves an empty board, which counts as connected.
+        if not occupied_coords:
+            return True
+
         # Consider the game board as a graph, where coordinates are connected if they are
         # direct neighbors. Use depth-first search to traverse the graph and verify that
         # all occupied coordinates can be found (except for the given coordinate).
