@@ -798,10 +798,13 @@ export interface components {
          *
          *     Attributes:
          *         hint: The agent that suggests moves to the person, or `None` for no hints.
+         *         name: The name of the person, such as a friend at the table, or `None` for the
+         *             person using the app.
          *         type: Always `human`, which tells the player kinds apart in JSON.
          */
         HumanPlayer: {
             hint?: components["schemas"]["HintAgent"] | null;
+            name?: components["schemas"]["PlayerName"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -988,6 +991,7 @@ export interface components {
             targets: components["schemas"]["Coordinate"][];
         };
         PlayerConfig: components["schemas"]["HumanPlayer"] | components["schemas"]["AgentPlayer"];
+        PlayerName: string;
         /** @enum {string} */
         PlayerType: "human" | "agent";
         /**
