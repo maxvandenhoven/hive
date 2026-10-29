@@ -52,6 +52,18 @@ class Piece(JsonCodec):
     owner: Player
 
 
+SHARED_PIECES: Mapping[tuple[Player, PieceType], Piece] = {
+    (owner, piece_type): Piece(type=piece_type, owner=owner)
+    for owner in Player
+    for piece_type in PieceType
+}
+"""One instance of every piece by owner and type, which placements put on the board.
+
+Pieces are immutable and compared by value, so sharing them is safe, and looking one up
+is cheaper than creating it on every placement.
+"""
+
+
 @dataclass(slots=True)
 class Move(JsonCodec):
     """A game move that places or moves a piece on the board.
@@ -549,7 +561,7 @@ class GameState:
         Args:
             move: The placement move to apply. The `source_coord` must be `None`.
         """
-        piece = Piece(type=move.piece_type, owner=self.current_player)
+        piece = SHARED_PIECES[self.current_player, move.piece_type]
         self.hand[self.current_player][move.piece_type] -= 1
 
         self.board.setdefault(move.target_coord, []).append(piece)

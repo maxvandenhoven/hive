@@ -3,7 +3,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from hive.engine.state import GameState, Move, Piece, PieceType, Player
+from hive.engine.state import SHARED_PIECES, GameState, Move, Piece, PieceType, Player
 
 
 def assert_state_equal(state: GameState, expected: GameState) -> None:
@@ -89,6 +89,18 @@ class TestGameStateMovementAndPlacement:
         assert state.board[(0, 0)][0].owner is state.current_player
         assert state.hand[Player.WHITE][PieceType.QUEEN] == queen_count_before - 1
         assert state.queen_coord[Player.WHITE] == (0, 0)
+
+    def test_apply_placement_shares_pieces(self, default_state: GameState) -> None:
+        """Test that placements put the shared instance of the piece on the board."""
+        state = default_state
+        move = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
+
+        state.apply_placement(move)
+
+        assert state.board[(0, 0)][0] is SHARED_PIECES[Player.WHITE, PieceType.ANT]
+        assert SHARED_PIECES[Player.BLACK, PieceType.QUEEN] == Piece(
+            type=PieceType.QUEEN, owner=Player.BLACK
+        )
 
     def test_undo_placement_non_queen(self, default_state: GameState) -> None:
         """Test undoing non-queen placement restores board and hand."""
