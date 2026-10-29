@@ -56,6 +56,10 @@
         "0": 1,
         "1": 2
       },
+      "engine_counts": {
+        "2": 116,
+        "3": 1525
+      },
       "legal_moves": [
         {"piece": "queen", "from": [0, -1], "to": [1, -1]},
         {"piece": "queen", "from": [0, -1], "to": [-1, 0]}
@@ -90,6 +94,10 @@
       "counts": {
         "0": 1,
         "1": 7
+      },
+      "engine_counts": {
+        "2": 605,
+        "3": 10680
       },
       "legal_moves": [
         {"piece": "grasshopper", "from": [0, 0], "to": [3, 0]},
@@ -134,6 +142,10 @@
       "counts": {
         "0": 1,
         "1": 16
+      },
+      "engine_counts": {
+        "2": 912,
+        "3": 37589
       },
       "legal_moves": [
         {"piece": "ant", "from": [2, -1], "to": [3, -2]},
@@ -186,6 +198,10 @@
         "0": 1,
         "1": 4
       },
+      "engine_counts": {
+        "2": 232,
+        "3": 3132
+      },
       "legal_moves": [
         {"piece": "spider", "from": [0, -1], "to": [2, -1]},
         {"piece": "spider", "from": [0, -1], "to": [1, 1]},
@@ -224,6 +240,10 @@
       "counts": {
         "0": 1,
         "1": 4
+      },
+      "engine_counts": {
+        "2": 461,
+        "3": 5472
       },
       "legal_moves": [
         {"piece": "spider", "from": [0, 1], "to": [1, -2]},
@@ -264,6 +284,10 @@
         "0": 1,
         "1": 5
       },
+      "engine_counts": {
+        "2": 339,
+        "3": 6582
+      },
       "legal_moves": [
         {"piece": "beetle", "from": [0, 0], "to": [0, -1]},
         {"piece": "beetle", "from": [0, 0], "to": [1, -1]},
@@ -280,6 +304,10 @@
       "counts": {
         "0": 1,
         "1": 4
+      },
+      "engine_counts": {
+        "2": 96,
+        "3": 1440
       },
       "legal_moves": [
         {"piece": "grasshopper", "from": null, "to": [0, 0]},
@@ -390,6 +418,10 @@
         "0": 1,
         "1": 1
       },
+      "engine_counts": {
+        "2": 74,
+        "3": 432
+      },
       "legal_moves": [
         null
       ],
@@ -425,6 +457,10 @@
       "counts": {
         "0": 1,
         "1": 45
+      },
+      "engine_counts": {
+        "2": 1855,
+        "3": 149512
       },
       "legal_moves": [
         {"piece": "ant", "from": [-10, 0], "to": [-9, -1]},
@@ -505,6 +541,10 @@
       "counts": {
         "0": 1,
         "1": 4
+      },
+      "engine_counts": {
+        "2": 202,
+        "3": 5249
       },
       "legal_moves": [
         {"piece": "beetle", "from": [0, 0], "to": [0, -1]},

@@ -87,3 +87,81 @@ The #47 rows sort `placement_moves` and `movement_moves`, so the move order depe
 the position and seeded agents are reproducible. This costs about 12% nodes/s (median of
 three runs at depth 5, one at depth 6). Win it back in WP 27, for example with a move or
 board representation whose order is deterministic by construction.
+
+## Engine benchmark (WP 27)
+
+`hive bench engine` is the benchmark protocol of the speed work. It runs a fixed set of
+cases (`ENGINE_BENCH_CASES` in `src/hive/bench.py`), each about one second at the
+baseline, `--repeat` times (default 5). The cases take turns, one run each per round, so a
+slow phase of the machine spreads over all of them. Per case it prints the median seconds,
+the spread (slowest minus fastest run over the median) and nodes/s of the median run, and
+overall the geometric mean of the nodes/s of all cases, which weighs a relative speedup of
+every case equally. Every run must reproduce the node count of its case, so a speedup that
+changes the game tree fails the benchmark (exit code 1).
+
+| Case | Workload | Nodes |
+|---|---|---|
+| `perft-start-5` | perft from the start position, depth 5: placements | 516,240 |
+| `perft-ant-3` | perft from `ant_moves`, depth 3: a large hive with many ant moves | 37,589 |
+| `perft-long-3` | perft from `long_hive`, depth 3: a long chain, ants along the hive | 149,512 |
+| `negamax-long-3` | one `negamax` decision at depth 3 from `long_hive`, default evaluation | 153,360 |
+| `mobility-ant-2` | one `negamax` decision at depth 2 from `ant_moves` with `mobility: 1.0`, which generates the moves of both players at every leaf | 946 |
+
+The midgame positions come from the nokamute positions of the perft suite. Their depth 2
+and 3 counts are `engine_counts` produced by this engine (see `tests/data/perft/README.md`),
+which the perft tests also check, so a change in movement generation fails `make test`
+and not only the benchmark.
+
+Profile with `cProfile` or `py-spy` on the same cases:
+
+```
+uv run hive bench engine --repeat 1 --case perft-long-3 --profile long.prof
+uv run snakeviz long.prof   # or python -m pstats long.prof
+uvx py-spy record --format raw -o stacks.txt -- .venv/bin/hive bench engine --repeat 1
+```
+
+`py-spy` needs a Python process as its child (`.venv/bin/hive`, not `uv run`), and
+`--format raw` writes collapsed stacks that can be summarised as text or turned into a
+flame graph.
+
+### Baseline (WP 27)
+
+Measured on `41b8a30` (AMD Ryzen 7 5800H, Linux, Python 3.13.12, otherwise idle), median
+of 5 runs per case, spread below 3% for every case:
+
+| Case | Median s | Nodes/s |
+|---|---|---|
+| `perft-start-5` | 1.036 | 498,000 |
+| `perft-ant-3` | 0.354 | 106,000 |
+| `perft-long-3` | 1.215 | 123,000 |
+| `negamax-long-3` | 1.761 | 87,100 |
+| `mobility-ant-2` | 0.854 | 1,110 |
+| geometric mean | | 57,500 |
+
+`make perft` (start position, depth 6): 24.9 s, 491,000 nodes/s. A gauntlet of two
+`negamax` agents without a depth limit (`--budget 1 --max-turns 30 --seed 0`, two games)
+reached a mean search depth of 2.6 per decision.
+
+Profile of the baseline (`py-spy`, share of samples including callees, `perft-long-3` and
+`negamax-long-3` together):
+
+| Function | Share |
+|---|---|
+| `Rules.legal_moves` | 74% |
+| `Rules.ant_targets` | 60% |
+| `Rules.slideable_neighbors` | 56% |
+| `grid.get_flanking_coords` (twice per neighbour: `can_slide` and the contact check) | 27% |
+| `GameState.can_slide` | 21% |
+| `GameState.is_occupied` (self time only) | 11% |
+| `SearchAgent.evaluate` | 8% |
+| `Rules.winners` | 7% |
+| `Rules.placement_moves` | 6% |
+| `GameState.get_articulation_points` | 4% |
+| `GameState.apply_move` and `undo_move` | 7% |
+
+In the start position `placement_moves` takes 32% (a quarter of it sorting and `Move`
+construction), `apply_placement` 23% (a new `Piece` per placement), `undo_placement` 12%
+and `get_adjacent_players` 10% (a set per candidate coordinate). Articulation points are
+not a hot spot (4%), so incremental articulation points are not worth their complexity.
+Zobrist hashing only adds work to perft; it belongs to repetition handling (WP 30) and the
+transposition table (WP 28).

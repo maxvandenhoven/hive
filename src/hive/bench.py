@@ -2,17 +2,26 @@
 
 Perft walks the full game tree from a position to a fixed depth and counts the leaf
 positions. The counts depend only on the rules, so they prove correctness against
-reference engines, and the time taken measures raw engine speed.
+reference engines, and the time taken measures raw engine speed. The engine benchmark
+repeats a fixed set of perft walks and search decisions and reports the median speed of
+each, the objective of the engine speed work in `docs/plans/performance.md`.
 """
 
 import json
+import math
+import statistics
 import time
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, override
 
 from pydantic import ConfigDict
 
+from hive.agents.factory import AgentSpec, build_agent
+from hive.agents.search import SearchAgent
+from hive.agents.testing import LocalTurnContext
 from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
 from hive.engine.state import GameState, Move
@@ -136,6 +145,8 @@ class PerftPosition(JsonCodec):
         name: The name of the position, for example `start`.
         moves: The moves that lead to the position from the initial state.
         counts: The reference perft count per depth.
+        engine_counts: Perft counts per depth produced by this engine where no reference
+            count is known. They catch changes in behaviour, not rule bugs.
         legal_moves: The reference legal moves of the position, or `None` if only the
             counts are known.
     """
@@ -146,7 +157,20 @@ class PerftPosition(JsonCodec):
     name: str
     moves: list[Move | None]
     counts: dict[int, int]
+    engine_counts: dict[int, int] = field(default_factory=dict)
     legal_moves: list[Move | None] | None = None
+
+    def expected_count(self, depth: int) -> int | None:
+        """Get the stored count at a depth, preferring a reference count.
+
+        Args:
+            depth: The perft depth.
+
+        Returns:
+            The reference count, else the count of this engine, or `None` if neither is
+            stored.
+        """
+        return self.counts.get(depth, self.engine_counts.get(depth))
 
     def state(self, rules: Rules) -> GameState:
         """Create the game state of the position by replaying its moves.
@@ -189,8 +213,8 @@ class PerftSuite(JsonCodec):
 
         The file holds the JSON form of the suite: the `rules` (missing fields keep their
         default) and a list of `positions`, each with a `name`, a list of `moves`,
-        `counts` keyed by depth and optionally `legal_moves`. Other keys, such as the
-        `source` of the reference counts, are ignored.
+        `counts` keyed by depth and optionally `engine_counts` and `legal_moves`. Other
+        keys, such as the `source` of the reference counts, are ignored.
 
         Args:
             path: The path of the JSON file.
@@ -221,3 +245,264 @@ class PerftSuite(JsonCodec):
 
         msg = f"Unknown perft position `{name}`."
         raise KeyError(msg)
+
+
+@dataclass(frozen=True, slots=True)
+class EngineBenchSample:
+    """One timed run of an engine benchmark case.
+
+    Attributes:
+        nodes: The number of nodes the run counted or visited.
+        seconds: The wall clock time of the run.
+    """
+
+    nodes: int
+    seconds: float
+
+
+class EngineBenchMismatchError(ValueError):
+    """Raised when a benchmark run visits a different number of nodes than expected."""
+
+
+@dataclass(frozen=True, slots=True)
+class EngineBenchCase(ABC):
+    """A fixed workload of the engine benchmark, started from a perft suite position.
+
+    Every run of a case visits the same nodes, so the node count checks that a speedup
+    did not change what the engine does, and the time measures how fast it does it.
+
+    Attributes:
+        name: The name of the case in reports.
+        position: The name of the suite position the case starts from.
+        nodes: The number of nodes every run must count or visit.
+    """
+
+    name: str
+    position: str
+    nodes: int
+
+    @abstractmethod
+    def run(self, state: GameState, rules: Rules) -> EngineBenchSample:
+        """Run the workload once and time it.
+
+        Args:
+            state: The state of the position, which the run may modify.
+            rules: The rules of the suite.
+
+        Returns:
+            The number of nodes and the seconds of the timed part of the run.
+        """
+
+    def sample(self, suite: PerftSuite) -> EngineBenchSample:
+        """Run the workload once from a fresh state of the position and check the nodes.
+
+        Args:
+            suite: The suite with the position and the rules.
+
+        Returns:
+            The number of nodes and the seconds of the run.
+
+        Raises:
+            EngineBenchMismatchError: If the run visits a different number of nodes than
+                `nodes`.
+        """
+        state = suite.position(self.position).state(suite.rules)
+        sample = self.run(state=state, rules=suite.rules)
+
+        if sample.nodes != self.nodes:
+            msg = (
+                f"Benchmark case `{self.name}` visited `{sample.nodes}` nodes, but "
+                f"`{self.nodes}` are expected."
+            )
+            raise EngineBenchMismatchError(msg)
+
+        return sample
+
+
+@dataclass(frozen=True, slots=True)
+class PerftBenchCase(EngineBenchCase):
+    """A benchmark case that runs perft, which measures move generation, apply and undo.
+
+    Attributes:
+        depth: The number of plies to walk.
+    """
+
+    depth: int
+
+    @override
+    def run(self, state: GameState, rules: Rules) -> EngineBenchSample:
+        """Run perft once and time it.
+
+        Args:
+            state: The state of the position, which is restored afterwards.
+            rules: The rules of the suite.
+
+        Returns:
+            The number of leaf positions and the seconds of the walk.
+        """
+        result = timed_perft(state=state, rules=rules, depth=self.depth)
+        return EngineBenchSample(nodes=result.nodes, seconds=result.seconds)
+
+
+@dataclass(frozen=True, slots=True)
+class SearchBenchCase(EngineBenchCase):
+    """A benchmark case that makes one search decision, which adds evaluation to perft.
+
+    Attributes:
+        agent: The search agent, which needs a `depth` limit so every run visits the same
+            nodes.
+    """
+
+    agent: AgentSpec
+
+    @override
+    def run(self, state: GameState, rules: Rules) -> EngineBenchSample:
+        """Make one decision with the agent and time it, without building the agent.
+
+        Args:
+            state: The state of the position, which is restored afterwards.
+            rules: The rules of the suite.
+
+        Returns:
+            The number of nodes the search visited and the seconds of the decision.
+
+        Raises:
+            ValueError: If `agent` is not a search agent.
+        """
+        agent = build_agent(spec=self.agent, rules=rules, seed=0)
+
+        if not isinstance(agent, SearchAgent):
+            msg = f"Benchmark case `{self.name}` needs a search agent, not `{agent}`."
+            raise ValueError(msg)
+
+        start = time.perf_counter()
+        agent.think(state=state, turn=LocalTurnContext())
+        seconds = time.perf_counter() - start
+
+        return EngineBenchSample(nodes=agent.nodes, seconds=seconds)
+
+
+ENGINE_BENCH_CASES: list[EngineBenchCase] = [
+    PerftBenchCase(name="perft-start-5", position="start", depth=5, nodes=516_240),
+    PerftBenchCase(name="perft-ant-3", position="ant_moves", depth=3, nodes=37_589),
+    PerftBenchCase(name="perft-long-3", position="long_hive", depth=3, nodes=149_512),
+    SearchBenchCase(
+        name="negamax-long-3",
+        position="long_hive",
+        agent=AgentSpec(kind="negamax", params={"depth": 3}),
+        nodes=153_360,
+    ),
+    SearchBenchCase(
+        name="mobility-ant-2",
+        position="ant_moves",
+        agent=AgentSpec(kind="negamax", params={"depth": 2, "mobility": 1.0}),
+        nodes=946,
+    ),
+]
+"""The fixed cases of `hive bench engine`, each about one second at the WP 27 baseline.
+
+The start position measures placements. `ant_moves` and `long_hive` from the perft suite
+are large hives with many ant, spider and beetle moves, where articulation points and
+slide checks dominate. The search cases add a negamax decision with the default evaluation
+and one with the mobility term, which generates the moves of both players at every leaf.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class EngineBenchResult:
+    """The repeated runs of one engine benchmark case.
+
+    Attributes:
+        case: The case.
+        samples: The runs, in the order they were made.
+    """
+
+    case: EngineBenchCase
+    samples: list[EngineBenchSample]
+
+    @property
+    def median_seconds(self) -> float:
+        """Get the median wall clock time of the runs.
+
+        Returns:
+            The median of the seconds of every run.
+        """
+        return statistics.median(sample.seconds for sample in self.samples)
+
+    @property
+    def nodes_per_second(self) -> float:
+        """Get the speed of the median run.
+
+        Returns:
+            The nodes of the case divided by the median seconds.
+        """
+        return self.case.nodes / self.median_seconds
+
+    @property
+    def spread(self) -> float:
+        """Get the spread of the runs relative to the median, a measure of noise.
+
+        Returns:
+            The slowest minus the fastest run, divided by the median run.
+        """
+        seconds = [sample.seconds for sample in self.samples]
+        return (max(seconds) - min(seconds)) / self.median_seconds
+
+
+@dataclass(frozen=True, slots=True)
+class EngineBenchReport:
+    """The results of an engine benchmark over several cases.
+
+    Attributes:
+        results: The result of every case, in the order of the cases.
+    """
+
+    results: list[EngineBenchResult]
+
+    @classmethod
+    def measure(
+        cls, cases: Sequence[EngineBenchCase], suite: PerftSuite, repeat: int
+    ) -> "EngineBenchReport":
+        """Run every case `repeat` times.
+
+        The cases take turns, one run each per round, so a slow phase of the machine
+        affects every case a little rather than one case a lot.
+
+        Args:
+            cases: The cases to run.
+            suite: The suite with the positions and the rules.
+            repeat: The number of runs per case, at least one.
+
+        Returns:
+            The runs of every case.
+
+        Raises:
+            ValueError: If `repeat` is less than one.
+        """
+        if repeat < 1:
+            msg = f"The benchmark needs at least `1` run per case, but got `{repeat}`."
+            raise ValueError(msg)
+
+        samples: list[list[EngineBenchSample]] = [[] for _ in cases]
+
+        for _ in range(repeat):
+            for case, case_samples in zip(cases, samples, strict=True):
+                case_samples.append(case.sample(suite))
+
+        return cls(
+            results=[
+                EngineBenchResult(case=case, samples=case_samples)
+                for case, case_samples in zip(cases, samples, strict=True)
+            ]
+        )
+
+    @property
+    def nodes_per_second(self) -> float:
+        """Get the overall speed, which weighs a relative speedup of every case equally.
+
+        Returns:
+            The geometric mean of the nodes per second of every case.
+        """
+        return math.exp(
+            statistics.mean(math.log(result.nodes_per_second) for result in self.results)
+        )
