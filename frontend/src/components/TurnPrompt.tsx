@@ -6,7 +6,6 @@ import {
   SkipForwardIcon,
   Undo2Icon,
 } from "lucide-react";
-import type { ReactNode } from "react";
 
 import type { GamePosition } from "@/api/client";
 import type { BoardView } from "@/components/board/types";
@@ -33,8 +32,6 @@ interface TurnPromptProps {
   onUndo: () => void;
   /** Return from a replayed position to the live one. */
   onLive: () => void;
-  /** The help button for the current scenario and turn, after the actions. */
-  help?: ReactNode;
 }
 
 /**
@@ -53,7 +50,6 @@ export function TurnPrompt({
   onPass,
   onUndo,
   onLive,
-  help,
 }: TurnPromptProps) {
   const { kind } = prompt;
   const suggests = kind === "pending" || (kind === "turn" && hint.state.type === "shown");
@@ -109,7 +105,6 @@ export function TurnPrompt({
             </Button>
           )}
           {(kind === "over" || kind === "abandoned") && <NewGameDialog />}
-          {help}
         </div>
       </div>
       {kind === "watching" && <MatchControls turns={turns} />}

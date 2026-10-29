@@ -56,6 +56,23 @@ describe("SvgBoard", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps a diagram fitted, without the key, zoom buttons or wheel zoom", () => {
+    renderBoard({ diagram: true });
+    const fitted = viewBox();
+    const board = screen.getByRole("group", { name: "Board" });
+    const wheel = new WheelEvent("wheel", { deltaY: -100, cancelable: true });
+    board.dispatchEvent(wheel);
+
+    expect(screen.queryByRole("button", { name: "Key" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Zoom in" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Fit the board" }),
+    ).not.toBeInTheDocument();
+    expect(wheel.defaultPrevented).toBe(false);
+    expect(viewBox()).toBe(fitted);
+    expect(board).not.toHaveClass("touch-none");
+  });
+
   it("makes movable tiles and targets clickable", async () => {
     const { onHexClick, user } = renderBoard({
       movable: [[0, 0]],

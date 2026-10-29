@@ -1,24 +1,25 @@
 /*
- * The sections of the help and the rules reference, which help buttons and board tips
- * link to. The pages give each section an element with its id, and a test checks that
- * every id here has one.
+ * The two help pages linked from the game list, how the app works and the rules, and
+ * their sections. The pages give each section an element with its id for the section
+ * links at their top, and a test checks that every id here has one.
  */
 
-/** A section of the help page at `/help`. */
-export type HelpSection =
-  "scenarios" | "board" | "controls" | "games" | "leaving" | "rules";
+/** The path of the page on how the app works. */
+export const HELP_PATH = "/help";
 
-/** The sections of the help page, in page order, with their headings. */
+/** A section of the page on how the app works. */
+export type HelpSection = "scenarios" | "board" | "controls" | "games" | "leaving";
+
+/** The sections of the page on how the app works, in page order, with their headings. */
 export const HELP_SECTIONS: readonly { id: HelpSection; title: string }[] = [
-  { id: "scenarios", title: "What you can do" },
-  { id: "board", title: "Reading the board" },
+  { id: "scenarios", title: "Creating a game" },
+  { id: "board", title: "Colours and marks on the board" },
   { id: "controls", title: "Controls" },
   { id: "games", title: "Games and statuses" },
   { id: "leaving", title: "Leaving and coming back" },
-  { id: "rules", title: "Rules" },
 ];
 
-/** A section of the rules reference at `/help/rules`. */
+/** A section of the rules reference. */
 export type RulesSection =
   | "goal"
   | "placement"
@@ -48,17 +49,7 @@ export const RULES_SECTIONS: readonly { id: RulesSection; title: string }[] = [
 ];
 
 /** The path of the rules reference. */
-export const RULES_PATH = "/help/rules";
-
-/** The link to a section of the help page. */
-export function helpPath(section: HelpSection): string {
-  return `/help#${section}`;
-}
-
-/** The link to a section of the rules reference. */
-export function rulesPath(section: RulesSection): string {
-  return `${RULES_PATH}#${section}`;
-}
+export const RULES_PATH = "/rules";
 
 /** A link in the text of the help, foreground text with a honey underline. */
 export const HELP_LINK_CLASSES =

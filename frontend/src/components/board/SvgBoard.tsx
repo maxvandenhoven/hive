@@ -221,7 +221,7 @@ function buttonProps(
  *
  * The view fits the board until it is panned (drag) or zoomed (pinch, mouse wheel or the
  * buttons); the fit button returns to fitting. Tapping a stack shows its contents. A
- * diagram leaves out the key and the zoom buttons.
+ * diagram stays fitted around the board, without the key, zoom buttons or gestures.
  */
 export function SvgBoard({
   board,
@@ -253,6 +253,7 @@ export function SvgBoard({
     view,
     limits,
     onViewChange: setManualView,
+    enabled: !diagram,
   });
   const grid = useMemo(() => {
     const visible = screenSize === null ? view : visibleViewBox(view, screenSize);
@@ -401,7 +402,7 @@ export function SvgBoard({
           role="group"
           aria-label="Board"
           viewBox={viewBoxAttribute(view)}
-          className="size-full touch-none select-none"
+          className={cn("size-full select-none", !diagram && "touch-none")}
           onClick={clickBackground}
           {...handlers}
         >

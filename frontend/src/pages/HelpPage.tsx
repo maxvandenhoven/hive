@@ -1,15 +1,16 @@
+import { ArrowLeftIcon } from "lucide-react";
 import { Link } from "react-router";
 
 import { BoardHelp } from "@/components/help/BoardHelp";
 import { HelpSection } from "@/components/help/HelpSection";
 import { useScrollToHash } from "@/components/help/useScrollToHash";
+import { Button } from "@/components/ui/button";
 import {
   HELP_LINK_CLASSES,
   HELP_SECTIONS,
   RULES_PATH,
   type HelpSection as HelpSectionId,
 } from "@/lib/help";
-import { cn } from "@/lib/utils";
 
 const TITLES = Object.fromEntries(
   HELP_SECTIONS.map(({ id, title }) => [id, title]),
@@ -28,7 +29,10 @@ function HelpList({ items }: { items: string[] }) {
 function ScenariosHelp() {
   return (
     <>
-      <p>A new game asks what you would like to do. There are three ways to play.</p>
+      <p>
+        Press New game on the game list and choose what you would like to do. There are
+        three ways to play.
+      </p>
       <HelpList
         items={[
           "Play against an agent. You play one side on this screen and the agent answers within its time budget.",
@@ -41,6 +45,12 @@ function ScenariosHelp() {
         follows a real board. You make each move with the real pieces and then enter it
         here. When an agent plays at the table, it shows its move and waits until you have
         made it and pressed Done.
+      </p>
+      <p>
+        After choosing, set the game up. Pick your colour (or let it be drawn), the agent
+        and how strong it is, and whether you want hints. The name is optional. The app
+        remembers your choices on this device, so the next similar game is New game and
+        then Start game.
       </p>
       <p>
         Hints are suggestions from an agent for your own side. Press Hint on your turn to
@@ -63,7 +73,6 @@ function ControlsHelp() {
         "The move list and the replay buttons show earlier positions. Replayed positions are read only, and Go live returns to the game.",
         "Drag the board to pan it, pinch or use the mouse wheel to zoom, and press the fit button at the bottom right to see the whole hive again.",
         "Tap a stack of two or more pieces to see every piece in it from the top.",
-        "The Tips button on the game page turns the tips above the board on or off on this device.",
       ]}
     />
   );
@@ -105,13 +114,31 @@ function LeavingHelp() {
   );
 }
 
-/** The help: what the app does, how to read the board, the controls and the statuses. */
+/**
+ * How the app works: creating games, the colours and marks of the board, the controls,
+ * the statuses and what is kept when you leave.
+ */
 export function HelpPage() {
   useScrollToHash();
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="font-heading text-2xl font-semibold">Help</h1>
+      <div>
+        <Button variant="ghost" asChild>
+          <Link to="/">
+            <ArrowLeftIcon />
+            Games
+          </Link>
+        </Button>
+      </div>
+      <h1 className="font-heading text-2xl font-semibold">How the app works</h1>
+      <p className="text-muted-foreground">
+        The rules of the game itself are on the{" "}
+        <Link to={RULES_PATH} className={HELP_LINK_CLASSES}>
+          rules page
+        </Link>
+        .
+      </p>
       <nav aria-label="Help sections">
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {HELP_SECTIONS.map(({ id, title }) => (
@@ -137,16 +164,6 @@ export function HelpPage() {
       </HelpSection>
       <HelpSection id="leaving" title={TITLES.leaving}>
         <LeavingHelp />
-      </HelpSection>
-      <HelpSection id="rules" title={TITLES.rules}>
-        <p>
-          The rules reference explains every rule of the base game with small boards.
-          Green hexes are allowed and crossed out red hexes are not, both checked against
-          the engine of this app.
-        </p>
-        <Link to={RULES_PATH} className={cn(HELP_LINK_CLASSES, "self-start")}>
-          Read the rules
-        </Link>
       </HelpSection>
     </div>
   );

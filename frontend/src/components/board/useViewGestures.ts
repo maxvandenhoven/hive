@@ -54,19 +54,23 @@ interface ViewGesturesOptions {
   view: ViewBox;
   limits: ViewBoxLimits;
   onViewChange: (view: ViewBox) => void;
+  /** Whether the gestures move the view; a fixed view leaves the wheel to the page. */
+  enabled?: boolean;
 }
 
 /**
  * Pan with one pointer, pinch to zoom with two and zoom with the mouse wheel.
  *
  * Returns the pointer handlers for the SVG and `consumeDrag`, which tells a click
- * handler whether the click ended a drag and should be ignored.
+ * handler whether the click ended a drag and should be ignored. Disabled, the SVG gets
+ * no handlers and the wheel scrolls the page.
  */
 export function useViewGestures({
   svgRef,
   view,
   limits,
   onViewChange,
+  enabled = true,
 }: ViewGesturesOptions) {
   const pointers = useRef(new Map<number, PixelPoint>());
   const start = useRef<GestureStart | null>(null);
@@ -76,7 +80,7 @@ export function useViewGestures({
   useEffect(() => {
     const svg = svgRef.current;
 
-    if (svg === null) {
+    if (svg === null || !enabled) {
       return;
     }
 
@@ -97,7 +101,7 @@ export function useViewGestures({
     return () => {
       svg.removeEventListener("wheel", zoom);
     };
-  }, [svgRef, view, limits, onViewChange]);
+  }, [svgRef, view, limits, onViewChange, enabled]);
 
   /** Measure the gesture from here, whenever a pointer is added or lifted. */
   const restart = () => {
@@ -195,12 +199,14 @@ export function useViewGestures({
   };
 
   return {
-    handlers: {
-      onPointerDown,
-      onPointerMove,
-      onPointerUp: onPointerEnd,
-      onPointerCancel: onPointerEnd,
-    },
+    handlers: enabled
+      ? {
+          onPointerDown,
+          onPointerMove,
+          onPointerUp: onPointerEnd,
+          onPointerCancel: onPointerEnd,
+        }
+      : {},
     consumeDrag,
   };
 }

@@ -32,13 +32,13 @@ export function RulesPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div>
         <Button variant="ghost" asChild>
-          <Link to="/help">
+          <Link to="/">
             <ArrowLeftIcon />
-            Help
+            Games
           </Link>
         </Button>
       </div>
-      <h1 className="font-heading text-2xl font-semibold">Rules</h1>
+      <h1 className="font-heading text-2xl font-semibold">Game rules</h1>
       <p className="text-muted-foreground">
         In the diagrams a blue outline marks the piece that moves, green hexes are where
         it may go and crossed out red hexes are where it may not. Every diagram is checked

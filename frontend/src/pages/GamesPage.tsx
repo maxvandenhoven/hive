@@ -5,12 +5,11 @@ import type { GameSummary } from "@/api/client";
 import { useGamePage } from "@/api/queries";
 import { DeleteGameDialog } from "@/components/DeleteGameDialog";
 import { GamesTable } from "@/components/GamesTable";
-import { HelpButton } from "@/components/help/HelpButton";
+import { HelpCards } from "@/components/help/HelpCards";
 import { NewGameDialog } from "@/components/NewGameDialog";
 import { RenameGameDialog } from "@/components/RenameGameDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { helpPath } from "@/lib/help";
 
 /** The number of games on one page of the list. */
 export const GAMES_PAGE_SIZE = 20;
@@ -21,7 +20,10 @@ function readPageNumber(value: string | null): number {
   return Number.isInteger(page) && page > 1 ? page : 1;
 }
 
-/** The game list, newest first, with the new game dialog and the game actions. */
+/**
+ * The game list, newest first, with the new game dialog, the game actions and the links
+ * to the rules and to how the app works.
+ */
 export function GamesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageNumber = readPageNumber(searchParams.get("page"));
@@ -37,18 +39,10 @@ export function GamesPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-1">
-          <h1 className="font-heading text-2xl font-semibold">Games</h1>
-          <HelpButton topic="game statuses" title="Game statuses" to={helpPath("games")}>
-            <p>
-              Each game shows what it waits for. Honey labels such as Your turn and
-              Agent's move to make wait for you. An agent to move plays when you open the
-              game.
-            </p>
-          </HelpButton>
-        </div>
+        <h1 className="font-heading text-2xl font-semibold">Games</h1>
         <NewGameDialog />
       </div>
+      <HelpCards />
       <Card className="py-0">
         <CardContent className="px-0">
           {gamePage.isPending && (

@@ -1,7 +1,6 @@
-import { CircleHelpIcon, HexagonIcon } from "lucide-react";
+import { HexagonIcon } from "lucide-react";
 import { Link, Outlet } from "react-router";
 
-import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 
 /** The width of the header and page content: a desktop screen, one column on a phone. */
@@ -20,18 +19,7 @@ export function AppLayout() {
             <HexagonIcon className="size-6 fill-primary text-primary" />
             Hive
           </Link>
-          <div className="flex items-center gap-2" data-slot="header-actions">
-            <Button
-              variant="ghost"
-              asChild
-              className="text-header-foreground hover:bg-header-foreground/10 hover:text-header-foreground"
-            >
-              <Link to="/help">
-                <CircleHelpIcon />
-                Help
-              </Link>
-            </Button>
-          </div>
+          <div className="flex items-center gap-2" data-slot="header-actions" />
         </div>
       </header>
       <main className={`${FRAME_CLASSES} py-6`}>

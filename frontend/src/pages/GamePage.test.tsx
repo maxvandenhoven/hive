@@ -155,25 +155,6 @@ describe("GamePage", () => {
     ]);
   });
 
-  it("explains the turn in its help and shows tips for a first game", async () => {
-    mockGameApi();
-    const user = renderGamePage();
-    const prompt = await findPrompt();
-
-    expect(screen.getByRole("list", { name: "Tips" })).toHaveTextContent(
-      "Tap a piece with a blue ring to see where it can go.",
-    );
-
-    await user.click(within(prompt).getByRole("button", { name: "Help with this game" }));
-    const help = within(await screen.findByRole("dialog"));
-
-    expect(help.getByText(/then tap a green hex/)).toBeInTheDocument();
-    expect(help.getByRole("link", { name: "More in the help" })).toHaveAttribute(
-      "href",
-      "/help#controls",
-    );
-  });
-
   it("places a piece from the hand", async () => {
     let position = gamePosition();
     const requests = mockGameApi(
