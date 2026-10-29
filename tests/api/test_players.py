@@ -68,3 +68,8 @@ class TestHumanPlayer:
 
     def test_round_trips_hint(self) -> None:
         assert HumanPlayer.from_json(HINTED.to_json()) == HINTED
+
+    def test_round_trips_name(self) -> None:
+        player = HumanPlayer(name="Sam")
+
+        assert HumanPlayer.from_json(player.to_json()) == player

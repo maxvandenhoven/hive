@@ -30,9 +30,9 @@ game at the table:
 
 - Each side is either a **human** or an **agent**, and a game is played **on screen** (the
   app is the board) or **at the table** (a physical board the app follows). Three
-  scenarios are supported (D26): play against an agent (on screen or at the table), play a
-  friend with **hints** from an agent for one or both sides (at the table), and watch two
-  agents (on screen). Human vs human without hints is not a goal.
+  scenarios are supported (D26): play against an agent (on screen), play a named friend
+  with **hints** from an agent for you only (at the table), and watch two agents (on
+  screen). Human vs human without hints is not a goal.
 - Human moves are entered **manually** (tap a tile, tap a target) or with the **camera**:
   a photo is taken, tiles are detected, and the engine infers which legal move was played.
 - Agent moves are computed within a fixed **time budget**, with the search streamed live to

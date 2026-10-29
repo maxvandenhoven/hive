@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import {
   buildNewGameRequest,
   defaultGameName,
+  OPPONENT_DEFAULT_NAME,
+  PLAYER_NAME_MAX_LENGTH,
   defaultNewGameChoices,
   GAME_NAME_MAX_LENGTH,
   readNewGameChoices,
@@ -96,25 +98,6 @@ function AgentGameSetup({
   return (
     <>
       <ChoiceCards
-        legend="Where to play"
-        value={value.location}
-        options={[
-          {
-            value: "screen",
-            title: "On this screen",
-            description: "The app is the board; the agent's moves appear on it.",
-          },
-          {
-            value: "table",
-            title: "At the table",
-            description: "Play on a physical board and enter your moves here.",
-          },
-        ]}
-        onChange={(location) => {
-          onChange({ ...value, location });
-        }}
-      />
-      <ChoiceCards
         legend="Your colour"
         layout="row"
         value={value.colour}
@@ -169,24 +152,39 @@ function HintsGameSetup({
   agents,
   onChange,
 }: ScenarioSetupProps<HintsGameChoices>) {
+  const opponentId = useId();
+
   return (
     <>
       <p className="text-muted-foreground">
-        Always at the table: play on a physical board and enter each move here.
+        Always at the table: play on a physical board and enter each move here. Only you
+        get hints.
       </p>
       <ChoiceCards
-        legend="Who gets hints"
+        legend="Your colour"
         layout="row"
-        value={value.sides}
+        value={value.colour}
         options={[
           { value: "white", title: "White" },
           { value: "black", title: "Black" },
-          { value: "both", title: "Both" },
+          { value: "random", title: "Random" },
         ]}
-        onChange={(sides) => {
-          onChange({ ...value, sides });
+        onChange={(colour) => {
+          onChange({ ...value, colour });
         }}
       />
+      <Field>
+        <FieldLabel htmlFor={opponentId}>Opponent's name</FieldLabel>
+        <Input
+          id={opponentId}
+          value={value.opponentName}
+          maxLength={PLAYER_NAME_MAX_LENGTH}
+          placeholder={OPPONENT_DEFAULT_NAME}
+          onChange={(event) => {
+            onChange({ ...value, opponentName: event.target.value });
+          }}
+        />
+      </Field>
       <AgentChoiceField
         label="Hint strength"
         value={value.hint}

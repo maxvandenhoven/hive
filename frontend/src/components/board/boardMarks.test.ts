@@ -17,7 +17,7 @@ describe("boardMarksShown", () => {
     expect(boardMarksShown(EMPTY)).toEqual([]);
   });
 
-  it("finds every mark, in legend order", () => {
+  it("finds every mark but movable with a suggestion, in legend order", () => {
     expect(
       boardMarksShown({
         ...EMPTY,
@@ -31,7 +31,8 @@ describe("boardMarksShown", () => {
         proposedMove: { from: [0, 0], to: [1, 0] },
         forbidden: [[2, 0]],
       }),
-    ).toEqual(BOARD_MARKS.map(({ kind }) => kind));
+    ).toEqual(BOARD_MARKS.map(({ kind }) => kind).filter((kind) => kind !== "movable"));
+    expect(boardMarksShown({ ...EMPTY, movable: [[0, 0]] })).toEqual(["movable"]);
   });
 
   it("tells targets on empty hexes from climbs onto tiles", () => {

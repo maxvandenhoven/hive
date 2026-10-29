@@ -105,7 +105,6 @@ describe("buildNewGameRequest", () => {
         ...choices,
         agentGame: {
           ...choices.agentGame,
-          location: "table",
           colour: "black",
           opponent: { mode: "preset", preset: "nm2" },
           hints: true,
@@ -115,7 +114,7 @@ describe("buildNewGameRequest", () => {
       name: "You vs nm2",
       white: NM2,
       black: { type: "human", hint: { spec: NM3.spec, budget_s: 5 } },
-      board_location: "table",
+      board_location: "screen",
     });
   });
 
@@ -131,25 +130,26 @@ describe("buildNewGameRequest", () => {
     });
   });
 
-  it("gives hints to the chosen sides of a hints game at the table", () => {
+  it("gives hints only to the person in a game against a friend", () => {
     const choices: NewGameChoices = {
       ...defaults(),
       scenario: "hints",
-      hintsGame: { sides: "black", hint: { mode: "preset", preset: "nm2" } },
+      hintsGame: {
+        colour: "black",
+        opponentName: " Sam ",
+        hint: { mode: "preset", preset: "nm2" },
+      },
     };
 
     expect(build(choices)).toEqual({
-      name: "Hints game",
-      white: { type: "human" },
+      name: "You vs Sam",
+      white: { type: "human", name: "Sam" },
       black: { type: "human", hint: { spec: NM2.spec, budget_s: 5 } },
       board_location: "table",
     });
     expect(
-      build({ ...choices, hintsGame: { ...choices.hintsGame, sides: "both" } }),
-    ).toMatchObject({
-      white: { type: "human", hint: { spec: NM2.spec } },
-      black: { type: "human", hint: { spec: NM2.spec } },
-    });
+      build({ ...choices, hintsGame: { ...choices.hintsGame, opponentName: "" } }),
+    ).toMatchObject({ name: "You vs Opponent", white: { name: "Opponent" } });
   });
 
   it("watches two agents on the screen", () => {
@@ -192,7 +192,8 @@ describe("remembered choices", () => {
       ...defaults(),
       scenario: "hints",
       hintsGame: {
-        sides: "white",
+        colour: "random",
+        opponentName: "Sam",
         hint: { mode: "advanced", draft: { ...agentDraft(negamax), budget: "2" } },
       },
     };
@@ -206,7 +207,7 @@ describe("remembered choices", () => {
       NEW_GAME_STORAGE_KEY,
       JSON.stringify({
         scenario: "watch",
-        agentGame: { location: "moon", colour: "black", hints: "yes" },
+        agentGame: { colour: "black", hints: "yes" },
         watchGame: {
           white: { mode: "preset", preset: "removed" },
           black: { mode: "advanced", draft: { kind: "gone" } },

@@ -153,6 +153,46 @@ function useScreenSize(ref: RefObject<SVGSVGElement | null>): ScreenSize | null 
   return size;
 }
 
+/** How close in pixels a mouse pointer comes to the stack contents before they fade out. */
+const STACK_POPUP_FADE_MARGIN = 24;
+
+/**
+ * Whether a mouse pointer is near the element, so a popup over the board can fade out
+ * and let clicks through to the tiles below it while it stays open.
+ */
+function usePointerNear(ref: RefObject<HTMLElement | null>, active: boolean): boolean {
+  const [near, setNear] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const move = (event: PointerEvent) => {
+      const element = ref.current;
+
+      if (element === null || event.pointerType !== "mouse") {
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+      setNear(
+        event.clientX > rect.left - STACK_POPUP_FADE_MARGIN &&
+          event.clientX < rect.right + STACK_POPUP_FADE_MARGIN &&
+          event.clientY > rect.top - STACK_POPUP_FADE_MARGIN &&
+          event.clientY < rect.bottom + STACK_POPUP_FADE_MARGIN,
+      );
+    };
+    window.addEventListener("pointermove", move);
+
+    return () => {
+      window.removeEventListener("pointermove", move);
+    };
+  }, [ref, active]);
+
+  return active && near;
+}
+
 /** The SVG attributes that make a part of the board a button. */
 function buttonProps(
   label: string,
@@ -193,6 +233,7 @@ export function SvgBoard({
   onHexClick,
 }: BoardRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const stackPopupRef = useRef<HTMLDivElement>(null);
   const screenSize = useScreenSize(svgRef);
   const fitted = useMemo(() => fitViewBox(board.map((stack) => stack.coord)), [board]);
   const limits = useMemo(
@@ -227,12 +268,15 @@ export function SvgBoard({
   });
   const highlightKeys = new Set(highlights.map(hexKey));
   const movableKeys = new Set(movable.map(hexKey));
+  // A suggested move hides the movable marks, so its rings are the only ones shown.
+  const marksMovable = proposedMove === null;
   const stacks = new Map(board.map((stack) => [hexKey(stack.coord), stack]));
   const inspectedStack = inspected === null ? undefined : stacks.get(hexKey(inspected));
   const openStack =
     inspectedStack !== undefined && inspectedStack.pieces.length > 1
       ? inspectedStack
       : undefined;
+  const stackPopupFaded = usePointerNear(stackPopupRef, openStack !== undefined);
 
   /** Report a hex, and show or hide the contents of a stack tapped for itself. */
   const activate = (coord: HexCoord) => {
@@ -307,10 +351,10 @@ export function SvgBoard({
               },
             })}
       >
-        {movableKeys.has(key) && <MovableShadow />}
+        {marksMovable && movableKeys.has(key) && <MovableShadow />}
         <StackLayers pieces={stack.pieces} />
         <PieceTile piece={top} />
-        {movableKeys.has(key) && <MovableRing />}
+        {marksMovable && movableKeys.has(key) && <MovableRing />}
         {height > 1 && <StackBadge height={height} />}
         {interactive && <BoardFocusRing />}
       </g>
@@ -443,7 +487,11 @@ export function SvgBoard({
       </div>
       {openStack !== undefined && (
         <PopoverContent
-          className="w-56"
+          ref={stackPopupRef}
+          className={cn(
+            "w-56 transition-opacity",
+            stackPopupFaded && "pointer-events-none opacity-0",
+          )}
           onOpenAutoFocus={(event) => {
             event.preventDefault();
           }}

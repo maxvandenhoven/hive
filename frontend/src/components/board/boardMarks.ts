@@ -47,7 +47,7 @@ export const BOARD_MARKS: readonly BoardMarkInfo[] = [
     kind: "suggestion",
     label: "Agent suggestion",
     description:
-      "An arrow to a double ring: an agent's best move, the move to make or a hint.",
+      "A ring on the piece to move and a double ring where it goes: an agent's best move, the move to make or a hint.",
   },
   {
     kind: "forbidden",
@@ -81,7 +81,7 @@ export function boardMarksShown({
   const occupied = new Set(board.map((stack) => hexKey(stack.coord)));
   const climbs = highlights.filter((coord) => occupied.has(hexKey(coord)));
   const shown: Record<BoardMarkKind, boolean> = {
-    movable: movable.length > 0,
+    movable: movable.length > 0 && proposedMove === null,
     selected: selected !== null,
     target: climbs.length < highlights.length,
     climb: climbs.length > 0,

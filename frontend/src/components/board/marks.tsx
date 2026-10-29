@@ -17,8 +17,11 @@ const TILE_PATH = roundedHexPath(TILE_RADIUS);
 const RING_POINTS = hexPoints(ORIGIN, TILE_RADIUS);
 const TARGET_POINTS = hexPoints(ORIGIN, 0.8);
 const LAST_MOVE_POINTS = hexPoints(ORIGIN, 0.96);
-const SUGGESTION_OUTER_POINTS = hexPoints(ORIGIN, 1);
-const SUGGESTION_INNER_POINTS = hexPoints(ORIGIN, 0.8);
+// The rings stay inside the hex, radius plus half the stroke at most 1, and the outer
+// one leaves a gap around a tile.
+const SUGGESTION_STROKE = 0.07;
+const SUGGESTION_OUTER_PATH = roundedHexPath(1 - SUGGESTION_STROKE / 2);
+const SUGGESTION_INNER_PATH = roundedHexPath(0.8);
 
 /** How far the shadow of a raised tile falls, down and to the right. */
 const SHADOW_OFFSET = { x: 0.06, y: 0.1 };
@@ -117,7 +120,24 @@ interface SuggestionMarkProps {
   to: PixelPoint;
 }
 
-/** An agent's suggested move: an arrow from where it starts to a double ring. */
+/** A single rounded ring around the piece an agent suggests to move, on the board or in hand. */
+export function SuggestionSourceRing() {
+  return (
+    <path
+      data-mark="suggestion"
+      d={SUGGESTION_OUTER_PATH}
+      fill="none"
+      strokeWidth={SUGGESTION_STROKE}
+      pointerEvents="none"
+      className="stroke-board-suggestion"
+    />
+  );
+}
+
+/**
+ * An agent's suggested move: a single ring around the piece to move, an arrow from it and
+ * a double ring where it goes. A placement has its single ring on the piece in hand.
+ */
 export function SuggestionMark({ from, to }: SuggestionMarkProps) {
   const arrowId = useId();
   let arrow = null;
@@ -156,16 +176,21 @@ export function SuggestionMark({ from, to }: SuggestionMarkProps) {
           <path d="M 0 0 L 10 5 L 0 10 z" className="fill-board-suggestion" />
         </marker>
       </defs>
+      {from !== null && (
+        <g transform={`translate(${from.x} ${from.y})`}>
+          <SuggestionSourceRing />
+        </g>
+      )}
       {arrow}
       <g transform={`translate(${to.x} ${to.y})`} fill="none">
-        <polygon
-          points={SUGGESTION_OUTER_POINTS}
-          strokeWidth={0.08}
+        <path
+          d={SUGGESTION_OUTER_PATH}
+          strokeWidth={SUGGESTION_STROKE}
           className="stroke-board-suggestion"
         />
-        <polygon
-          points={SUGGESTION_INNER_POINTS}
-          strokeWidth={0.06}
+        <path
+          d={SUGGESTION_INNER_PATH}
+          strokeWidth={SUGGESTION_STROKE}
           className="stroke-board-suggestion"
         />
       </g>

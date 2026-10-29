@@ -19,6 +19,12 @@ DEFAULT_AGENT_BUDGET_S = 5.0
 type AgentBudget = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 """The time budget of an agent decision in seconds."""
 
+PLAYER_NAME_MAX_LENGTH = 40
+"""The longest name of a person playing a side."""
+
+type PlayerName = Annotated[str, Field(min_length=1, max_length=PLAYER_NAME_MAX_LENGTH)]
+"""The name of a person playing a side."""
+
 type PlayerType = Literal["human", "agent"]
 """Whether a person or an agent plays a side."""
 
@@ -43,10 +49,13 @@ class HumanPlayer(JsonCodec):
 
     Attributes:
         hint: The agent that suggests moves to the person, or `None` for no hints.
+        name: The name of the person, such as a friend at the table, or `None` for the
+            person using the app.
         type: Always `human`, which tells the player kinds apart in JSON.
     """
 
     hint: HintAgent | None = None
+    name: PlayerName | None = None
     type: Literal["human"] = "human"
 
 

@@ -1,11 +1,11 @@
 import type { GameDetail, GamePosition } from "@/api/client";
 import { GameStatusBadge } from "@/components/GameStatusBadge";
-import { describePlayer, SIDE_TITLES } from "@/lib/players";
+import { describeMover, describePlayer, SIDE_TITLES, sideName } from "@/lib/players";
 
 /** What happens now in a game: whose turn it is, or how it ended. */
 function describeTurn(game: GameDetail, position: GamePosition): string {
   if (position.result !== null) {
-    return position.result === "draw" ? "Draw" : `${SIDE_TITLES[position.result]} won`;
+    return position.result === "draw" ? "Draw" : `${sideName(game, position.result)} won`;
   }
 
   if (game.status === "abandoned") {
@@ -14,9 +14,9 @@ function describeTurn(game: GameDetail, position: GamePosition): string {
 
   const side = position.current_player;
   const player = game[side];
-  const agent = player.type === "agent" ? ` · ${describePlayer(player)}` : "";
-
-  return `${SIDE_TITLES[side]} to move${agent}`;
+  return player.type === "agent"
+    ? `${SIDE_TITLES[side]} to move · ${describePlayer(player)}`
+    : describeMover(game, side);
 }
 
 /** The name, status and players of a game, with whose turn it is. */

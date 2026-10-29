@@ -97,19 +97,19 @@ describe("describePlayer", () => {
 });
 
 describe("gameScenario", () => {
-  it("tells the scenarios apart by their players and board location", () => {
+  it("tells the scenarios apart by their players", () => {
     const cases = [
       {
         white: HUMAN,
         black: NM3,
         board_location: "screen",
-        label: "vs agent · on screen",
+        label: "vs agent",
       },
       {
         white: NM3,
         black: HINTED,
         board_location: "table",
-        label: "vs agent · at the table",
+        label: "vs agent",
       },
       { white: HINTED, black: HUMAN, board_location: "table", label: "hints game" },
       { white: NM3, black: NM2, board_location: "screen", label: "watching" },
