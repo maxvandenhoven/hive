@@ -196,3 +196,24 @@ def test_from_board_reproduces_state(profile: Profile) -> None:
             assert_invariants(state=derived, rules=rules)
 
     run_profile(profile=profile, check=check)
+
+
+@pytest.mark.parametrize("profile", PROFILES)
+def test_articulation_points_match_removal(profile: Profile) -> None:
+    """Test that the articulation points are the pieces whose removal splits the hive."""
+
+    def check(game: Game) -> None:
+        rules, moves = game
+        state = rules.create_initial_state()
+
+        for move in moves:
+            state.apply_move(move)
+
+            expected = {
+                coord
+                for coord in state.board
+                if not state.is_connected_after_removing(coord)
+            }
+            assert state.get_articulation_points() == expected
+
+    run_profile(profile=profile, check=check)
