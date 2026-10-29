@@ -13,20 +13,24 @@ import { useGame, useGamePosition, usePlayMove, useUndoMove } from "@/api/querie
 import { SvgBoard } from "@/components/board/SvgBoard";
 import type { BoardRenderer } from "@/components/board/types";
 import { useBoardInteraction } from "@/components/board/useBoardInteraction";
+import { BoardTips, TipsToggle } from "@/components/BoardTips";
 import { GameHeader } from "@/components/GameHeader";
 import { HandTray } from "@/components/HandTray";
+import { HelpButton } from "@/components/help/HelpButton";
 import { HintButton } from "@/components/HintButton";
 import { MoveList } from "@/components/MoveList";
 import { ReplayControls } from "@/components/ReplayControls";
 import { ThinkingPanel } from "@/components/ThinkingPanel";
 import { TurnPrompt } from "@/components/TurnPrompt";
 import { useAgentTurns, type AgentTurns } from "@/components/useAgentTurns";
+import { useBoardTips } from "@/components/useBoardTips";
 import { useHint, type Hint } from "@/components/useHint";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { playerAtPly, toBoardView, toMoveView } from "@/lib/moves";
-import { ownSide, type PlayerSide } from "@/lib/players";
+import { boardTips, describeGameHelp } from "@/lib/gameHelp";
+import { gameScenario, ownSide, type PlayerSide } from "@/lib/players";
 import { describeTurnPrompt } from "@/lib/turnPrompt";
 
 /** The board renderer; a 3D renderer can take its place behind the same props. */
@@ -134,6 +138,14 @@ function GameScreen({ game, position }: GameScreenProps) {
     turnState: turns.state.type,
     shownPly,
   });
+  const tipsState = useBoardTips(gameScenario(game), game.id);
+  const tips = boardTips({
+    game,
+    position,
+    kind: prompt.kind,
+    hintAvailable: hint.agent !== null,
+  });
+  const gameHelp = describeGameHelp({ game, position, kind: prompt.kind });
   const home = homeSide(game);
   const away = home === "white" ? "black" : "white";
   const selectedPiece =
@@ -197,7 +209,13 @@ function GameScreen({ game, position }: GameScreenProps) {
           onLive={() => {
             setReplayPly(null);
           }}
+          help={
+            <HelpButton topic="this game" title={gameHelp.title} to={gameHelp.to}>
+              <p>{gameHelp.text}</p>
+            </HelpButton>
+          }
         />
+        <BoardTips tips={tips} state={tipsState} />
         {renderTray(away)}
         <Card className="relative aspect-square max-h-[65dvh] w-full bg-board-surface py-0 lg:aspect-auto lg:h-[max(24rem,calc(100dvh-19rem))] lg:max-h-none">
           <Board
@@ -237,6 +255,7 @@ function GameScreen({ game, position }: GameScreenProps) {
               Export
             </a>
           </Button>
+          <TipsToggle state={tipsState} />
         </div>
         <Card size="sm">
           <CardHeader>

@@ -220,7 +220,8 @@ function buttonProps(
  * suggestion, forbidden), which the Key button explains.
  *
  * The view fits the board until it is panned (drag) or zoomed (pinch, mouse wheel or the
- * buttons); the fit button returns to fitting. Tapping a stack shows its contents.
+ * buttons); the fit button returns to fitting. Tapping a stack shows its contents. A
+ * diagram leaves out the key and the zoom buttons.
  */
 export function SvgBoard({
   board,
@@ -230,6 +231,7 @@ export function SvgBoard({
   lastMove,
   proposedMove,
   forbidden = [],
+  diagram = false,
   onHexClick,
 }: BoardRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -450,40 +452,44 @@ export function SvgBoard({
             </PopoverAnchor>
           )}
         </svg>
-        <BoardLegend shown={shownMarks} className="absolute top-2 bottom-2 left-2" />
-        <div className="absolute right-2 bottom-2 flex gap-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Zoom in"
-            onClick={() => {
-              zoomBy(1 / ZOOM_STEP);
-            }}
-          >
-            <ZoomInIcon />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Zoom out"
-            onClick={() => {
-              zoomBy(ZOOM_STEP);
-            }}
-          >
-            <ZoomOutIcon />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Fit the board"
-            disabled={manualView === null}
-            onClick={() => {
-              setManualView(null);
-            }}
-          >
-            <ScanIcon />
-          </Button>
-        </div>
+        {!diagram && (
+          <BoardLegend shown={shownMarks} className="absolute top-2 bottom-2 left-2" />
+        )}
+        {!diagram && (
+          <div className="absolute right-2 bottom-2 flex gap-1">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Zoom in"
+              onClick={() => {
+                zoomBy(1 / ZOOM_STEP);
+              }}
+            >
+              <ZoomInIcon />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Zoom out"
+              onClick={() => {
+                zoomBy(ZOOM_STEP);
+              }}
+            >
+              <ZoomOutIcon />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Fit the board"
+              disabled={manualView === null}
+              onClick={() => {
+                setManualView(null);
+              }}
+            >
+              <ScanIcon />
+            </Button>
+          </div>
+        )}
       </div>
       {openStack !== undefined && (
         <PopoverContent

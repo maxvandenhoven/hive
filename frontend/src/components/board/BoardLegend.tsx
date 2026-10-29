@@ -29,7 +29,19 @@ function writeOpen(open: boolean) {
   }
 }
 
-function MarkList({ title, marks }: { title: string; marks: BoardMarkInfo[] }) {
+interface BoardMarkListProps {
+  title: string;
+  marks: readonly BoardMarkInfo[];
+  /** Show the descriptions on a phone too, as the help does; the legend hides them. */
+  describeOnPhone?: boolean;
+}
+
+/** A titled list of marks, each with its swatch, label and description. */
+export function BoardMarkList({
+  title,
+  marks,
+  describeOnPhone = false,
+}: BoardMarkListProps) {
   if (marks.length === 0) {
     return null;
   }
@@ -45,7 +57,12 @@ function MarkList({ title, marks }: { title: string; marks: BoardMarkInfo[] }) {
             </span>
             <span className="flex flex-col leading-tight">
               <span className="font-medium">{mark.label}</span>
-              <span className="hidden text-xs text-muted-foreground sm:block">
+              <span
+                className={cn(
+                  "text-xs text-muted-foreground",
+                  !describeOnPhone && "hidden sm:block",
+                )}
+              >
                 {mark.description}
               </span>
             </span>
@@ -92,8 +109,11 @@ export function BoardLegend({ shown, className }: BoardLegendProps) {
           aria-label="Board key"
           className="pointer-events-auto flex min-h-0 flex-col gap-3 overflow-y-auto rounded-lg bg-popover p-3 text-sm text-popover-foreground shadow-md ring-1 ring-border"
         >
-          <MarkList title="On the board" marks={onBoard} />
-          <MarkList title={onBoard.length > 0 ? "Other marks" : "Marks"} marks={others} />
+          <BoardMarkList title="On the board" marks={onBoard} />
+          <BoardMarkList
+            title={onBoard.length > 0 ? "Other marks" : "Marks"}
+            marks={others}
+          />
         </div>
       )}
       <Button

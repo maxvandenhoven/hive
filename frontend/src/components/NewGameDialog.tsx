@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useAgentKinds, useAgentPresets, useCreateGame } from "@/api/queries";
 import { AgentChoiceField } from "@/components/AgentChoiceField";
 import { ChoiceCards } from "@/components/ChoiceCards";
+import { HelpButton } from "@/components/help/HelpButton";
 import { GAME_SCENARIO_ICONS } from "@/components/scenarioIcons";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,7 +41,24 @@ import {
   type NewGameChoices,
   type WatchGameChoices,
 } from "@/lib/newGame";
+import { helpPath } from "@/lib/help";
 import { GAME_SCENARIO_INFO, GAME_SCENARIOS, type GameScenario } from "@/lib/players";
+
+/** The short help of each setup, on where the game is played and on hints. */
+const SETUP_HELP: Record<GameScenario, { title: string; text: string }> = {
+  agent: {
+    title: "On this screen",
+    text: "The app is the board and you play by tapping. Hints are off by default. Turn them on to ask an agent for a suggestion on your turns.",
+  },
+  hints: {
+    title: "At the table with hints",
+    text: "You play with real pieces and enter each move here, so the app can follow the game. Press Hint on your turn for a suggestion that only you see.",
+  },
+  watch: {
+    title: "On this screen",
+    text: "The agents play here. The match starts paused, and you can play it, pause it or step one move at a time.",
+  },
+};
 
 interface ScenarioCardsProps {
   value: GameScenario | null;
@@ -318,7 +336,19 @@ export function NewGameFlow({
     return (
       <>
         <DialogHeader className="border-b p-4 pr-12">
-          <DialogTitle>New game</DialogTitle>
+          <div className="flex items-center gap-1">
+            <DialogTitle>New game</DialogTitle>
+            <HelpButton
+              topic="the scenarios"
+              title="Three ways to play"
+              to={helpPath("scenarios")}
+            >
+              <p>
+                Play an agent on this screen, play a friend on a real board with hints for
+                you, or watch two agents play each other.
+              </p>
+            </HelpButton>
+          </div>
           <DialogDescription>What would you like to do?</DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -349,7 +379,16 @@ export function NewGameFlow({
           <ChevronLeftIcon />
         </Button>
         <div className="flex flex-col gap-1">
-          <DialogTitle>{info.title}</DialogTitle>
+          <div className="flex items-center gap-1">
+            <DialogTitle>{info.title}</DialogTitle>
+            <HelpButton
+              topic="this setup"
+              title={SETUP_HELP[choices.scenario].title}
+              to={helpPath("scenarios")}
+            >
+              <p>{SETUP_HELP[choices.scenario].text}</p>
+            </HelpButton>
+          </div>
           <DialogDescription>{info.description}</DialogDescription>
         </div>
       </DialogHeader>

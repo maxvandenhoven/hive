@@ -100,14 +100,14 @@ convention = "google"
 
 [tool.ty.environment]
 python-version = "3.13"
-extra-paths = ["scripts/tooling"]
+extra-paths = ["scripts", "scripts/tooling"]
 
 [tool.ty.src]
 include = ["src", "tests", "scripts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["scripts/tooling"]
+pythonpath = ["scripts", "scripts/tooling"]
 addopts = ["--strict-markers"]
 markers = ["slow: long-running tests, excluded from `make test` (run with `make test-slow`)"]
 

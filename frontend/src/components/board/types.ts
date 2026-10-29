@@ -42,6 +42,8 @@ export interface BoardRendererProps {
   proposedMove: MoveView | null;
   /** Hexes marked "not allowed", for the rule diagrams; games leave it out. */
   forbidden?: HexCoord[];
+  /** Draw a small static diagram for the help, without the key and zoom buttons. */
+  diagram?: boolean;
   onHexClick: (coord: HexCoord) => void;
 }
 
