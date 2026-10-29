@@ -1,7 +1,14 @@
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { HELP_PATH, HELP_SECTIONS, RULES_PATH, RULES_SECTIONS } from "@/lib/help";
+import {
+  HELP_PATH,
+  HELP_SECTIONS,
+  helpTextMatches,
+  RULES_PATH,
+  RULES_SECTIONS,
+} from "@/lib/help";
 import { GamesPage } from "@/pages/GamesPage";
 import { HelpPage } from "@/pages/HelpPage";
 import { RulesPage } from "@/pages/RulesPage";
@@ -9,14 +16,12 @@ import { mockApi } from "@/test/api";
 import { renderPage } from "@/test/render";
 
 describe("HelpPage", () => {
-  it("has an anchor and a section link for every section", () => {
+  it("has an anchor for every section", () => {
     renderPage(<HelpPage />, { path: HELP_PATH, route: HELP_PATH });
-    const nav = within(screen.getByRole("navigation", { name: "Help sections" }));
 
     for (const { id, title } of HELP_SECTIONS) {
       expect(document.getElementById(id)).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
-      expect(nav.getByRole("link", { name: title })).toHaveAttribute("href", `#${id}`);
     }
   });
 
@@ -36,15 +41,50 @@ describe("HelpPage", () => {
 });
 
 describe("RulesPage", () => {
-  it("has an anchor and a section link for every rule section", () => {
+  it("has an anchor for every rule section", () => {
     renderPage(<RulesPage />, { path: RULES_PATH, route: RULES_PATH });
-    const nav = within(screen.getByRole("navigation", { name: "Rule sections" }));
 
     for (const { id, title } of RULES_SECTIONS) {
       expect(document.getElementById(id)).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
-      expect(nav.getByRole("link", { name: title })).toHaveAttribute("href", `#${id}`);
     }
+  });
+});
+
+describe("help search", () => {
+  it("shows only the sections with every word searched for", async () => {
+    const user = userEvent.setup();
+    renderPage(<RulesPage />, { path: RULES_PATH, route: RULES_PATH });
+
+    await user.type(screen.getByRole("searchbox", { name: "Search the rules" }), "Climb");
+
+    expect(screen.getByRole("heading", { name: "Beetle" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Spider" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nothing matches/)).not.toBeVisible();
+
+    await user.type(screen.getByRole("searchbox"), " pins");
+
+    expect(screen.getByRole("heading", { name: "Beetle" })).toBeVisible();
+
+    await user.clear(screen.getByRole("searchbox"));
+    await user.type(screen.getByRole("searchbox"), "mosquito");
+
+    expect(screen.queryByRole("heading", { name: "Beetle" })).not.toBeInTheDocument();
+    expect(screen.getByText("Nothing matches “mosquito”.")).toBeVisible();
+
+    await user.clear(screen.getByRole("searchbox"));
+
+    expect(
+      RULES_SECTIONS.map(({ title }) => screen.getByRole("heading", { name: title })),
+    ).toHaveLength(RULES_SECTIONS.length);
+  });
+});
+
+describe("helpTextMatches", () => {
+  it("needs every word, in any case and order", () => {
+    expect(helpTextMatches("The beetle climbs onto the hive", "HIVE beetle")).toBe(true);
+    expect(helpTextMatches("The beetle climbs onto the hive", "beetle ant")).toBe(false);
+    expect(helpTextMatches("Anything", "  ")).toBe(true);
   });
 });
 

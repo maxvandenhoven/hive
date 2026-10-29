@@ -54,3 +54,14 @@ export const RULES_PATH = "/rules";
 /** A link in the text of the help, foreground text with a honey underline. */
 export const HELP_LINK_CLASSES =
   "font-medium underline decoration-primary decoration-2 underline-offset-4";
+
+/** Whether a help text holds every word of a search, ignoring case; an empty one does. */
+export function helpTextMatches(text: string, query: string): boolean {
+  const haystack = text.toLowerCase();
+
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length > 0)
+    .every((word) => haystack.includes(word));
+}

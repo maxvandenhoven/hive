@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-/** One section of the help or the rules reference, with an anchor for help links. */
+/** One section of a help page, with an anchor, which the page search can hide. */
 export function HelpSection({
   id,
   title,
@@ -15,7 +15,7 @@ export function HelpSection({
   const headingId = `${id}-heading`;
 
   return (
-    <section id={id} aria-labelledby={headingId} className="scroll-mt-4">
+    <section id={id} aria-labelledby={headingId} data-help-section>
       <Card>
         <CardHeader>
           <CardTitle>

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 import { BoardHelp } from "@/components/help/BoardHelp";
 import { HelpSection } from "@/components/help/HelpSection";
-import { useScrollToHash } from "@/components/help/useScrollToHash";
+import { SearchableSections } from "@/components/help/SearchableSections";
 import { Button } from "@/components/ui/button";
 import {
   HELP_LINK_CLASSES,
@@ -119,8 +119,6 @@ function LeavingHelp() {
  * the statuses and what is kept when you leave.
  */
 export function HelpPage() {
-  useScrollToHash();
-
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div>
@@ -139,32 +137,23 @@ export function HelpPage() {
         </Link>
         .
       </p>
-      <nav aria-label="Help sections">
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          {HELP_SECTIONS.map(({ id, title }) => (
-            <li key={id}>
-              <a href={`#${id}`} className={HELP_LINK_CLASSES}>
-                {title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <HelpSection id="scenarios" title={TITLES.scenarios}>
-        <ScenariosHelp />
-      </HelpSection>
-      <HelpSection id="board" title={TITLES.board}>
-        <BoardHelp />
-      </HelpSection>
-      <HelpSection id="controls" title={TITLES.controls}>
-        <ControlsHelp />
-      </HelpSection>
-      <HelpSection id="games" title={TITLES.games}>
-        <GamesHelp />
-      </HelpSection>
-      <HelpSection id="leaving" title={TITLES.leaving}>
-        <LeavingHelp />
-      </HelpSection>
+      <SearchableSections label="Search how the app works">
+        <HelpSection id="scenarios" title={TITLES.scenarios}>
+          <ScenariosHelp />
+        </HelpSection>
+        <HelpSection id="board" title={TITLES.board}>
+          <BoardHelp />
+        </HelpSection>
+        <HelpSection id="controls" title={TITLES.controls}>
+          <ControlsHelp />
+        </HelpSection>
+        <HelpSection id="games" title={TITLES.games}>
+          <GamesHelp />
+        </HelpSection>
+        <HelpSection id="leaving" title={TITLES.leaving}>
+          <LeavingHelp />
+        </HelpSection>
+      </SearchableSections>
     </div>
   );
 }
