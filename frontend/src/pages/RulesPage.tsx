@@ -89,9 +89,9 @@ export function RulesPage() {
       </div>
       <h1 className="font-heading text-2xl font-semibold">Game rules</h1>
       <p className="text-muted-foreground">
-        In the diagrams a blue outline marks the piece that moves, green hexes are where
-        it may go and crossed out red hexes are where it may not. Every diagram is checked
-        against the engine of this app.
+        In the diagrams a blue ring highlights the piece the text next to it is about.
+        Green hexes show where that piece may go and crossed out red hexes show where it
+        may not. Every diagram is checked against the engine of this app.
       </p>
       <SearchableSections label="Search the rules">
         <HelpSection id="pieces" title={TITLES.pieces}>
