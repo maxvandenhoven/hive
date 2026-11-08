@@ -1,18 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-<title id="title">hive logo</title>
-<desc id="desc">A paper-filled rounded hexagonal project mark with flat print inks.</desc>
-<path d="M136 20L216 66Q224 70 224 80V176Q224 186 216 190L136 236Q128 240 120 236L40 190Q32 186 32 176V80Q32 70 40 66L120 20Q128 16 136 20Z" fill="#F8F6F1" stroke="#1E1B1A" stroke-width="5"/>
-<g stroke="#1E1B1A" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
-<path d="M104 61L124 72.5V95.5L104 107L84 95.5V72.5Z" fill="#F8F6F1" stroke="#1E1B1A" stroke-width="4"/>
-<path d="M150 61L170 72.5V95.5L150 107L130 95.5V72.5Z" fill="#F8F6F1" stroke="#1E1B1A" stroke-width="4"/>
-<path d="M81 101L101 112.5V135.5L81 147L61 135.5V112.5Z" fill="#F8F6F1" stroke="#1E1B1A" stroke-width="4"/>
-<path d="M127 101L147 112.5V135.5L127 147L107 135.5V112.5Z" fill="#1E1B1A" stroke="#1E1B1A" stroke-width="4"/>
-<path d="M150 141L170 152.5V175.5L150 187L130 175.5V152.5Z" fill="#F8F6F1" stroke="#1E1B1A" stroke-width="4"/>
-<circle cx="104" cy="84" r="4" fill="#1E1B1A" stroke="none" stroke-width="5"/>
-<circle cx="150" cy="84" r="4" fill="#1E1B1A" stroke="none" stroke-width="5"/>
-<circle cx="81" cy="124" r="4" fill="#1E1B1A" stroke="none" stroke-width="5"/>
-<circle cx="150" cy="164" r="4" fill="#1E1B1A" stroke="none" stroke-width="5"/>
-<path d="M115 128L113 116L122 121L127 112L132 121L141 116L139 128Z" fill="#F8F6F1" stroke="#1E1B1A" stroke-width="2.5"/>
-<path d="M116 134H138" fill="none" stroke="#F8F6F1" stroke-width="3"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="hive-title hive-desc">
+<title id="hive-title">hive logo</title>
+<desc id="hive-desc">An asymmetric cluster of hexagonal tiles around a crowned queen tile, printed as a risograph inside a point-up hexagon.</desc>
+<path id="hive-paper" d="M180.56 36.964L221.259 60.462A23.72 23.72 0 0 1 233.119 81.004L233.119 174.996A23.72 23.72 0 0 1 221.259 195.538L139.86 242.534A23.72 23.72 0 0 1 116.14 242.534L34.741 195.538A23.72 23.72 0 0 1 22.881 174.996L22.881 81.004A23.72 23.72 0 0 1 34.741 60.462L116.14 13.466A23.72 23.72 0 0 1 139.86 13.466Z" fill="#F8F6F1"/>
+<g id="hive-motif">
+<path d="M61.5 96L82.3 108L82.3 132L61.5 144L40.7 132L40.7 108Z" fill="#F8F6F1"/>
+<path d="M61.5 96L82.3 108L82.3 132L61.5 144L40.7 132L40.7 108Z" fill="none" stroke="#1E1B1A" stroke-width="8" stroke-linejoin="round"/>
+<path d="M140.25 50.5L161.05 62.5L161.05 86.5L140.25 98.5L119.45 86.5L119.45 62.5Z" fill="#F8F6F1"/>
+<path d="M140.25 50.5L161.05 62.5L161.05 86.5L140.25 98.5L119.45 86.5L119.45 62.5Z" fill="none" stroke="#1E1B1A" stroke-width="8" stroke-linejoin="round"/>
+<path d="M142.25 137.65L163.36 149.85C164.596 150.564 165.359 151.882 165.36 153.31L165.36 177.69C165.359 179.118 164.596 180.436 163.36 181.15L142.25 193.35C141.012 194.065 139.488 194.065 138.25 193.35L117.14 181.15C115.904 180.436 115.141 179.118 115.14 177.69L115.14 153.31C115.141 151.882 115.904 150.564 117.14 149.85L138.25 137.65C139.488 136.935 141.012 136.935 142.25 137.65Z" fill="#1E1B1A"/>
+<path d="M192.75 141.5L213.55 153.5L213.55 177.5L192.75 189.5L171.95 177.5L171.95 153.5Z" fill="#F8F6F1"/>
+<path d="M192.75 141.5L213.55 153.5L213.55 177.5L192.75 189.5L171.95 177.5L171.95 153.5Z" fill="none" stroke="#1E1B1A" stroke-width="8" stroke-linejoin="round"/>
+<path d="M116 92.15L137.11 104.35C138.346 105.064 139.109 106.382 139.11 107.81L139.11 132.19C139.109 133.618 138.346 134.936 137.11 135.65L116 147.85C114.762 148.565 113.238 148.565 112 147.85L90.89 135.65C89.654 134.936 88.891 133.618 88.89 132.19L88.89 107.81C88.891 106.382 89.654 105.064 90.89 104.35L112 92.15C113.238 91.435 114.762 91.435 116 92.15Z" fill="#1E1B1A"/>
+<path d="M100 132L96.5 110L106 117.5L114 104L122 117.5L131.5 110L128 132Z" fill="#F8F6F1"/>
 </g>
+<path id="hive-frame" d="M182.56 33.5L223.259 56.998A27.72 27.72 0 0 1 237.119 81.004L237.119 174.996A27.72 27.72 0 0 1 223.259 199.002L141.86 245.998A27.72 27.72 0 0 1 114.14 245.998L32.741 199.002A27.72 27.72 0 0 1 18.881 174.996L18.881 81.004A27.72 27.72 0 0 1 32.741 56.998L114.14 10.002A27.72 27.72 0 0 1 141.86 10.002ZM178.56 40.428L219.259 63.926A19.72 19.72 0 0 1 229.119 81.004L229.119 174.996A19.72 19.72 0 0 1 219.259 192.074L137.86 239.07A19.72 19.72 0 0 1 118.14 239.07L36.741 192.074A19.72 19.72 0 0 1 26.881 174.996L26.881 81.004A19.72 19.72 0 0 1 36.741 63.926L118.14 16.93A19.72 19.72 0 0 1 137.86 16.93Z" fill="#1E1B1A" fill-rule="evenodd"/>
 </svg>

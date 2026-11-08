@@ -49,7 +49,7 @@ npm --prefix frontend run build
 uv run hive serve
 ```
 
-Open `http://127.0.0.1:8000`. The default frontend directory is `frontend/dist`; set `HIVE_FRONTEND_DIR` to use another build directory. If that directory does not exist, FastAPI serves only the API. This is a local serving workflow, not a complete production deployment.
+Open `http://127.0.0.1:8000`. The default frontend directory is `frontend/dist`, and `HIVE_FRONTEND_DIR` selects another build directory. If that directory does not exist, FastAPI serves only the API. This is a local serving workflow, not a complete production deployment.
 
 ## Check API changes
 

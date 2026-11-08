@@ -1,4 +1,4 @@
-<img src="assets/logo.svg" width="160" alt="Hive logo">
+<img src="assets/logo.png" width="160" alt="Hive logo">
 
 # Hive
 
@@ -10,7 +10,9 @@ Hive is a two-player board game in which players place and move insect tiles to 
 
 ## Background
 
-The engine provides the rules shared by the web app and the agents, so legal moves, game history, and search all use the same representation. The command-line tools make it possible to compare agents under a fixed time budget without running the app. The browser adds a board for playing against an agent, following a physical game with hints, or watching two agents play.
+This project explores building a complete system around Hive, from a rules engine through search-based agents to an interface for playing and inspecting games. Hive suits that purpose because its rules are intricate, with moving tiles, a hive that must stay connected, and insects that each move differently, while the game itself is deterministic and both players see everything. Those properties make it practical to test the engine thoroughly and to compare agents fairly under the same time budget.
+
+The engine provides the rules shared by the web app and the agents, so legal moves, game history, and search all use the same representation. The command-line tools run agents against each other without the app. The browser adds a board for playing against an agent, following a physical game with hints, or watching two agents play.
 
 ## Getting started
 
