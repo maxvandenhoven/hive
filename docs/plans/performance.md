@@ -135,6 +135,37 @@ Implemented in the Rust search kernel (`rust-core.md` §Search kernel), on top o
 - Every change is validated by a gauntlet against the previous best at equal time budget,
   with the report committed under `reports/` or attached to the PR.
 
+### Alpha-beta (first part of WP 28)
+
+`alpha_beta` is an agent param of `minimax` and `negamax`, on by default. The search
+prunes with alpha-beta and searches the principal variation of the previous depth first;
+other moves keep their order (at the root, the documented order of legal moves). Rust
+tests check that the root score equals the full search at depths 3 and 4 on several suite
+positions, for both formulations, and that minimax and negamax prune alike. Among equally
+scored moves another may be chosen than without pruning. The older benchmark cases turn
+it off to keep their node counts.
+
+Time to reach a depth on `long_hive` with the default evaluation, and on `ant_moves` with
+the mobility term (medians of `hive bench engine` and single runs):
+
+| Search | Full nodes | Full time | Alpha-beta nodes | Alpha-beta time | Speedup |
+|---|---|---|---|---|---|
+| `long_hive` depth 3 | 153,360 | 7.2 ms | 5,989 | 0.5 ms | 14x |
+| `long_hive` depth 4 | 12,102,433 | 572 ms | 51,847 | 6 ms | 95x |
+| `long_hive` depth 5 | – | – | 454,425 | 27 ms | |
+| `long_hive` depth 6 | – | – | 1,241,120 | 341 ms | |
+| `ant_moves` mobility depth 3 | 39,464 | 64 ms | 3,286 | 5.4 ms | 12x |
+| `ant_moves` mobility depth 5 | – | – | 481,529 | 755 ms | |
+
+Pruning costs nodes per second (3.6M against 21M at `long_hive`, since every visited node
+generates all its moves but searches few of them), but it reaches depth 6 in a third of
+the time the full search needs for depth 4. The gauntlet of the WP 27 baseline (two
+unbounded `negamax` agents, `--budget 1 --max-turns 30 --seed 0`, two games) reached a
+mean search depth of 5.4 per decision, against 4.1 without pruning and 2.8 for the Python
+search, and both games ended in a win instead of a draw at the turn cap. Move ordering
+beyond the principal variation, the transposition table and threads (the rest of WP 28)
+come next.
+
 ## Baseline numbers
 
 Measured with `hive bench perft` (WP 05) on an otherwise idle machine, single process,
