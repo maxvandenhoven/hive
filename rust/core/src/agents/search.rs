@@ -37,6 +37,41 @@ pub struct SearchConfig {
     pub weights: EvaluationWeights,
     /// The number of nodes between two calls of [`SearchObserver::should_stop`].
     pub stop_check_interval: u64,
+    /// Whether to prune with alpha-beta, searching the principal variation of the
+    /// previous depth first. The root score is the same as without pruning; among moves
+    /// with an equal score, another may be chosen.
+    pub alpha_beta: bool,
+}
+
+/// The place of a node in the search: its remaining depth, its ply from the root, its
+/// alpha-beta window and whether it lies on the principal variation of the previous
+/// depth.
+#[derive(Clone, Copy, Debug)]
+struct Node {
+    /// The remaining depth in plies.
+    depth: u32,
+    /// The number of plies from the root.
+    ply: u32,
+    /// The score the side to move (negamax) or the root player (minimax) is assured of.
+    alpha: f64,
+    /// The score the opponent is assured of, as a bound on the side's score.
+    beta: f64,
+    /// Whether every move from the root to the node follows the previous principal
+    /// variation, so its next move is searched first.
+    on_principal_variation: bool,
+}
+
+impl Node {
+    /// Get the root node of a search to a depth, with an infinite window.
+    fn root(depth: u32) -> Self {
+        Node {
+            depth,
+            ply: 0,
+            alpha: f64::NEG_INFINITY,
+            beta: f64::INFINITY,
+            on_principal_variation: true,
+        }
+    }
 }
 
 /// The result of one completed depth of iterative deepening.
@@ -90,6 +125,8 @@ pub struct Searcher {
     buffers: Vec<Vec<Move>>,
     /// The principal variation below each ply, a triangular table.
     lines: Vec<Vec<Option<Move>>>,
+    /// The principal variation of the previous depth, searched first with alpha-beta.
+    previous_line: Vec<Option<Move>>,
 }
 
 impl Searcher {
@@ -103,6 +140,7 @@ impl Searcher {
             cutoff: false,
             buffers: Vec::new(),
             lines: Vec::new(),
+            previous_line: Vec::new(),
         }
     }
 
@@ -127,6 +165,7 @@ impl Searcher {
     /// observer stops the search.
     pub fn think(&mut self, state: &mut GameState, observer: &mut impl SearchObserver) {
         self.nodes = 0;
+        self.previous_line.clear();
         let start = Instant::now();
         let mut depth = 1;
 
@@ -135,10 +174,11 @@ impl Searcher {
             self.reserve(depth);
             let root_player = state.current_player();
 
+            let root = Node::root(depth);
             let result = match self.config.algorithm {
-                SearchAlgorithm::Negamax => self.negamax(state, depth, 0, observer),
+                SearchAlgorithm::Negamax => self.negamax(state, root, observer),
                 SearchAlgorithm::Minimax => {
-                    self.minimax(state, depth, 0, root_player, observer)
+                    self.minimax(state, root, root_player, observer)
                 }
             };
             let Ok(score) = result else { return };
@@ -159,6 +199,7 @@ impl Searcher {
                 return;
             }
 
+            self.previous_line.clone_from(&self.lines[0]);
             depth += 1;
         }
     }
@@ -218,48 +259,98 @@ impl Searcher {
         line.extend_from_slice(&below[0]);
     }
 
+    /// Move the move of the previous principal variation at a node to the front of its
+    /// moves, keeping the order of the others. Returns whether the node follows that
+    /// variation, so its children may too.
+    fn order_principal_variation(&self, node: Node, moves: &mut [Move]) -> bool {
+        if !self.config.alpha_beta || !node.on_principal_variation {
+            return false;
+        }
+
+        let Some(&expected) = self.previous_line.get(node.ply as usize) else {
+            return false;
+        };
+
+        if let Some(mv) = expected
+            && let Some(position) = moves.iter().position(|&candidate| candidate == mv)
+        {
+            moves[..=position].rotate_right(1);
+        }
+
+        true
+    }
+
+    /// Check whether a child of a node that follows the previous principal variation
+    /// follows it too: its move is the variation's move at the node.
+    fn follows_principal_variation(
+        &self,
+        follows: bool,
+        ply: u32,
+        mv: Option<Move>,
+    ) -> bool {
+        follows && self.previous_line.get(ply as usize) == Some(&mv)
+    }
+
     /// Search a node with negamax: the score is from the perspective of the player to
-    /// move, and child scores are negated.
+    /// move, and child scores are negated. With alpha-beta, the search of a node stops as
+    /// soon as a move scores at least `beta`, which the opponent will not allow.
     fn negamax(
         &mut self,
         state: &mut GameState,
-        depth: u32,
-        ply: u32,
+        node: Node,
         observer: &mut impl SearchObserver,
     ) -> Result<f64, Stopped> {
         self.visit(observer)?;
-        let index = ply as usize;
+        let index = node.ply as usize;
         self.lines[index].clear();
         let player = state.current_player();
 
-        if let Some(score) = self.terminal_score(state, player, ply) {
+        if let Some(score) = self.terminal_score(state, player, node.ply) {
             return Ok(score);
         }
 
-        if depth == 0 {
+        if node.depth == 0 {
             self.cutoff = true;
             return Ok(self.evaluator.evaluate(state, player));
         }
 
         let mut moves = std::mem::take(&mut self.buffers[index]);
-        self.generate(state, ply, &mut moves);
+        self.generate(state, node.ply, &mut moves);
+        let follows = self.order_principal_variation(node, &mut moves);
+        let mut alpha = node.alpha;
         let mut best = f64::NEG_INFINITY;
 
         for position in 0..moves.len().max(1) {
             let mv = moves.get(position).copied();
+            let child = Node {
+                depth: node.depth - 1,
+                ply: node.ply + 1,
+                alpha: -node.beta,
+                beta: -alpha,
+                on_principal_variation: self
+                    .follows_principal_variation(follows, node.ply, mv),
+            };
             state.apply_move(mv);
-            let child = self.negamax(state, depth - 1, ply + 1, observer);
+            let result = self.negamax(state, child, observer);
             state.undo_move(mv);
 
-            let Ok(child) = child else {
+            let Ok(child_score) = result else {
                 self.buffers[index] = moves;
                 return Err(Stopped);
             };
-            let score = -child;
+            let score = -child_score;
 
             if score > best {
                 best = score;
                 self.update_line(index, mv);
+            }
+
+            if self.config.alpha_beta {
+                alpha = alpha.max(best);
+
+                if alpha >= node.beta {
+                    break;
+                }
             }
         }
 
@@ -268,40 +359,50 @@ impl Searcher {
     }
 
     /// Search a node with minimax: the score is from the perspective of `root_player`,
-    /// maximized where that player moves and minimized elsewhere.
+    /// maximized where that player moves and minimized elsewhere. With alpha-beta, the
+    /// search of a node stops once its score leaves the window `alpha..beta`.
     fn minimax(
         &mut self,
         state: &mut GameState,
-        depth: u32,
-        ply: u32,
+        node: Node,
         root_player: Player,
         observer: &mut impl SearchObserver,
     ) -> Result<f64, Stopped> {
         self.visit(observer)?;
-        let index = ply as usize;
+        let index = node.ply as usize;
         self.lines[index].clear();
 
-        if let Some(score) = self.terminal_score(state, root_player, ply) {
+        if let Some(score) = self.terminal_score(state, root_player, node.ply) {
             return Ok(score);
         }
 
-        if depth == 0 {
+        if node.depth == 0 {
             self.cutoff = true;
             return Ok(self.evaluator.evaluate(state, root_player));
         }
 
         let maximizing = state.current_player() == root_player;
         let mut moves = std::mem::take(&mut self.buffers[index]);
-        self.generate(state, ply, &mut moves);
+        self.generate(state, node.ply, &mut moves);
+        let follows = self.order_principal_variation(node, &mut moves);
+        let (mut alpha, mut beta) = (node.alpha, node.beta);
         let mut best = if maximizing { f64::NEG_INFINITY } else { f64::INFINITY };
 
         for position in 0..moves.len().max(1) {
             let mv = moves.get(position).copied();
+            let child = Node {
+                depth: node.depth - 1,
+                ply: node.ply + 1,
+                alpha,
+                beta,
+                on_principal_variation: self
+                    .follows_principal_variation(follows, node.ply, mv),
+            };
             state.apply_move(mv);
-            let child = self.minimax(state, depth - 1, ply + 1, root_player, observer);
+            let result = self.minimax(state, child, root_player, observer);
             state.undo_move(mv);
 
-            let Ok(score) = child else {
+            let Ok(score) = result else {
                 self.buffers[index] = moves;
                 return Err(Stopped);
             };
@@ -309,6 +410,18 @@ impl Searcher {
             if (maximizing && score > best) || (!maximizing && score < best) {
                 best = score;
                 self.update_line(index, mv);
+            }
+
+            if self.config.alpha_beta {
+                if maximizing {
+                    alpha = alpha.max(best);
+                } else {
+                    beta = beta.min(best);
+                }
+
+                if alpha >= beta {
+                    break;
+                }
             }
         }
 

@@ -129,6 +129,8 @@ impl PySearcher {
     ///         minus the opponent's.
     ///     stop_check_interval: The number of nodes between two calls of
     ///         `turn.should_stop`.
+    ///     alpha_beta: Whether to prune with alpha-beta, which finds the same scores in
+    ///         far fewer nodes but may choose another of several equally scored moves.
     ///
     /// Raises:
     ///     ValueError: If `algorithm` is unknown or `depth` is less than one.
@@ -143,7 +145,8 @@ impl PySearcher {
         positioning = 0.0,
         material_on_board = 0.0,
         material_in_hand = 0.0,
-        stop_check_interval = 1024
+        stop_check_interval = 1024,
+        alpha_beta = true
     ))]
     #[expect(clippy::too_many_arguments, reason = "the agent params, passed by keyword")]
     fn new(
@@ -156,6 +159,7 @@ impl PySearcher {
         material_on_board: f64,
         material_in_hand: f64,
         stop_check_interval: u64,
+        alpha_beta: bool,
     ) -> PyResult<Self> {
         let algorithm = match algorithm {
             "minimax" => SearchAlgorithm::Minimax,
@@ -177,7 +181,8 @@ impl PySearcher {
             material_on_board,
             material_in_hand,
         };
-        let config = SearchConfig { algorithm, depth, weights, stop_check_interval };
+        let config =
+            SearchConfig { algorithm, depth, weights, stop_check_interval, alpha_beta };
         Ok(PySearcher { inner: Searcher::new(rules.inner, config) })
     }
 
