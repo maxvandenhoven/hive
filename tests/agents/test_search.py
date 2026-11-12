@@ -70,7 +70,7 @@ def test_stops_at_depth_limit(
 
 @pytest.mark.parametrize("depth", [1, 2])
 def test_minimax_and_negamax_agree(depth: int, rules: Rules, position: GameState) -> None:
-    """Test that both formulations find the same score and principal variation.
+    """Test that both formulations find the same score, line and nodes without a table.
 
     Mobility generates moves at every leaf, which is too slow at depth 2, so it is left
     out here and covered by the evaluation tests instead.
@@ -80,7 +80,7 @@ def test_minimax_and_negamax_agree(depth: int, rules: Rules, position: GameState
 
     for agent_class in SEARCH_AGENTS:
         turn = LocalTurnContext()
-        agent_class(rules=rules, seed=0, depth=depth, **weights).think(
+        agent_class(rules=rules, seed=0, depth=depth, table_megabytes=0, **weights).think(
             state=position.copy(), turn=turn
         )
         infos.append({key: turn.infos[-1][key] for key in ("score", "pv", "nodes")})

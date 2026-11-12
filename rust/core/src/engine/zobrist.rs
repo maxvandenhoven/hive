@@ -21,6 +21,16 @@ pub fn piece_key(cell: Cell, height: usize, piece: Piece) -> u64 {
     splitmix64(PIECE_SEED ^ index as u64)
 }
 
+/// Get the key of a ply count, which search tables add to the position hash because the
+/// legal moves and the end of the game depend on the ply (the queen deadline, the turn
+/// limit).
+pub fn ply_key(ply: i64) -> u64 {
+    splitmix64(PLY_SEED ^ ply.cast_unsigned())
+}
+
+/// The seed mixed into every ply key.
+const PLY_SEED: u64 = 0x6a09_e667_f3bc_c909;
+
 /// Mix 64 bits into 64 well-distributed bits (the splitmix64 finaliser).
 const fn splitmix64(value: u64) -> u64 {
     let mut z = value.wrapping_add(0x9e37_79b9_7f4a_7c15);

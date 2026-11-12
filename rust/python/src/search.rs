@@ -131,6 +131,8 @@ impl PySearcher {
     ///         `turn.should_stop`.
     ///     alpha_beta: Whether to prune with alpha-beta, which finds the same scores in
     ///         far fewer nodes but may choose another of several equally scored moves.
+    ///     table_megabytes: The size of the transposition table in MB, zero for none.
+    ///         Negamax with alpha-beta uses it and orders moves by killers and history.
     ///
     /// Raises:
     ///     ValueError: If `algorithm` is unknown or `depth` is less than one.
@@ -146,7 +148,8 @@ impl PySearcher {
         material_on_board = 0.0,
         material_in_hand = 0.0,
         stop_check_interval = 1024,
-        alpha_beta = true
+        alpha_beta = true,
+        table_megabytes = 32
     ))]
     #[expect(clippy::too_many_arguments, reason = "the agent params, passed by keyword")]
     fn new(
@@ -160,6 +163,7 @@ impl PySearcher {
         material_in_hand: f64,
         stop_check_interval: u64,
         alpha_beta: bool,
+        table_megabytes: usize,
     ) -> PyResult<Self> {
         let algorithm = match algorithm {
             "minimax" => SearchAlgorithm::Minimax,
@@ -181,9 +185,20 @@ impl PySearcher {
             material_on_board,
             material_in_hand,
         };
-        let config =
-            SearchConfig { algorithm, depth, weights, stop_check_interval, alpha_beta };
+        let config = SearchConfig {
+            algorithm,
+            depth,
+            weights,
+            stop_check_interval,
+            alpha_beta,
+            table_megabytes,
+        };
         Ok(PySearcher { inner: Searcher::new(rules.inner, config) })
+    }
+
+    /// Forget the transposition table, killer moves and history, before a new game.
+    fn clear(&mut self) {
+        self.inner.clear();
     }
 
     /// The number of nodes the last decision visited.

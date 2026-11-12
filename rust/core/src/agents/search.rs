@@ -10,7 +10,14 @@
 use std::time::Instant;
 
 use crate::agents::evaluation::{EvaluationWeights, Evaluator};
-use crate::engine::{CoordMove, GameState, Move, Player, Rules};
+use crate::agents::table::{
+    TableBound, TableEntry, TranspositionTable, from_table_score, to_table_score,
+};
+use crate::engine::zobrist::ply_key;
+use crate::engine::{CoordMove, GameState, Move, PieceType, Player, Rules};
+
+/// The number of cells, the stride of the history table per piece type.
+const HISTORY_CELLS: usize = 1024;
 
 /// The score of a won position, reduced by one per ply so faster wins score higher.
 pub const SEARCH_WIN_SCORE: f64 = 1_000_000.0;
@@ -41,6 +48,9 @@ pub struct SearchConfig {
     /// previous depth first. The root score is the same as without pruning; among moves
     /// with an equal score, another may be chosen.
     pub alpha_beta: bool,
+    /// The size of the transposition table in MB, zero for none. Negamax with alpha-beta
+    /// uses it, and orders moves by killer moves and a history table too.
+    pub table_megabytes: usize,
 }
 
 /// The place of a node in the search: its remaining depth, its ply from the root, its
@@ -127,6 +137,14 @@ pub struct Searcher {
     lines: Vec<Vec<Option<Move>>>,
     /// The principal variation of the previous depth, searched first with alpha-beta.
     previous_line: Vec<Option<Move>>,
+    /// The transposition table, kept between decisions.
+    table: TranspositionTable,
+    /// Two moves per ply that recently caused a cutoff, tried early in sibling nodes.
+    killers: Vec<[Option<Move>; 2]>,
+    /// How often a move of a piece type onto a cell caused a cutoff, weighted by depth.
+    history: Vec<u32>,
+    /// Scratch space for ordering moves: the sort key and the move.
+    ordering: Vec<(u64, Move)>,
 }
 
 impl Searcher {
@@ -141,12 +159,24 @@ impl Searcher {
             buffers: Vec::new(),
             lines: Vec::new(),
             previous_line: Vec::new(),
+            table: TranspositionTable::new(config.table_megabytes),
+            killers: Vec::new(),
+            history: vec![0; PieceType::COUNT * HISTORY_CELLS],
+            ordering: Vec::new(),
         }
     }
 
     /// Get the configuration.
     pub fn config(&self) -> &SearchConfig {
         &self.config
+    }
+
+    /// Forget everything learned in earlier decisions: the transposition table, the
+    /// killer moves and the history, for example before a new game.
+    pub fn clear(&mut self) {
+        self.table.clear();
+        self.killers.clear();
+        self.history.fill(0);
     }
 
     /// Get the nodes visited in the last decision.
@@ -211,6 +241,10 @@ impl Searcher {
         while self.buffers.len() < plies {
             self.buffers.push(Vec::with_capacity(256));
             self.lines.push(Vec::with_capacity(plies));
+        }
+
+        while self.killers.len() < plies {
+            self.killers.push([None; 2]);
         }
     }
 
@@ -291,9 +325,49 @@ impl Searcher {
         follows && self.previous_line.get(ply as usize) == Some(&mv)
     }
 
+    /// Order the moves of an inner node: the moves in `first` in their order (the move of
+    /// the previous principal variation, the table move and the killer moves), then the
+    /// rest by their history, keeping the generation order between equals.
+    fn order_moves(&mut self, first: [Option<Move>; 4], moves: &mut [Move]) {
+        let ordering = &mut self.ordering;
+        ordering.clear();
+
+        for (position, &mv) in moves.iter().enumerate() {
+            let rank =
+                first.iter().position(|&candidate| candidate == Some(mv)).map_or_else(
+                    || u64::from(self.history[history_index(mv)]),
+                    |priority| u64::from(u32::MAX) - priority as u64,
+                );
+            let key = (rank << 16) | (0xffff - (position as u64).min(0xffff));
+            ordering.push((key, mv));
+        }
+
+        ordering.sort_unstable_by_key(|&(key, _)| std::cmp::Reverse(key));
+
+        for (slot, &(_, mv)) in moves.iter_mut().zip(ordering.iter()) {
+            *slot = mv;
+        }
+    }
+
+    /// Remember a move that caused a cutoff at a ply, as a killer and in the history.
+    fn record_cutoff(&mut self, index: usize, depth: u32, mv: Move) {
+        let killers = &mut self.killers[index];
+
+        if killers[0] != Some(mv) {
+            killers[1] = killers[0];
+            killers[0] = Some(mv);
+        }
+
+        let entry = &mut self.history[history_index(mv)];
+        *entry = entry.saturating_add(depth * depth);
+    }
+
     /// Search a node with negamax: the score is from the perspective of the player to
     /// move, and child scores are negated. With alpha-beta, the search of a node stops as
-    /// soon as a move scores at least `beta`, which the opponent will not allow.
+    /// soon as a move scores at least `beta`, which the opponent will not allow. Results
+    /// are stored in the transposition table and reused when a position recurs at the
+    /// same remaining depth or deeper; moves are ordered by the table, killers and
+    /// history.
     fn negamax(
         &mut self,
         state: &mut GameState,
@@ -314,9 +388,39 @@ impl Searcher {
             return Ok(self.evaluator.evaluate(state, player));
         }
 
+        let use_table = self.config.alpha_beta && self.config.table_megabytes > 0;
+        let key = state.hash() ^ ply_key(state.current_ply());
+        let mut table_move = None;
+
+        if use_table && let Some(entry) = self.table.probe(key) {
+            table_move = entry.best_move();
+            let score = from_table_score(entry.score, node.ply);
+            let usable = index > 0
+                && u32::from(entry.depth) >= node.depth
+                && match entry.bound {
+                    TableBound::Exact => true,
+                    TableBound::Lower => score >= node.beta,
+                    TableBound::Upper => score <= node.alpha,
+                };
+
+            if usable {
+                self.cutoff |= entry.cutoff;
+                self.lines[index].push(table_move);
+                return Ok(score);
+            }
+        }
+
         let mut moves = std::mem::take(&mut self.buffers[index]);
         self.generate(state, node.ply, &mut moves);
         let follows = self.order_principal_variation(node, &mut moves);
+
+        if use_table && index > 0 && moves.len() > 1 {
+            let expected = if follows { self.previous_line[index] } else { None };
+            let killers = self.killers[index];
+            self.order_moves([expected, table_move, killers[0], killers[1]], &mut moves);
+        }
+
+        let outer_cutoff = std::mem::replace(&mut self.cutoff, false);
         let mut alpha = node.alpha;
         let mut best = f64::NEG_INFINITY;
 
@@ -349,12 +453,40 @@ impl Searcher {
                 alpha = alpha.max(best);
 
                 if alpha >= node.beta {
+                    if let Some(mv) = mv
+                        && use_table
+                    {
+                        self.record_cutoff(index, node.depth, mv);
+                    }
+
                     break;
                 }
             }
         }
 
         self.buffers[index] = moves;
+        let subtree_cutoff = self.cutoff;
+        self.cutoff |= outer_cutoff;
+
+        if use_table {
+            let bound = if best <= node.alpha {
+                TableBound::Upper
+            } else if best >= node.beta {
+                TableBound::Lower
+            } else {
+                TableBound::Exact
+            };
+            let best_move = self.lines[index].first().copied().flatten();
+            self.table.store(TableEntry {
+                key,
+                score: to_table_score(best, node.ply),
+                best: best_move.map_or(0, Move::bits),
+                depth: u8::try_from(node.depth).unwrap_or(u8::MAX),
+                bound,
+                cutoff: subtree_cutoff,
+            });
+        }
+
         Ok(best)
     }
 
@@ -428,6 +560,11 @@ impl Searcher {
         self.buffers[index] = moves;
         Ok(best)
     }
+}
+
+/// Get the slot of a move in the history table: its piece type and target cell.
+fn history_index(mv: Move) -> usize {
+    mv.piece_type().index() * HISTORY_CELLS + mv.target().index()
 }
 
 /// Convert a line of moves from a state to coordinates, playing it on a copy.
