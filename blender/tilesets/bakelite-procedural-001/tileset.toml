@@ -1,0 +1,24 @@
+# Procedural bakelite tiles: hexagonal slabs with rounded corners and soft edges, with the
+# insect artwork of `src/hive/assets/svg/` debossed into the top face and painted. A tile
+# has 20 mm sides (34.6 mm across flats, 40 mm across corners) and is 10 mm high.
+id = "bakelite-procedural-001"
+name = "Procedural bakelite tiles with debossed insects"
+kind = "procedural"
+weight = 1.0
+across_flats_mm = 34.64
+thickness_mm = 10.0
+corner_radius_mm = 3.0
+edge_radius_mm = 1.5
+deboss_mm = 0.6
+insect_size = 0.62
+
+[body_colors]
+white = "#EDE5D0"
+black = "#1A1A1C"
+
+[materials]
+roughness = [0.22, 0.5]
+coat = [0.0, 0.5]
+bump_strength = [0.02, 0.12]
+scuff_strength = [0.0, 0.35]
+paint_roughness = [0.35, 0.65]

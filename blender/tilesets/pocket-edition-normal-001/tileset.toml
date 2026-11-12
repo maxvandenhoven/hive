@@ -1,0 +1,30 @@
+# Template for the modelled Hive Pocket set (standard colours). It has weight 0, so the
+# renderer skips it until the tiles exist. To enable it:
+#
+# 1. Model one `.blend` file per tile below, each with a single mesh object named `tile`:
+#    - in metres, at real size (measure `across_flats_mm` and `thickness_mm`);
+#    - origin at the centre of the bottom face, top face up (+z);
+#    - pointy-top orientation: a corner points along +y, flat sides face +x and -x;
+#    - the insect's head pointing at the +y corner;
+#    - materials included; textures in `textures/` with relative paths.
+# 2. Set the measured sizes, which place the tiles on the grid and give the label outline.
+# 3. Set `weight` above 0. Track the `.blend` files and textures with Git LFS.
+id = "pocket-edition-normal-001"
+name = "Hive Pocket (standard colours)"
+kind = "blend"
+weight = 0.0
+across_flats_mm = 34.64
+thickness_mm = 10.0
+corner_radius_mm = 3.0
+
+[tiles]
+white-queen = { file = "white-queen.blend", object = "tile" }
+white-beetle = { file = "white-beetle.blend", object = "tile" }
+white-grasshopper = { file = "white-grasshopper.blend", object = "tile" }
+white-spider = { file = "white-spider.blend", object = "tile" }
+white-ant = { file = "white-ant.blend", object = "tile" }
+black-queen = { file = "black-queen.blend", object = "tile" }
+black-beetle = { file = "black-beetle.blend", object = "tile" }
+black-grasshopper = { file = "black-grasshopper.blend", object = "tile" }
+black-spider = { file = "black-spider.blend", object = "tile" }
+black-ant = { file = "black-ant.blend", object = "tile" }
