@@ -8,6 +8,7 @@ from hiveblend.geometry import (
     offset_direction,
     polygon_area,
     rounded_hexagon,
+    shift_color,
 )
 
 
@@ -73,3 +74,15 @@ def test_offset_direction() -> None:
     assert x / -z == pytest.approx(1.0)
     assert y / -z == pytest.approx(-math.tan(0.5))
     assert math.hypot(x, y, z) == pytest.approx(1.0)
+
+
+def test_shift_color() -> None:
+    assert shift_color(
+        color="#A8695A", hue_shift=0.0, saturation_scale=1.0, value_scale=1.0
+    ) == pytest.approx(hex_to_linear_rgb("#A8695A"))
+    assert shift_color(
+        color="#FF0000", hue_shift=1 / 3, saturation_scale=1.0, value_scale=1.0
+    ) == pytest.approx((0.0, 1.0, 0.0))
+    assert shift_color(
+        color="#FF0000", hue_shift=0.0, saturation_scale=0.0, value_scale=2.0
+    ) == pytest.approx((1.0, 1.0, 1.0))

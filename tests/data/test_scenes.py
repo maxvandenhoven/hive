@@ -205,3 +205,46 @@ def test_write_scenes_in_processes_matches_one_process(tmp_path: Path) -> None:
     assert [path.read_text() for path in serial] == [
         path.read_text() for path in parallel
     ]
+
+
+def test_distractors_keep_clear_of_tiles_and_each_other(scenes: list[Scene]) -> None:
+    config = ScenesConfig()
+    kinds = set()
+
+    for scene in scenes:
+        tiles = [(cell.x, cell.y) for cell in scene.board] + [
+            (piece.x, piece.y) for piece in scene.loose_pieces
+        ]
+        reaches = [math.hypot(d.size[0], d.size[1]) / 2 for d in scene.distractors]
+
+        for index, (distractor, reach) in enumerate(
+            zip(scene.distractors, reaches, strict=True)
+        ):
+            kinds.add(distractor.kind)
+
+            for tile in tiles:
+                assert math.dist((distractor.x, distractor.y), tile) > (
+                    reach + SCENE_TILE_CIRCUMRADIUS
+                )
+
+            for other, other_reach in zip(
+                scene.distractors[index + 1 :], reaches[index + 1 :], strict=True
+            ):
+                assert math.dist((distractor.x, distractor.y), (other.x, other.y)) > (
+                    reach + other_reach
+                )
+
+        assert len(scene.distractors) <= config.distractor_count[1]
+
+    assert sum(bool(scene.distractors) for scene in scenes) > SCENE_COUNT * 0.3
+    assert kinds == set(config.distractor_kinds)
+
+
+def test_camera_covers_steep_and_close_views(scenes: list[Scene]) -> None:
+    config = ScenesConfig()
+
+    assert any(scene.camera.tilt_deg > 45 for scene in scenes)
+    assert all(
+        config.aperture_f[0] <= scene.camera.aperture_f <= config.aperture_f[1]
+        for scene in scenes
+    )

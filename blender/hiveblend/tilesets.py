@@ -19,7 +19,7 @@ from typing import Any
 import bmesh
 import bpy
 
-from hiveblend.geometry import hex_to_linear_rgb, rounded_hexagon
+from hiveblend.geometry import hex_to_linear_rgb, rounded_hexagon, shift_color
 
 PIECE_NAMES = ("queen", "beetle", "grasshopper", "spider", "ant")
 """The piece names in class order, matching the engine `PieceType` values."""
@@ -241,11 +241,16 @@ class TileLibrary:
         """Randomise the material parameters for the next image.
 
         Only procedural materials are varied; a `blend` tileset keeps the materials of
-        its files.
+        its files. Besides the finish, the body and paint colours shift slightly, as
+        between sets, prints and white balances; the hue shift of the paint stays small
+        enough that no insect takes the colour of another.
 
         Args:
             rng: The random number generator of the scene.
         """
+        if self.spec.kind != "procedural":
+            return
+
         roughness = self.spec.sample_range(key="roughness", default=[0.22, 0.5], rng=rng)
         coat = self.spec.sample_range(key="coat", default=[0.0, 0.5], rng=rng)
         bump = self.spec.sample_range(key="bump_strength", default=[0.02, 0.12], rng=rng)
@@ -254,16 +259,43 @@ class TileLibrary:
             key="paint_roughness", default=[0.35, 0.65], rng=rng
         )
 
-        for material in self.body_materials.values():
-            nodes = material.node_tree.nodes
+        for owner in OWNER_NAMES:
+            nodes = self.body_material(owner).node_tree.nodes
+            color = shift_color(
+                color=self.body_hex(owner),
+                hue_shift=rng.uniform(-0.02, 0.02),
+                saturation_scale=rng.uniform(0.6, 1.5),
+                value_scale=rng.uniform(0.9, 1.08),
+            )
+            nodes["Principled BSDF"].inputs["Base Color"].default_value = (*color, 1.0)
             nodes["roughness"].outputs[0].default_value = roughness
             nodes["scuff"].outputs[0].default_value = scuff
             nodes["Principled BSDF"].inputs["Coat Weight"].default_value = coat
             nodes["Bump"].inputs["Strength"].default_value = bump
 
-        for material in self.paint_materials.values():
-            nodes = material.node_tree.nodes
-            nodes["Principled BSDF"].inputs["Roughness"].default_value = paint_roughness
+        for piece in PIECE_NAMES:
+            bsdf = self.paint_material(piece).node_tree.nodes["Principled BSDF"]
+            color = shift_color(
+                color=self.spec.insect_colors[piece],
+                hue_shift=rng.uniform(-0.035, 0.035),
+                saturation_scale=rng.uniform(0.8, 1.3),
+                value_scale=rng.uniform(0.75, 1.15),
+            )
+            bsdf.inputs["Base Color"].default_value = (*color, 1.0)
+            bsdf.inputs["Roughness"].default_value = paint_roughness
+
+    def body_hex(self, owner: str) -> str:
+        """Get the sRGB body colour of an owner from the manifest or the default.
+
+        Args:
+            owner: The owner name.
+
+        Returns:
+            The colour as `#rrggbb`.
+        """
+        default = "#EFE8D6" if owner == "white" else "#1C1C1E"
+
+        return self.spec.body_colors.get(owner, default)
 
     def body_material(self, owner: str) -> Any:
         """Get the bakelite material of an owner, building it on first use.
@@ -275,8 +307,7 @@ class TileLibrary:
             The material.
         """
         if owner not in self.body_materials:
-            default = "#EFE8D6" if owner == "white" else "#1C1C1E"
-            color = hex_to_linear_rgb(self.spec.body_colors.get(owner, default))
+            color = hex_to_linear_rgb(self.body_hex(owner))
             self.body_materials[owner] = build_bakelite_material(
                 name=f"{self.spec.id}-{owner}-body", color=color
             )

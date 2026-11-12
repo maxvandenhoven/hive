@@ -26,8 +26,9 @@ from hive.engine.grid import Coordinate
 from hive.engine.rules import Rules
 from hive.engine.state import GameState, Move, PieceType, Player
 
-SCENE_SCHEMA_VERSION: Final = 1
-"""The version of the scene JSON, raised on every incompatible change."""
+SCENE_SCHEMA_VERSION: Final = 2
+"""The version of the scene JSON, raised on every incompatible change. Version 2 adds the
+camera aperture and the distractors."""
 
 SCENE_SCHEMA_PATH: Final = Path(__file__).parent / "schemas" / "scene.schema.json"
 """The committed JSON Schema of a scene, which `hive data schema` writes."""
@@ -131,6 +132,8 @@ class SceneCamera(JsonCodec):
         frame_offset: Where the hive centre appears in the frame, from -1 (left, bottom)
             to 1 (right, top).
         portrait: Whether the image is taller than wide.
+        aperture_f: The 35 mm equivalent f-number, with the focus on the hive centre, so
+            close and steep photos blur the far side of the hive slightly.
     """
 
     distance: float
@@ -140,6 +143,33 @@ class SceneCamera(JsonCodec):
     focal_mm: float
     frame_offset: tuple[float, float]
     portrait: bool
+    aperture_f: float
+
+
+type SceneDistractorKind = Literal["box", "cylinder", "rod"]
+"""A kind of everyday object on the table: a box lying flat (a book, phone or notebook), a
+standing cylinder (a mug or can), or a rod lying down (a pen or pencil)."""
+
+
+@dataclass(frozen=True, slots=True)
+class SceneDistractor(JsonCodec):
+    """An object on the table that is not a tile, which the detector must ignore.
+
+    Attributes:
+        kind: The kind of object.
+        x: The position to the east of the hive centre, in tile widths.
+        y: The position to the north of the hive centre, in tile widths.
+        size: The length, width and height of the object in tile widths.
+        rot_deg: The rotation around the vertical axis in degrees.
+        color_seed: Picks the colour and finish of the object.
+    """
+
+    kind: SceneDistractorKind
+    x: float
+    y: float
+    size: tuple[float, float, float]
+    rot_deg: float
+    color_seed: int
 
 
 type SceneLightingPreset = Literal["window", "ceiling", "lamp", "flash", "environment"]
@@ -213,6 +243,7 @@ class Scene(JsonCodec):
         moves: The moves of the random game, which replay to the board.
         board: The occupied cells, ordered by coordinate.
         loose_pieces: The unplayed tiles next to the hive.
+        distractors: The other objects on the table.
         tile_gap: The space between neighbouring tiles in tile widths.
         camera: The camera.
         lighting: The lighting.
@@ -220,12 +251,13 @@ class Scene(JsonCodec):
         post: The camera effects.
     """
 
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     scene_id: str
     seed: int
     moves: list[Move | None]
     board: list[SceneCell]
     loose_pieces: list[SceneLoosePiece]
+    distractors: list[SceneDistractor]
     tile_gap: float
     camera: SceneCamera
     lighting: SceneLighting
@@ -275,13 +307,19 @@ class ScenesConfig(JsonCodec):
         loose_fraction: The range of the fraction of unplayed tiles that is shown.
         loose_distance: The range of the space between the hive and the unplayed tiles.
         flipped_probability: The chance that an unplayed tile lies upside down.
+        distractor_probability: The chance that other objects lie on the table.
+        distractor_count: The range of the number of other objects.
+        distractor_kinds: The relative weight of each kind of object.
+        distractor_distance: The range of the space between the hive and an object.
         tilt_deg: The range of camera tilts from straight down.
         roll_deg: The range of camera rolls around the view direction.
         focal_mm: The range of 35 mm equivalent focal lengths.
-        fill: The range of the fraction of the half frame height the hive radius fills.
+        fill: The range of the fraction of the half frame height the hive radius fills;
+            above 1 the hive is cut off by the frame.
         frame_offset_slack: How far past the frame edge the hive may be pushed, as a
             fraction of the half frame.
         portrait_probability: The chance of a portrait image.
+        aperture_f: The range of 35 mm equivalent f-numbers.
         lighting_presets: The relative weight of each lighting preset.
         color_temp_k: The range of light colour temperatures.
         intensity: The range of light intensities.
@@ -304,12 +342,19 @@ class ScenesConfig(JsonCodec):
     loose_fraction: SceneRange = (0.15, 1.0)
     loose_distance: SceneRange = (0.4, 2.5)
     flipped_probability: float = 0.05
-    tilt_deg: SceneRange = (0.0, 35.0)
+    distractor_probability: float = 0.6
+    distractor_count: tuple[int, int] = (1, 4)
+    distractor_kinds: dict[SceneDistractorKind, float] = field(
+        default_factory=lambda: {"box": 3.0, "cylinder": 1.5, "rod": 1.5}
+    )
+    distractor_distance: SceneRange = (0.5, 6.0)
+    tilt_deg: SceneRange = (0.0, 60.0)
     roll_deg: SceneRange = (-8.0, 8.0)
     focal_mm: SceneRange = (22.0, 52.0)
-    fill: SceneRange = (0.35, 0.95)
+    fill: SceneRange = (0.35, 1.2)
     frame_offset_slack: float = 0.15
     portrait_probability: float = 0.4
+    aperture_f: SceneRange = (5.6, 16.0)
     lighting_presets: dict[SceneLightingPreset, float] = field(
         default_factory=lambda: {
             "window": 3.0,
@@ -427,6 +472,12 @@ class ScenesConfig(JsonCodec):
         loose_pieces = self.sample_loose_pieces(
             state=state, board=board, radius=radius, rng=rng
         )
+        distractors = self.sample_distractors(
+            tiles=[(cell.x, cell.y) for cell in board]
+            + [(piece.x, piece.y) for piece in loose_pieces],
+            radius=radius,
+            rng=rng,
+        )
 
         return Scene(
             schema_version=SCENE_SCHEMA_VERSION,
@@ -435,6 +486,7 @@ class ScenesConfig(JsonCodec):
             moves=moves,
             board=board,
             loose_pieces=loose_pieces,
+            distractors=distractors,
             tile_gap=tile_gap,
             camera=self.sample_camera(radius=radius, rng=rng),
             lighting=self.sample_lighting(rng),
@@ -609,6 +661,62 @@ class ScenesConfig(JsonCodec):
 
         return loose_pieces
 
+    def sample_distractors(
+        self, tiles: list[tuple[float, float]], radius: float, rng: random.Random
+    ) -> list[SceneDistractor]:
+        """Place everyday objects around the hive, never on a tile or on each other.
+
+        Args:
+            tiles: The positions of every tile on the table, on the board and loose.
+            radius: The radius of the hive around its centre.
+            rng: The random number generator.
+
+        Returns:
+            The objects; fewer than sampled when no free spot is found.
+        """
+        if rng.random() >= self.distractor_probability:
+            return []
+
+        kinds = list(self.distractor_kinds)
+        weights = [self.distractor_kinds[kind] for kind in kinds]
+        distractors: list[SceneDistractor] = []
+        footprints: list[tuple[float, float, float]] = []
+
+        for _ in range(rng.randint(*self.distractor_count)):
+            kind = rng.choices(kinds, weights=weights)[0]
+            size = sample_distractor_size(kind=kind, rng=rng)
+            # The footprint is the circle around the object seen from above.
+            reach = math.hypot(size[0], size[1]) / 2
+
+            for _ in range(30):
+                angle = rng.uniform(0, 2 * math.pi)
+                distance = radius + reach + rng.uniform(*self.distractor_distance)
+                x, y = distance * math.cos(angle), distance * math.sin(angle)
+                clear_of_tiles = all(
+                    math.dist((x, y), tile) > reach + SCENE_TILE_CIRCUMRADIUS + 0.1
+                    for tile in tiles
+                )
+                clear_of_objects = all(
+                    math.dist((x, y), (other_x, other_y)) > reach + other_reach
+                    for other_x, other_y, other_reach in footprints
+                )
+
+                if clear_of_tiles and clear_of_objects:
+                    footprints.append((x, y, reach))
+                    distractors.append(
+                        SceneDistractor(
+                            kind=kind,
+                            x=x,
+                            y=y,
+                            size=size,
+                            rot_deg=rng.uniform(0, 360),
+                            color_seed=rng.randrange(2**31),
+                        )
+                    )
+                    break
+
+        return distractors
+
     def sample_camera(self, radius: float, rng: random.Random) -> SceneCamera:
         """Sample a camera that frames the hive with a random fill and offset.
 
@@ -627,8 +735,8 @@ class ScenesConfig(JsonCodec):
         # The hive spans `fill` of the short half frame and less of the long one, so it
         # may move further along the long side before it leaves the frame.
         aspect = SCENE_SENSOR_MM[1] / SCENE_SENSOR_MM[0]
-        long_limit = 1 - fill * aspect + self.frame_offset_slack
-        short_limit = 1 - fill + self.frame_offset_slack
+        long_limit = max(1 - fill * aspect + self.frame_offset_slack, 0.1)
+        short_limit = max(1 - fill + self.frame_offset_slack, 0.1)
         x_limit, y_limit = (
             (short_limit, long_limit) if portrait else (long_limit, short_limit)
         )
@@ -641,6 +749,7 @@ class ScenesConfig(JsonCodec):
             focal_mm=focal_mm,
             frame_offset=(rng.uniform(-x_limit, x_limit), rng.uniform(-y_limit, y_limit)),
             portrait=portrait,
+            aperture_f=rng.uniform(*self.aperture_f),
         )
 
     def sample_lighting(self, rng: random.Random) -> SceneLighting:
@@ -682,6 +791,31 @@ class ScenesConfig(JsonCodec):
             rotation_deg=rng.uniform(0, 360),
             scale=rng.uniform(*self.texture_scale),
         )
+
+
+def sample_distractor_size(
+    kind: SceneDistractorKind, rng: random.Random
+) -> tuple[float, float, float]:
+    """Sample the size of an everyday object, with a tile 34.6 mm wide.
+
+    Args:
+        kind: The kind of object.
+        rng: The random number generator.
+
+    Returns:
+        The length, width and height in tile widths.
+    """
+    if kind == "box":
+        return rng.uniform(2.0, 7.0), rng.uniform(1.5, 6.0), rng.uniform(0.15, 1.5)
+
+    if kind == "cylinder":
+        diameter = rng.uniform(1.5, 3.0)
+
+        return diameter, diameter, rng.uniform(1.5, 3.5)
+
+    diameter = rng.uniform(0.15, 0.35)
+
+    return rng.uniform(3.0, 5.0), diameter, diameter
 
 
 def derive_scene_seed(seed: int, index: int) -> int:

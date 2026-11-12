@@ -22,7 +22,10 @@ The code runs under Blender's bundled Python and does not import `hive`:
 - GPU: Cycles uses OptiX, CUDA, HIP or oneAPI when Blender finds a GPU, and otherwise
   every CPU thread. EEVEE uses the GPU through OpenGL or Vulkan, also headless with `-b`.
   On a laptop with an NVIDIA GPU, the NVIDIA kernel module must be loaded
-  (`nvidia-smi` works) for Cycles to use it.
+  (`nvidia-smi` works) for Cycles and training to use it. On Ubuntu the signed module
+  comes from `linux-modules-nvidia-<driver>-open-<kernel>`; when the kernel was updated
+  without it, install the package for the running kernel (`uname -r`) with a matching
+  driver, then `sudo modprobe nvidia`.
 
 ## Running
 

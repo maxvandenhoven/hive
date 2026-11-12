@@ -4,6 +4,7 @@ Lengths are in metres unless a name says otherwise. Hexagons are pointy-top, lik
 engine grid: a corner points up (+y) and the flat sides face east and west.
 """
 
+import colorsys
 import math
 from collections.abc import Sequence
 
@@ -144,6 +145,36 @@ def hex_to_linear_rgb(color: str) -> tuple[float, float, float]:
         srgb_to_linear(int(digits[0:2], 16) / 255),
         srgb_to_linear(int(digits[2:4], 16) / 255),
         srgb_to_linear(int(digits[4:6], 16) / 255),
+    )
+
+
+def shift_color(
+    color: str, hue_shift: float, saturation_scale: float, value_scale: float
+) -> tuple[float, float, float]:
+    """Shift a `#rrggbb` colour in HSV space and convert it to linear RGB.
+
+    Args:
+        color: The sRGB colour as six hex digits after a `#`.
+        hue_shift: The hue change as a fraction of the colour wheel.
+        saturation_scale: The factor the saturation is multiplied by, clamped to 1.
+        value_scale: The factor the value is multiplied by, clamped to 1.
+
+    Returns:
+        The linear RGB channels between 0 and 1.
+    """
+    digits = color.lstrip("#")
+    red, green, blue = (int(digits[i : i + 2], 16) / 255 for i in (0, 2, 4))
+    hue, saturation, value = colorsys.rgb_to_hsv(red, green, blue)
+    shifted = colorsys.hsv_to_rgb(
+        (hue + hue_shift) % 1.0,
+        min(saturation * saturation_scale, 1.0),
+        min(value * value_scale, 1.0),
+    )
+
+    return (
+        srgb_to_linear(shifted[0]),
+        srgb_to_linear(shifted[1]),
+        srgb_to_linear(shifted[2]),
     )
 
 

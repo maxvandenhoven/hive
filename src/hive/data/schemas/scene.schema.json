@@ -82,7 +82,7 @@
     },
     "SceneCamera": {
       "additionalProperties": false,
-      "description": "A phone camera looking at the hive.\n\nAttributes:\n    distance: The distance from the camera to the hive centre in tile widths.\n    tilt_deg: The angle between the view direction and straight down.\n    azimuth_deg: The direction the camera is in, seen from the hive, anti-clockwise\n        from the east.\n    roll_deg: The rotation of the camera around its view direction.\n    focal_mm: The 35 mm equivalent focal length.\n    frame_offset: Where the hive centre appears in the frame, from -1 (left, bottom)\n        to 1 (right, top).\n    portrait: Whether the image is taller than wide.",
+      "description": "A phone camera looking at the hive.\n\nAttributes:\n    distance: The distance from the camera to the hive centre in tile widths.\n    tilt_deg: The angle between the view direction and straight down.\n    azimuth_deg: The direction the camera is in, seen from the hive, anti-clockwise\n        from the east.\n    roll_deg: The rotation of the camera around its view direction.\n    focal_mm: The 35 mm equivalent focal length.\n    frame_offset: Where the hive centre appears in the frame, from -1 (left, bottom)\n        to 1 (right, top).\n    portrait: Whether the image is taller than wide.\n    aperture_f: The 35 mm equivalent f-number, with the focus on the hive centre, so\n        close and steep photos blur the far side of the hive slightly.",
       "properties": {
         "distance": {
           "title": "Distance",
@@ -121,6 +121,10 @@
         "portrait": {
           "title": "Portrait",
           "type": "boolean"
+        },
+        "aperture_f": {
+          "title": "Aperture F",
+          "type": "number"
         }
       },
       "required": [
@@ -130,7 +134,8 @@
         "roll_deg",
         "focal_mm",
         "frame_offset",
-        "portrait"
+        "portrait",
+        "aperture_f"
       ],
       "title": "SceneCamera",
       "type": "object"
@@ -174,6 +179,66 @@
       ],
       "title": "SceneCell",
       "type": "object"
+    },
+    "SceneDistractor": {
+      "additionalProperties": false,
+      "description": "An object on the table that is not a tile, which the detector must ignore.\n\nAttributes:\n    kind: The kind of object.\n    x: The position to the east of the hive centre, in tile widths.\n    y: The position to the north of the hive centre, in tile widths.\n    size: The length, width and height of the object in tile widths.\n    rot_deg: The rotation around the vertical axis in degrees.\n    color_seed: Picks the colour and finish of the object.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SceneDistractorKind"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "size": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Size",
+          "type": "array"
+        },
+        "rot_deg": {
+          "title": "Rot Deg",
+          "type": "number"
+        },
+        "color_seed": {
+          "title": "Color Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "x",
+        "y",
+        "size",
+        "rot_deg",
+        "color_seed"
+      ],
+      "title": "SceneDistractor",
+      "type": "object"
+    },
+    "SceneDistractorKind": {
+      "enum": [
+        "box",
+        "cylinder",
+        "rod"
+      ],
+      "type": "string"
     },
     "SceneJitter": {
       "additionalProperties": false,
@@ -365,10 +430,10 @@
     }
   },
   "additionalProperties": false,
-  "description": "Everything the renderer needs for one image, in tile widths.\n\nAttributes:\n    schema_version: The version of the scene JSON.\n    scene_id: The unique id, also the file name.\n    seed: The seed of the scene, which the renderer also uses for its own choices\n        such as the tileset.\n    moves: The moves of the random game, which replay to the board.\n    board: The occupied cells, ordered by coordinate.\n    loose_pieces: The unplayed tiles next to the hive.\n    tile_gap: The space between neighbouring tiles in tile widths.\n    camera: The camera.\n    lighting: The lighting.\n    background: The table surface.\n    post: The camera effects.",
+  "description": "Everything the renderer needs for one image, in tile widths.\n\nAttributes:\n    schema_version: The version of the scene JSON.\n    scene_id: The unique id, also the file name.\n    seed: The seed of the scene, which the renderer also uses for its own choices\n        such as the tileset.\n    moves: The moves of the random game, which replay to the board.\n    board: The occupied cells, ordered by coordinate.\n    loose_pieces: The unplayed tiles next to the hive.\n    distractors: The other objects on the table.\n    tile_gap: The space between neighbouring tiles in tile widths.\n    camera: The camera.\n    lighting: The lighting.\n    background: The table surface.\n    post: The camera effects.",
   "properties": {
     "schema_version": {
-      "const": 1,
+      "const": 2,
       "title": "Schema Version",
       "type": "integer"
     },
@@ -408,6 +473,13 @@
       "title": "Loose Pieces",
       "type": "array"
     },
+    "distractors": {
+      "items": {
+        "$ref": "#/$defs/SceneDistractor"
+      },
+      "title": "Distractors",
+      "type": "array"
+    },
     "tile_gap": {
       "title": "Tile Gap",
       "type": "number"
@@ -432,6 +504,7 @@
     "moves",
     "board",
     "loose_pieces",
+    "distractors",
     "tile_gap",
     "camera",
     "lighting",

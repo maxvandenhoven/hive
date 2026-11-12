@@ -39,8 +39,9 @@ from hiveblend.tilesets import TileLibrary, TilesetSpec, discover_tilesets  # no
 
 BLENDER_DIR = Path(__file__).resolve().parent
 REPO_DIR = BLENDER_DIR.parent
-SCENE_SCHEMA_VERSION = 1
-"""The scene schema version this renderer reads (`hive.data.scenes`)."""
+SCENE_SCHEMA_VERSIONS = (1, 2)
+"""The scene schema versions this renderer reads (`hive.data.scenes`); version 1 scenes
+have no aperture and no distractors."""
 
 logger = logging.getLogger("render")
 
@@ -126,7 +127,7 @@ class SceneRenderer:
         """
         scene = json.loads(path.read_text())
 
-        if scene.get("schema_version") != SCENE_SCHEMA_VERSION:
+        if scene.get("schema_version") not in SCENE_SCHEMA_VERSIONS:
             msg = f"`{path}` has schema version {scene.get('schema_version')}."
             raise ValueError(msg)
 
@@ -145,6 +146,7 @@ class SceneRenderer:
         stage = self.stage
         stage.clear()
         stage.build_tiles(scene=scene, library=library)
+        stage.build_distractors(scene=scene, width=spec.across_flats_m)
         width, height = stage.set_camera(
             camera=scene["camera"],
             width=spec.across_flats_m,
@@ -209,6 +211,7 @@ class SceneRenderer:
             "look": look,
             "exposure": exposure,
             "camera": scene["camera"],
+            "distractors": scene.get("distractors", []),
             "lighting": scene["lighting"],
             "post": scene["post"],
             "board": [
@@ -337,7 +340,11 @@ class SceneRenderer:
         shading.show_cavity = False
         shading.show_object_outline = False
         shading.show_specular_highlight = False
+        # Everything but tiles is id 0, so other objects still cover the tiles behind.
         self.stage.table.color = (0.0, 0.0, 0.0, 1.0)
+
+        for prop in self.stage.props:
+            prop.color = (0.0, 0.0, 0.0, 1.0)
 
         for instance in self.stage.tiles:
             instance.obj.color = instance_color(instance.instance_id)

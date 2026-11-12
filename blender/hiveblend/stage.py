@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import bmesh
 import bpy
 from mathutils import Euler, Matrix, Quaternion, Vector
 
@@ -34,6 +35,20 @@ PLAIN_SURFACE_COLORS = [
     "#C8B28E",
 ]
 """Colours of plain tables, felt mats and painted surfaces, as sRGB."""
+
+DISTRACTOR_COLORS = [
+    "#F4F1EA",
+    "#1B1C1E",
+    "#C23B22",
+    "#2E5E8C",
+    "#3F7D4E",
+    "#D9A441",
+    "#8A8F96",
+    "#5B3A6E",
+    "#E8D5B5",
+    "#B0B7BD",
+]
+"""Colours of everyday objects on the table (books, phones, mugs, pens), as sRGB."""
 
 FALLBACK_WOOD_COLORS = ["#8A5A35", "#A9744A", "#5C3A22", "#C79A68", "#3E2A1C"]
 """Colours of the procedural stand-in for wood when no wood textures are downloaded."""
@@ -113,6 +128,7 @@ class Stage:
         table: The table plane.
         assets: The downloaded surfaces and environments.
         tiles: The tile objects of the current scene.
+        props: The other objects on the table in the current scene.
         lights: The light objects of the current scene.
         images: Loaded images by path, kept between scenes.
     """
@@ -129,6 +145,7 @@ class Stage:
         self.scene = bpy.context.scene
         self.assets = assets
         self.tiles: list[TileInstance] = []
+        self.props: list[Any] = []
         self.lights: list[Any] = []
         self.images: dict[Path, Any] = {}
 
@@ -142,7 +159,8 @@ class Stage:
         self.scene.camera = self.camera
 
         table_mesh = bpy.data.meshes.new("table")
-        size = 4.0
+        # Large enough that steep views see table up to the horizon, not its edge.
+        size = 12.0
         table_mesh.from_pydata(
             [(-size, -size, 0), (size, -size, 0), (size, size, 0), (-size, size, 0)],
             [],
@@ -162,9 +180,18 @@ class Stage:
         self.scene.world = world
 
     def clear(self) -> None:
-        """Remove the tiles and lights of the previous scene."""
+        """Remove the tiles, other objects and lights of the previous scene."""
         for instance in self.tiles:
             bpy.data.objects.remove(instance.obj)
+
+        for prop in self.props:
+            mesh = prop.data
+            materials = list(mesh.materials)
+            bpy.data.objects.remove(prop)
+            bpy.data.meshes.remove(mesh)
+
+            for material in materials:
+                bpy.data.materials.remove(material)
 
         for light in self.lights:
             data = light.data
@@ -172,6 +199,7 @@ class Stage:
             bpy.data.lights.remove(data)
 
         self.tiles = []
+        self.props = []
         self.lights = []
 
     def build_tiles(self, scene: dict[str, Any], library: TileLibrary) -> None:
@@ -225,6 +253,60 @@ class Stage:
                 level=0,
                 labeled=not flipped,
             )
+
+    def build_distractors(self, scene: dict[str, Any], width: float) -> None:
+        """Create the everyday objects of a scene: boxes, standing cylinders and rods.
+
+        Args:
+            scene: The scene JSON; scenes before schema version 2 have no objects.
+            width: The tile width in metres.
+        """
+        for item in scene.get("distractors", []):
+            variant = random.Random(item["color_seed"])
+            length, depth, height = (value * width for value in item["size"])
+            bm = bmesh.new()
+
+            if item["kind"] == "box":
+                bmesh.ops.create_cube(bm, size=1.0)
+            else:
+                bmesh.ops.create_cone(
+                    bm, cap_ends=True, segments=32, radius1=0.5, radius2=0.5, depth=1.0
+                )
+
+                if item["kind"] == "rod":
+                    bmesh.ops.rotate(
+                        bm, verts=bm.verts, matrix=Matrix.Rotation(math.pi / 2, 3, "Y")
+                    )
+
+                for face in bm.faces:
+                    face.smooth = len(face.verts) == 4
+
+            bmesh.ops.scale(bm, vec=(length, depth, height), verts=bm.verts)
+            bmesh.ops.translate(bm, vec=(0.0, 0.0, height / 2), verts=bm.verts)
+            mesh = bpy.data.meshes.new("prop")
+            bm.to_mesh(mesh)
+            bm.free()
+
+            material = bpy.data.materials.new("prop")
+            bsdf = material.node_tree.nodes["Principled BSDF"]
+            color = variant.choice(DISTRACTOR_COLORS).lstrip("#")
+            linear = [srgb_to_linear(int(color[i : i + 2], 16) / 255) for i in (0, 2, 4)]
+            bsdf.inputs["Base Color"].default_value = (*linear, 1.0)
+            bsdf.inputs["Roughness"].default_value = variant.uniform(0.15, 0.85)
+            bsdf.inputs["Coat Weight"].default_value = variant.choice([0.0, 0.0, 0.6])
+            mesh.materials.append(material)
+
+            obj = bpy.data.objects.new("prop", mesh)
+            obj.location = (item["x"] * width, item["y"] * width, 0.0)
+            obj.rotation_euler = (0.0, 0.0, math.radians(item["rot_deg"]))
+
+            if item["kind"] == "box":
+                bevel = obj.modifiers.new("bevel", "BEVEL")
+                bevel.width = min(0.003, height / 4)
+                bevel.segments = 2
+
+            self.scene.collection.objects.link(obj)
+            self.props.append(obj)
 
     def add_tile(
         self,
@@ -317,6 +399,12 @@ class Stage:
         turn: Quaternion = Vector((0.0, 0.0, -1.0)).rotation_difference(desired)
         rotation = rotation @ turn.inverted().to_matrix().to_4x4()
         self.camera.matrix_world = Matrix.Translation(location) @ rotation
+        dof = self.camera.data.dof
+        dof.use_dof = "aperture_f" in camera
+
+        if dof.use_dof:
+            dof.focus_distance = camera["distance"] * width
+            dof.aperture_fstop = camera["aperture_f"]
 
         return size
 
