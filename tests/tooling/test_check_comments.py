@@ -158,3 +158,11 @@ class TestMain:
 
         assert exit_code == 1
         assert capsys.readouterr().out.startswith(f"{path}:1: could not tokenize:")
+
+
+def test_stubs_are_checked(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    stub = tmp_path / "_core.pyi"
+    stub.write_text("x: int  # bad comment\n")
+
+    assert main([str(tmp_path)]) == 1
+    assert "_core.pyi:1" in capsys.readouterr().out

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostToolUse hook: format the Python or frontend file Claude just edited and report
+# PostToolUse hook: format the Python, Rust or frontend file Claude just edited and report
 # remaining lint and comment style errors. Exit code 2 feeds stderr back to Claude; exit
 # code 0 means nothing to report.
 set -uo pipefail
@@ -30,7 +30,25 @@ if [[ "$file_path" == "$repo_root"/frontend/src/* && "$file_path" =~ \.(ts|tsx|c
     exit 0
 fi
 
-[[ "$file_path" == *.py ]] || exit 0
+# Rust sources are formatted with rustfmt (the pinned toolchain of `rust-toolchain.toml`).
+# Clippy needs the whole crate, so it runs in the Stop hook (`make check`).
+if [[ "$file_path" == "$repo_root"/rust/* && "$file_path" == *.rs ]]; then
+    rustfmt="${CARGO_HOME:-$HOME/.cargo}/bin/rustfmt"
+    [[ -x "$rustfmt" ]] || rustfmt="$(command -v rustfmt)" || exit 0
+
+    if ! output="$(cd "$repo_root" && "$rustfmt" --edition 2024 "$file_path" 2>&1)"; then
+        echo "$output" >&2
+        exit 2
+    fi
+    if output="$(grep -nE '^.{91,}$' "$file_path")"; then
+        echo "$file_path: lines over 90 characters:" >&2
+        echo "$output" >&2
+        exit 2
+    fi
+    exit 0
+fi
+
+[[ "$file_path" == *.py || "$file_path" == *.pyi ]] || exit 0
 
 cd "$repo_root" || exit 0
 

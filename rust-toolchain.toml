@@ -1,0 +1,6 @@
+# The pinned Rust toolchain of the Rust core (see docs/plans/tooling.md §Rust). rustup
+# installs it on first use; change it in a commit of its own.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

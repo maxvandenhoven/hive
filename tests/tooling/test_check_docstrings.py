@@ -225,3 +225,12 @@ class TestMain:
 
         assert main([str(broken)]) == 1
         assert "could not parse" in capsys.readouterr().out
+
+
+def test_stubs_are_checked(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    stub = tmp_path / "pkg" / "_core.pyi"
+    stub.parent.mkdir()
+    stub.write_text('def f(a: int) -> int:\n    """Do something."""\n')
+
+    assert main([str(tmp_path)]) == 1
+    assert "_core.pyi:1" in capsys.readouterr().out

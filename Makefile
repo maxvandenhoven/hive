@@ -1,3 +1,7 @@
+# rustup installs cargo in `~/.cargo/bin`, which is not always on the PATH of a shell.
+export PATH := $(HOME)/.cargo/bin:$(PATH)
+
+
 .PHONY: sync
 sync:
 	@uv sync --all-groups --all-extras
@@ -10,8 +14,8 @@ frontend/node_modules: frontend/package-lock.json
 	@touch frontend/node_modules
 
 
-.PHONY: format format-python format-frontend
-format: format-python format-frontend
+.PHONY: format format-python format-frontend format-rust
+format: format-python format-frontend format-rust
 
 format-python:
 	@uv run ruff format
@@ -20,9 +24,12 @@ format-python:
 format-frontend: frontend/node_modules
 	@cd frontend && npm run --silent format
 
+format-rust:
+	@cd rust && cargo fmt --all
 
-.PHONY: lint lint-python lint-frontend
-lint: lint-python lint-frontend
+
+.PHONY: lint lint-python lint-frontend lint-rust
+lint: lint-python lint-frontend lint-rust
 
 lint-python:
 	@uv run ruff check --fix --output-format concise
@@ -31,6 +38,15 @@ lint-python:
 
 lint-frontend: frontend/node_modules
 	@cd frontend && npm run --silent lint:fix
+
+# Clippy with warnings as errors, rustdoc without broken links, and comment lines of at
+# most 90 characters, which stable rustfmt does not check.
+lint-rust:
+	@cd rust && cargo clippy --workspace --all-targets --locked --quiet -- -D warnings
+	@cd rust && RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps \
+		--document-private-items --locked --quiet
+	@! grep -rnE '^.{91,}$$' rust/core rust/python --include='*.rs' \
+		|| (echo 'Rust lines over 90 characters (above).' && false)
 
 
 .PHONY: type type-python type-frontend
@@ -43,8 +59,8 @@ type-frontend: frontend/node_modules
 	@cd frontend && npm run --silent typecheck
 
 
-.PHONY: test test-python test-frontend
-test: test-python test-frontend
+.PHONY: test test-python test-frontend test-rust
+test: test-python test-frontend test-rust
 
 test-python:
 	@uv run pytest -m "not slow" --cov --cov-report term-missing
@@ -52,10 +68,14 @@ test-python:
 test-frontend: frontend/node_modules
 	@cd frontend && npm run --silent test
 
+test-rust:
+	@cd rust && cargo test --workspace --locked --quiet
+
 
 .PHONY: test-slow
 test-slow:
 	@uv run pytest -m slow
+	@cd rust && cargo test --workspace --locked --quiet -- --ignored
 
 
 # Downloads the CC0 table surfaces and room lighting of the Blender renderer.

@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "make check",
-            "timeout": 120,
+            "timeout": 300,
             "statusMessage": "Running make check..."
           }
         ]
