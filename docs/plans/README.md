@@ -118,7 +118,7 @@ Each decision has a short rationale. Topic files go into detail.
 | D9 | Same `AgentSpec(kind, params)` + factory drives the API agent picker and the gauntlet CLI. | One way to name and configure agents everywhere. |
 | D10 | Stateful backend: Postgres stores games, moves, photos; Garage (S3) stores photo bytes, datasets and models. The engine stays stateless per request: load moves, replay, answer. | Game management and replay in the UI; pods can restart freely. |
 | D11 | Moves stored as JSON mirroring the engine `Move`. | Simple and exact. UHP notation can be added as an export later. |
-| D12 | Photo tracking: each photo is matched against the boards produced by all legal moves (plus two-move sequences as recovery). | Hidden stack contents are known from history; detection noise is corrected by legality. |
+| D12 | Photo tracking: each photo is matched against the boards produced by all legal moves (plus two-move sequences as recovery) by likelihood, in board coordinates so photos may be taken from any angle; unclear photos ask for another photo, whose evidence is added, and the previous photo's tile readings are remembered. | Hidden stack contents are known from history; detection noise is corrected by legality; a wrong move is worse than one more photo. |
 | D13 | Two vision readers behind one `BoardReader` protocol: classical CV first, YOLO second. Shared grid fitting and matching. | The classical reader needs no training data, unblocks the app early, and is the baseline YOLO must beat. |
 | D14 | YOLO trained with Ultralytics, exported to ONNX, served with ONNX Runtime. | Keeps torch out of the API image. |
 | D15 | Blender is decoupled from the package: `hive data scenes` writes scene JSON, `blender/render.py` (Blender's bundled Python) reads it. | Blender bundles its own Python version; the package requires 3.13. |
@@ -154,7 +154,7 @@ hive/
 │  ├─ engine/                  # grid.py, state.py, rules.py, codec.py, record.py, errors.py
 │  ├─ agents/                  # base.py, factory.py, random.py, search.py, minimax.py, negamax.py, testing.py
 │  ├─ match/                   # turn.py, worker.py, runner.py, records.py, gauntlet.py
-│  ├─ vision/                  # [vision] classes.py, types.py, reader.py, yolo/, classical/, grid_fit.py, matcher.py, eval/
+│  ├─ vision/                  # [vision] classes.py, types.py, reader.py, yolo/, lattice.py, grid_fit.py, resolver.py, tracking.py, sequences.py, testing.py, classical/, eval/
 │  ├─ data/                    # scenes.py (scene JSON), datasets.py (labels, export, manifests), testing.py
 │  ├─ api/                     # [api] app.py, settings.py, db/, storage.py, routes/, pool.py, metrics.py
 │  ├─ plotting/                # existing matplotlib/svg plotting (optional extra `plotting`)

@@ -7,9 +7,10 @@ is an optional speed-up: every flow works with manual move entry. Code lives in
 ## Pipeline
 
 ```
-photo ──▶ BoardReader.read(image) ──▶ list[TileObservation]        (reader-specific)
-      ──▶ fit_hex_grid(observations) ──▶ ObservedBoard              (shared)
-      ──▶ match_move(state, rules, observed) ──▶ MatchResult        (shared)
+photo ──▶ BoardReader.read(image) ──▶ list[TileObservation]           (reader-specific)
+      ──▶ ObservedBoard.fit(observations) ──▶ ObservedBoard           (grid_fit.py)
+      ──▶ MoveResolver.resolve(state, photos, previous) ──▶ MoveResolution   (resolver.py)
+      ──▶ GameTracker: plays resolved moves, keeps unclear photos     (tracking.py)
 ```
 
 ### Tracking assumption
@@ -21,15 +22,17 @@ played, not reconstruct the full state:
 - Pieces under beetles are known from history; the reader only needs the **top piece per
   stack**.
 - Side to move, hands and ply are tracked exactly by the engine.
-- Detection errors are corrected by legality: the closest legal move wins.
+- Detection errors are corrected by legality: the most likely legal move wins.
+- Photos may be taken from any angle; everything is compared in board coordinates, never
+  in pixels.
 
 ### Capture assumptions
 
-- Phone camera, roughly overhead: tilt up to about 35°, any rotation around the vertical
-  axis, the hive anywhere in the frame, any table surface, normal indoor lighting.
-- Unplayed pieces may lie next to the hive; they must be ignored.
-- Tiles cut off at the frame edge: only tiles more than 50% visible are labeled; the app
-  warns when observations touch the image border.
+- Phone camera: tilt up to about 60°, any rotation around the vertical axis, the hive
+  anywhere in the frame (partly outside it too), any table surface, normal indoor lighting.
+- Unplayed pieces and other objects may lie next to the hive; they must be ignored.
+- Tiles cut off at the frame edge: only tiles more than 50% visible are labeled; tiles
+  outside the frame are unseen rather than missing.
 
 ## Interfaces
 
@@ -37,10 +40,12 @@ played, not reconstruct the full state:
 @dataclass(frozen=True, slots=True)
 class TileObservation:
     center: tuple[float, float]           # pixels
-    polygon: tuple[tuple[float, float], ...] | None
-    piece: PieceType
+    box: tuple[float, float, float, float]
+    polygon: list[tuple[float, float]] | None
+    piece_type: PieceType
     owner: Player
     score: float                           # 0..1 confidence
+    class_scores: tuple[float, ...] | None # every class, in class id order
 
 class BoardReader(Protocol):
     name: str
@@ -48,44 +53,97 @@ class BoardReader(Protocol):
 ```
 
 Detection classes are tileset-agnostic: 10 classes, `class_id = owner * 5 + piece_type`
-(matching the `Player` and `PieceType` enum values).
+(matching the `Player` and `PieceType` enum values, `hive.vision.classes.TileClass`).
 
 ## Grid fitting (WP 17)
 
-`fit_hex_grid(observations) -> ObservedBoard` maps pixel centers to axial `(q, r)`:
+`ObservedBoard.fit(observations, image_size)` places the detections of one photo on the
+hex lattice, in a frame of its own (`lattice.py`: x east, y south, neighbours 1 apart, so
+the plane-to-photo map keeps orientation). The top faces of tiles on the table lie in one
+plane, so a homography maps the lattice plane to the photo at any angle:
 
-1. Estimate the lattice: nearest-neighbor vectors between centers cluster into three
-   directions 60° apart (up to the affine distortion from tilt). Fit an affine transform
-   from axial coordinates to pixels (robustly, RANSAC style), using the known neighbor
-   structure.
-2. Snap each center to the nearest lattice point; reject observations far from any lattice
-   point.
-3. Resolve collisions (two observations on one hex) by score.
-4. Keep the largest connected component of hexes (the hive); everything else (pieces in
-   hand next to the board, clutter) is dropped and reported as `rejected`.
-5. Output: `ObservedBoard = dict[Coordinate, (PieceType, Player, score)]` in an arbitrary
-   lattice frame, plus fit diagnostics (residual, rejected count, touches border).
+1. Seeds: a face outline is a hexagon in perspective; the inverse square root of its
+   covariance undoes the local foreshortening (a regular hexagon has the same spread in
+   every direction). Around a tile, the offset to its nearest neighbour becomes a lattice
+   step and a 60° turn gives the second step: a local affine model.
+2. Growth: from each seed, detections near the centre of a hex next to the hexes found so
+   far are added and the model refitted (along a line while the tiles are in a line,
+   affine from three tiles, homography from six spread over the plane). The largest
+   grown set wins.
+3. Final fit: a RANSAC homography, refitted to every face placed at table height.
+   Faces on stacks are higher than the plane and shift away from the camera in steep
+   views, so the camera centre is estimated from the homography (focal length from the
+   orthogonality of the plane axes, principal point at the image centre) and each
+   detection is snapped at the stack level that fits best, levels above 0 only when the
+   table level fits poorly. Each tile records how far one level shifts it there.
+4. Collisions keep the higher score; the largest connected group of hexes is the hive
+   (ties: nearest the image centre). Other detections are `off_grid`; those within half a
+   hex of a hex are kept in `near` for the resolver.
+5. `visibility(coord, level)` projects a hex into the photo: 1 well inside, 0.5 with its
+   centre on the edge, 0 outside.
+
+On simulated photos (`hive.vision.testing`, tilts up to 60°, noise and tiles in hand) the
+fit places every tile of the board exactly in 98% of photos.
 
 ## Move matching (WP 17)
 
-`match_move(state, rules, observed) -> MatchResult`:
+`MoveResolver.resolve(state, photos, previous)` ranks the positions after every legal move
+by the likelihood of one or more photos of the result:
 
-1. Align the observed frame to the current board: search the 6 hex rotations and the
-   translations that map observed hexes onto known occupied hexes, scoring agreement of top
-   pieces. Most tiles are unchanged between turns, so the best alignment is clear.
-2. For each move in `rules.legal_moves(state)`, compute the expected top-piece board after
-   the move and score it against the aligned observation: reward matches weighted by
-   score, penalise mismatched classes, missing hexes and extra hexes.
-3. Rank candidates. Return `auto` if the best score passes an absolute threshold and beats
-   the runner-up by a margin; otherwise `candidates` (top-k) for the user to choose.
-4. Recovery: if nothing passes, search two-move sequences (own move + opponent move, about
-   10k candidates) and return them as candidates flagged `two_moves`.
-5. Verification mode for agent turns: score only the expected move and report `match` or
-   `mismatch` with a diff.
+1. Alignment: every rotation and translation that puts an observed face on an engine tile
+   gets a vote weighted by the class probability; most tiles are unchanged, so the best
+   few alignments are clear before any move is considered. Before the first move every
+   detection is a candidate first tile, with a prior for lone tiles near the middle of the
+   photo (tiles in hand lie in groups at the side).
+2. Likelihood per hex, summed over the hive and the observed hexes: a detected face scores
+   `(1 - ρ) p(class) + ρ / 10` with the detector's class probabilities and a confusion
+   rate ρ = 5%; an expected face that is not detected costs `log(2% + 98% (1 -
+   visibility))`; a face on an empty hex costs `log(1%)`; a `near` detection can stand in
+   for an expected face at a penalty; where the camera angle shows stack levels clearly, a
+   face at another level costs more.
+3. Tile memory: the previous photo of the known position, aligned to it, gives each top
+   tile's class probabilities, and the current reading counts half by its agreement with
+   that reading; moved tiles take their reading along. A tile that the detector always
+   reads wrongly (like the real black queen) is then still recognised.
+4. Candidates are scored incrementally (only the source and target hexes change), the
+   best alignment per photo, summed over photos: further photos of the same position add
+   evidence instead of replacing it.
+5. Outcomes are merged up to rotation and translation (for example the six equivalent
+   second placements), and turned into posteriors.
+6. Two moves: when the best single move leaves any hex disagreeing, every pair of legal
+   moves is scored as well, with the prior `log(2%)` (a skipped photo) shared by the
+   possible second moves.
+7. Decision: `resolved` when the best outcome has posterior ≥ 0.95, leads the next by 3
+   nats and at most `1 + 15%` of the hexes disagree; `failed` when many hexes disagree
+   (another board, or no hive found); otherwise `ambiguous` with the top candidates and a
+   request for another photo.
 
-Matching is tested without images: generate states from random games, render the expected
-observation directly from the engine (with noise: dropped tiles, wrong classes, extra
-tiles, random rotation/translation/affine skew), and assert the right move ranks first.
+`GameTracker` keeps ambiguous photos and resolves them together with the next photo,
+plays resolved moves, and uses the photo that confirmed a position as the previous photo
+of the next move. `confirm(moves)` plays moves entered by hand.
+
+### Tracking results (WP 17)
+
+Simulated games (`hive.vision.testing`, 12 games of 30 random moves, tilts up to 55°, up
+to three photos per move, entered by hand after three):
+
+| Detector confusion | Resolved, 1 photo | 2 photos | 3 photos | By hand | Wrong |
+|---|---|---|---|---|---|
+| 0% | 303 | 47 | 8 | 1 | 1 |
+| 5% | 280 | 65 | 6 | 8 | 1 |
+| 10% | 262 | 76 | 6 | 4 | 1 |
+
+Rendered games (`hive data sequences`, 2 games of 40 moves with placements, moves and
+beetles climbing onto stacks; every photo with its own camera up to 45° tilt, lighting,
+table, clutter and tiles in hand; three photos per move rendered, used only when needed),
+read by `hive-yolo-seg` v001 and tracked with `hive vision track`:
+
+| Moves | Resolved, 1 photo | 2 photos | 3 photos | By hand | Wrong |
+|---|---|---|---|---|---|
+| 80 | 74 | 5 | 1 | 0 | 0 |
+
+Resolving takes about 10 ms per photo, and up to about 0.5 s when pairs of moves are
+searched.
 
 ## Readers
 

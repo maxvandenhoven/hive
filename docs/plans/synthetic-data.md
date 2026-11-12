@@ -86,6 +86,16 @@ size. Shortened example:
 - Tileset choice is left to the renderer (recorded in metadata), so scenes are reusable
   across tilesets.
 
+### Game sequences
+
+`hive data sequences --count N --plies P --takes T --out DIR [--config scenes.toml]` writes
+scenes of whole games for testing the tracking of a game from photos (`vision.md` §Move
+matching): one game per sequence that mostly grows the hive and lets beetles climb when
+they can, a scene after every move, and `T` photos per move with their own camera,
+lighting, table, clutter and tiles in hand (the extra photos stand in for a person taking
+another one). Scene ids are `<game>-<move>-<photo>`; the renderer copies the moves into
+its metadata, so `hive vision track` knows the true game.
+
 ## Tilesets (WP 22)
 
 ```
