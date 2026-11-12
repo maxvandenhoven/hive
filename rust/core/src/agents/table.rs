@@ -1,5 +1,7 @@
 //! The transposition table: search results of positions, reused when a position recurs.
 
+use std::sync::{Arc, Mutex};
+
 use crate::agents::search::SEARCH_WIN_SCORE;
 use crate::engine::Move;
 
@@ -49,6 +51,8 @@ pub struct TranspositionTable {
     entries: Vec<TableEntry>,
     /// The mask that maps a key to its slot.
     mask: u64,
+    /// Striped locks used only for multi-threaded search; local searches stay lock-free.
+    shared: Option<Arc<Vec<Mutex<Vec<TableEntry>>>>>,
 }
 
 impl TranspositionTable {
@@ -60,25 +64,70 @@ impl TranspositionTable {
         TranspositionTable {
             entries: vec![TableEntry::default(); slots],
             mask: (slots as u64).saturating_sub(1),
+            shared: None,
         }
     }
 
     /// Forget every stored result.
     pub fn clear(&mut self) {
         self.entries.fill(TableEntry::default());
+
+        if let Some(shards) = &self.shared {
+            for shard in shards.iter() {
+                shard
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .fill(TableEntry::default());
+            }
+        }
+    }
+
+    /// Share the existing slots between clones, without multiplying the memory budget.
+    pub fn share(&mut self) {
+        if self.shared.is_some() || self.entries.is_empty() {
+            return;
+        }
+
+        let mut shards = vec![Vec::new(); 256];
+        for (index, entry) in self.entries.drain(..).enumerate() {
+            shards[index % 256].push(entry);
+        }
+        self.entries = Vec::new();
+        self.shared = Some(Arc::new(shards.into_iter().map(Mutex::new).collect()));
     }
 
     /// Get the stored result of a position, if its slot holds it.
     #[inline]
     pub fn probe(&self, key: u64) -> Option<TableEntry> {
         let index = usize::try_from(key & self.mask).ok()?;
-        self.entries.get(index).copied().filter(|entry| entry.key == key && key != 0)
+        let entry = if let Some(shards) = &self.shared {
+            shards[index % 256]
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(index / 256)
+                .copied()
+        } else {
+            self.entries.get(index).copied()
+        };
+        entry.filter(|entry| entry.key == key && key != 0)
     }
 
     /// Store a search result, unless the slot holds a deeper result of the same position.
     #[inline]
     pub fn store(&mut self, entry: TableEntry) {
         let Ok(index) = usize::try_from(entry.key & self.mask) else { return };
+        if let Some(shards) = &self.shared {
+            let mut shard = shards[index % 256]
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(slot) = shard.get_mut(index / 256)
+                && (slot.key != entry.key || entry.depth >= slot.depth)
+            {
+                *slot = entry;
+            }
+            return;
+        }
+
         let Some(slot) = self.entries.get_mut(index) else { return };
 
         if slot.key != entry.key || entry.depth >= slot.depth {

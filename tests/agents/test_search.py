@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import pytest
 
@@ -211,3 +211,37 @@ def test_passing_player_has_no_mobility(rules: Rules) -> None:
     assert rules.legal_moves(state) == [None]
     assert agent.evaluate(state=state, player=Player.WHITE) == -black_move_count
     assert state.current_player is Player.WHITE
+
+
+@pytest.mark.parametrize("threads", [1, 2, 4])
+def test_threaded_aspiration_search(
+    rules: Rules, position: GameState, threads: int
+) -> None:
+    """Searches report exact scores through the bindings and retain a legal best move."""
+    baseline = LocalTurnContext()
+    NegamaxAgent(rules=rules, seed=0, depth=3).think(state=position.copy(), turn=baseline)
+    turn = LocalTurnContext()
+    agent = NegamaxAgent(
+        rules=rules, seed=0, depth=3, threads=threads, aspiration_window=0.01
+    )
+    before = position.copy()
+    agent.think(state=position, turn=turn)
+    assert position == before
+    assert [info["score"] for info in turn.infos] == [
+        info["score"] for info in baseline.infos
+    ]
+    assert turn.move in rules.legal_moves(position)
+    agent.reset()
+
+
+@pytest.mark.parametrize(
+    "params", [{"threads": 0}, {"threads": 257}, {"aspiration_window": float("nan")}]
+)
+def test_native_search_rejects_invalid_parallel_options(
+    rules: Rules, params: dict[str, Any]
+) -> None:
+    """Direct binding calls validate options even without the agent factory."""
+    from hive._core import Searcher
+
+    with pytest.raises(ValueError):
+        Searcher(rules, algorithm="negamax", **params)

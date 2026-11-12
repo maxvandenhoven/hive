@@ -133,9 +133,12 @@ impl PySearcher {
     ///         far fewer nodes but may choose another of several equally scored moves.
     ///     table_megabytes: The size of the transposition table in MB, zero for none.
     ///         Negamax with alpha-beta uses it and orders moves by killers and history.
+    ///     aspiration_window: Initial score half-window, zero to disable aspiration.
+    ///     threads: Total negamax search threads sharing one table, at least one.
+    ///     principal_variation_search: Scout later moves before a full-window search.
     ///
     /// Raises:
-    ///     ValueError: If `algorithm` is unknown or `depth` is less than one.
+    ///     ValueError: If the algorithm, depth, window or thread count is invalid.
     #[new]
     #[pyo3(signature = (
         rules,
@@ -149,7 +152,10 @@ impl PySearcher {
         material_in_hand = 0.0,
         stop_check_interval = 1024,
         alpha_beta = true,
-        table_megabytes = 32
+        table_megabytes = 32,
+        aspiration_window = 0.0,
+        threads = 1,
+        principal_variation_search = false
     ))]
     #[expect(clippy::too_many_arguments, reason = "the agent params, passed by keyword")]
     fn new(
@@ -164,6 +170,9 @@ impl PySearcher {
         stop_check_interval: u64,
         alpha_beta: bool,
         table_megabytes: usize,
+        aspiration_window: f64,
+        threads: usize,
+        principal_variation_search: bool,
     ) -> PyResult<Self> {
         let algorithm = match algorithm {
             "minimax" => SearchAlgorithm::Minimax,
@@ -176,6 +185,15 @@ impl PySearcher {
 
         if depth == Some(0) {
             return Err(PyValueError::new_err("The search depth must be at least `1`."));
+        }
+
+        if !(1..=256).contains(&threads)
+            || !aspiration_window.is_finite()
+            || aspiration_window < 0.0
+        {
+            return Err(PyValueError::new_err(
+                "Use 1..256 threads and a finite, nonnegative aspiration_window.",
+            ));
         }
 
         let weights = EvaluationWeights {
@@ -192,6 +210,9 @@ impl PySearcher {
             stop_check_interval,
             alpha_beta,
             table_megabytes,
+            aspiration_window,
+            threads,
+            principal_variation_search,
         };
         Ok(PySearcher { inner: Searcher::new(rules.inner, config) })
     }

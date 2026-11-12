@@ -814,3 +814,22 @@ def test_data_sequences(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert len(list(tmp_path.glob("000-00?-?.json"))) == 6
+
+
+def test_gauntlet_counts_search_threads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two four-thread matches cannot fairly run on four CPUs."""
+    monkeypatch.setattr("hive.match.gauntlet.os.cpu_count", lambda: 4)
+    result = CliRunner().invoke(
+        app,
+        [
+            "gauntlet",
+            "--agent",
+            "random",
+            "--agent",
+            "{kind: negamax, params: {threads: 4}}",
+            "--jobs",
+            "2",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "oversubscribe" in error_text(result.stderr)

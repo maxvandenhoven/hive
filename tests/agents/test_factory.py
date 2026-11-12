@@ -132,7 +132,7 @@ class TestAgentSpecFromYaml:
             "as a number (got 'high').",
             "  params.depht: Unknown param, expected one of: depth, queen_safety, "
             "mobility, positioning, material_on_board, material_in_hand, alpha_beta, "
-            "table_megabytes.",
+            "table_megabytes, aspiration_window, threads, principal_variation_search.",
         ]
 
 
@@ -338,6 +338,9 @@ class TestListAgents:
             "material_in_hand",
             "alpha_beta",
             "table_megabytes",
+            "aspiration_window",
+            "threads",
+            "principal_variation_search",
         ]
         assert properties["depth"] == {
             "anyOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}],
