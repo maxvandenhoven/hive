@@ -1,5 +1,6 @@
 """Command line interface for the `hive` package."""
 
+import cProfile
 import json
 import logging
 import os
@@ -665,11 +666,98 @@ def bench_perft(
         f"{result.seconds:.3f} s ({result.nodes_per_second:,.0f} nodes/s)"
     )
 
-    expected = perft_position.counts.get(depth)
+    expected = perft_position.expected_count(depth)
 
     if expected is not None and expected != result.nodes:
-        typer.echo(f"mismatch: the reference count is {expected}", err=True)
+        typer.echo(f"mismatch: the stored count is {expected}", err=True)
         raise typer.Exit(code=1)
+
+
+@bench_app.command(
+    "engine",
+    help=(
+        "Run the fixed engine benchmark cases several times and print the median speed "
+        "of each and their geometric mean."
+    ),
+)
+def bench_engine(
+    repeat: Annotated[
+        int, typer.Option(min=1, help="The number of runs of every case.")
+    ] = 5,
+    case: Annotated[
+        list[str] | None,
+        typer.Option(help="Run only the case with this name, given once per case."),
+    ] = None,
+    suite: Annotated[
+        Path, typer.Option(help="The perft suite with the positions and rules.")
+    ] = DEFAULT_PERFT_SUITE,
+    profile: Annotated[
+        Path | None,
+        typer.Option(
+            help=(
+                "Write `cProfile` statistics of the runs to this file, for `pstats` or "
+                "`snakeviz`. Profiling slows the runs down."
+            )
+        ),
+    ] = None,
+) -> None:
+    """Run the fixed engine benchmark cases and print the median speed of each.
+
+    Args:
+        repeat: The number of runs of every case.
+        case: The names of the cases to run, or `None` for all of them.
+        suite: The perft suite with the positions and rules.
+        profile: The file to write `cProfile` statistics of the runs to, or `None` to
+            run without profiling.
+
+    Raises:
+        typer.BadParameter: If a case name is unknown.
+        typer.Exit: With code 1 if a run visits a different number of nodes than its case
+            expects.
+    """
+    cases = bench.ENGINE_BENCH_CASES
+
+    if case:
+        known = {bench_case.name: bench_case for bench_case in cases}
+        unknown = [name for name in case if name not in known]
+
+        if unknown:
+            msg = f"Unknown benchmark case `{unknown[0]}`, choose from {list(known)}."
+            raise typer.BadParameter(msg, param_hint="--case")
+
+        cases = [known[name] for name in case]
+
+    perft_suite = PerftSuite.load(suite)
+    profiler = cProfile.Profile()
+
+    try:
+        if profile is not None:
+            profiler.enable()
+
+        report = bench.EngineBenchReport.measure(
+            cases=cases, suite=perft_suite, repeat=repeat
+        )
+    except bench.EngineBenchMismatchError as e:
+        typer.echo(f"mismatch: {e}", err=True)
+        raise typer.Exit(code=1) from e
+    finally:
+        if profile is not None:
+            profiler.disable()
+            profiler.dump_stats(profile)
+
+    typer.echo(f"{'case':<16} {'nodes':>9} {'median s':>9} {'spread':>7} {'nodes/s':>9}")
+
+    for result in report.results:
+        typer.echo(
+            f"{result.case.name:<16} {result.case.nodes:>9,} "
+            f"{result.median_seconds:>9.3f} {result.spread:>7.1%} "
+            f"{result.nodes_per_second:>9,.0f}"
+        )
+
+    typer.echo(
+        f"geometric mean {report.nodes_per_second:,.0f} nodes/s over {repeat} runs per "
+        "case"
+    )
 
 
 def format_move(move: Move | None) -> str:

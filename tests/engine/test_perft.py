@@ -1,7 +1,9 @@
 """Perft parity against the reference counts in `tests/data/perft/base.json`.
 
 Counts up to `SHALLOW_NODES` leaves run in `make test`. Larger counts up to `MAX_DEPTH`
-are marked `slow`, and deeper counts are kept as data only, since they take hours.
+are marked `slow`, and deeper counts are kept as data only, since they take hours. The
+engine counts of positions without deeper reference counts run the same way, so a speedup
+that changes the move generation of a large hive fails as well.
 """
 
 from pathlib import Path
@@ -25,7 +27,9 @@ def count_params() -> list[Any]:
     params = []
 
     for position in SUITE.positions:
-        for depth, count in sorted(position.counts.items()):
+        counts = position.engine_counts | position.counts
+
+        for depth, count in sorted(counts.items()):
             if depth > MAX_DEPTH:
                 continue
 

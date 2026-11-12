@@ -11,7 +11,7 @@ from hive.engine.grid import (
     HEX_DIRECTIONS,
     Coordinate,
     add,
-    get_flanking_coords,
+    get_neighbor_flanks,
     get_neighbors,
 )
 from hive.engine.state import GameBoard, GameState, Move, PieceType, Player
@@ -405,7 +405,8 @@ class Rules(JsonCodec):
         Both are sorted, so the order depends only on the position: placements first, then
         movements. Without sorting, the order follows the board dict, which move
         generation and `undo_move` reorder, and seeded agents that pick moves by index
-        would not be reproducible.
+        would not be reproducible. The moves are generated in sorted order, which is
+        cheaper than sorting them afterwards.
 
         Args:
             state: The current game state.
@@ -435,19 +436,13 @@ class Rules(JsonCodec):
             All legal placement moves, sorted by piece type and target coordinate. Each
             move has `source_coord` set to `None`.
         """
-        placeable_piece_types = self.placeable_piece_types(state)
+        placeable_coords = sorted(self.placeable_coords(state))
 
-        moves: list[Move] = []
-
-        for coord in self.placeable_coords(state):
-            for piece_type in placeable_piece_types:
-                moves.append(
-                    Move(piece_type=piece_type, source_coord=None, target_coord=coord)
-                )
-
-        moves.sort(key=lambda move: (move.piece_type, move.target_coord))
-
-        return moves
+        return [
+            Move(piece_type=piece_type, source_coord=None, target_coord=coord)
+            for piece_type in sorted(self.placeable_piece_types(state))
+            for coord in placeable_coords
+        ]
 
     def movement_moves(self, state: GameState) -> list[Move]:
         """Get all legal movement moves for the current player.
@@ -460,9 +455,14 @@ class Rules(JsonCodec):
             piece type, source and target coordinate.
         """
         moves: list[Move] = []
+        movable_pieces = sorted(
+            self.movable_pieces(state), key=lambda piece: (piece[1], piece[0])
+        )
 
-        for coord, piece_type in self.movable_pieces(state):
-            for target_coord in self.PIECE_TARGET_COORDS[piece_type](self, state, coord):
+        for coord, piece_type in movable_pieces:
+            target_coords = self.PIECE_TARGET_COORDS[piece_type](self, state, coord)
+
+            for target_coord in sorted(target_coords):
                 moves.append(
                     Move(
                         piece_type=piece_type,
@@ -470,10 +470,6 @@ class Rules(JsonCodec):
                         target_coord=target_coord,
                     )
                 )
-
-        moves.sort(
-            key=lambda move: (move.piece_type, move.source_coord, move.target_coord)
-        )
 
         return moves
 
@@ -557,22 +553,36 @@ class Rules(JsonCodec):
         if state.current_ply == 1:
             return get_neighbors((0, 0))
 
-        placeable_coords = set()
+        # Each candidate is checked once, even if it neighbors several of the player's
+        # pieces. A candidate is placeable if every occupied neighbor is topped by the
+        # player, which reads the board directly instead of collecting the owners.
+        board = state.board
+        player = state.current_player
+        checked_coords: set[Coordinate] = set()
+        placeable_coords: list[Coordinate] = []
 
-        for coord in state.get_occupied_coords():
-            top_piece = state.get_top_piece(coord)
-
-            if top_piece.owner != state.current_player:
+        for coord, stack in board.items():
+            if stack[-1].owner is not player:
                 continue
 
-            for neighbor in get_neighbors(coord):
-                if state.is_occupied(neighbor):
+            for candidate_coord in get_neighbors(coord):
+                if candidate_coord in board or candidate_coord in checked_coords:
                     continue
 
-                if state.get_adjacent_players(neighbor) == {state.current_player}:
-                    placeable_coords.add(neighbor)
+                checked_coords.add(candidate_coord)
 
-        return list(placeable_coords)
+                for neighbor_coord in get_neighbors(candidate_coord):
+                    neighbor_stack = board.get(neighbor_coord)
+
+                    if (
+                        neighbor_stack is not None
+                        and neighbor_stack[-1].owner is not player
+                    ):
+                        break
+                else:
+                    placeable_coords.append(candidate_coord)
+
+        return placeable_coords
 
     def placeable_piece_types(self, state: GameState) -> list[PieceType]:
         """Get all piece types the current player may place.
@@ -663,24 +673,19 @@ class Rules(JsonCodec):
         Returns:
             The neighboring coordinates that satisfy all sliding constraints.
         """
+        # This runs for every step of every sliding piece, so it reads the board directly
+        # instead of through `GameState.can_slide`. Exactly one flanking coordinate must
+        # be occupied: two form a gate, and none leave the piece without hive contact.
+        board = state.board
+        neighbor_flanks = get_neighbor_flanks(coord)
         slideable_neighbors: list[Coordinate] = []
 
-        for neighbor_coord in get_neighbors(coord):
-            if state.is_occupied(neighbor_coord):
+        for neighbor_coord, anti_clockwise_coord, clockwise_coord in neighbor_flanks:
+            if neighbor_coord in board:
                 continue
 
-            if not state.can_slide(source_coord=coord, target_coord=neighbor_coord):
-                continue
-
-            if not any(
-                state.is_occupied(flanking_coord)
-                for flanking_coord in get_flanking_coords(
-                    source_coord=coord, target_coord=neighbor_coord
-                )
-            ):
-                continue
-
-            slideable_neighbors.append(neighbor_coord)
+            if (anti_clockwise_coord in board) != (clockwise_coord in board):
+                slideable_neighbors.append(neighbor_coord)
 
         return slideable_neighbors
 
@@ -721,17 +726,17 @@ class Rules(JsonCodec):
                 else self.slideable_neighbors(state=state, coord=coord)
             )
 
-            for neighbor_coord in get_neighbors(coord):
+            neighbor_flanks = get_neighbor_flanks(coord)
+
+            for neighbor_coord, anti_clockwise_coord, clockwise_coord in neighbor_flanks:
                 height = max(source_height, state.get_stack_height(neighbor_coord))
 
                 if height == 0:
                     continue
 
-                if all(
-                    state.get_stack_height(flanking_coord) > height
-                    for flanking_coord in get_flanking_coords(
-                        source_coord=coord, target_coord=neighbor_coord
-                    )
+                if (
+                    state.get_stack_height(anti_clockwise_coord) > height
+                    and state.get_stack_height(clockwise_coord) > height
                 ):
                     continue
 

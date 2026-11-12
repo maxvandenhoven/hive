@@ -112,5 +112,10 @@ What the reference search found, recorded in `tests/data/perft/README.md` in ful
 - CI runs shallow perft on every PR: any rule regression fails the build.
 - `hive bench perft` output is the speed baseline for M6. Record baseline numbers (depth,
   nodes, seconds, nodes/s, machine) in `performance.md` when WP 05 lands.
+- WP 27 adds `engine_counts`: depth 2 and 3 counts of the nokamute positions produced by
+  this engine before the speedups, checked by the perft tests like reference counts. The
+  start position only exercises placements up to depth 7, so without them a movement bug
+  introduced by a speedup would only show at depth 1. `hive bench engine` (see
+  `performance.md`) is the speed objective.
 - In the autoresearch loop (WP 29), perft parity is the hard correctness gate and perft
   nodes/s is the objective.

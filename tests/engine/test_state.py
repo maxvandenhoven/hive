@@ -3,7 +3,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from hive.engine.state import GameState, Move, Piece, PieceType, Player
+from hive.engine.state import SHARED_PIECES, GameState, Move, Piece, PieceType, Player
 
 
 def assert_state_equal(state: GameState, expected: GameState) -> None:
@@ -89,6 +89,18 @@ class TestGameStateMovementAndPlacement:
         assert state.board[(0, 0)][0].owner is state.current_player
         assert state.hand[Player.WHITE][PieceType.QUEEN] == queen_count_before - 1
         assert state.queen_coord[Player.WHITE] == (0, 0)
+
+    def test_apply_placement_shares_pieces(self, default_state: GameState) -> None:
+        """Test that placements put the shared instance of the piece on the board."""
+        state = default_state
+        move = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
+
+        state.apply_placement(move)
+
+        assert state.board[(0, 0)][0] is SHARED_PIECES[Player.WHITE, PieceType.ANT]
+        assert SHARED_PIECES[Player.BLACK, PieceType.QUEEN] == Piece(
+            type=PieceType.QUEEN, owner=Player.BLACK
+        )
 
     def test_undo_placement_non_queen(self, default_state: GameState) -> None:
         """Test undoing non-queen placement restores board and hand."""
@@ -350,6 +362,29 @@ class TestGameStateIsSurrounded:
         """Test that all six neighbors occupied means surrounded."""
         state = ring_6_state
         assert state.is_surrounded((0, 0))
+
+
+class TestGameStateCountOccupiedNeighbors:
+    """Test the `count_occupied_neighbors` count."""
+
+    def test_no_neighbors(self, default_state: GameState) -> None:
+        """Test that an empty board has no occupied neighbors."""
+        assert default_state.count_occupied_neighbors((0, 0)) == 0
+
+    def test_line(self, line_3_state: GameState) -> None:
+        """Test the counts along a line, where a stack counts once."""
+        state = line_3_state
+        state.apply_placement(
+            Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(1, 0))
+        )
+
+        assert state.count_occupied_neighbors((0, 0)) == 2
+        assert state.count_occupied_neighbors((1, 0)) == 1
+        assert state.count_occupied_neighbors((0, 1)) == 2
+
+    def test_ring(self, ring_6_state: GameState) -> None:
+        """Test that the center of a ring has six occupied neighbors."""
+        assert ring_6_state.count_occupied_neighbors((0, 0)) == 6
 
 
 class TestGameStateGetQueenCoord:
@@ -727,6 +762,14 @@ class TestIsConnectedAfterRemoving:
 
         for coord in state.get_occupied_coords():
             assert state.is_connected_after_removing(coord)
+
+    def test_removing_only_piece(self, default_state: GameState) -> None:
+        """Test that removing the only piece leaves an empty, connected board."""
+        state = default_state
+        state.apply_placement(
+            Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
+        )
+        assert state.is_connected_after_removing((0, 0))
 
     def test_stacked_piece_always_connected(self, line_3_state: GameState) -> None:
         """Test that removing from a stack always stays connected."""

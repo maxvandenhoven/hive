@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import logging
+import pstats
 import re
 import sys
 from pathlib import Path
@@ -10,8 +11,9 @@ import pytest
 from alembic.config import Config
 from typer.testing import CliRunner
 
-from hive import __version__
+from hive import __version__, bench
 from hive.agents.factory import AgentSpec
+from hive.bench import PerftBenchCase
 from hive.cli import app, describe_match_result, log_decision
 from hive.engine.rules import Rules
 from hive.engine.state import Player
@@ -107,6 +109,71 @@ class TestBenchPerft:
 
         assert result.exit_code == 2
         assert "Unknown perft position `nope`" in result.stderr
+
+
+class TestBenchEngine:
+    @pytest.fixture(scope="function", autouse=True)
+    def small_cases(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Replace the benchmark cases with two quick ones."""
+        monkeypatch.setattr(
+            bench,
+            "ENGINE_BENCH_CASES",
+            [
+                PerftBenchCase(name="start-1", position="start", depth=1, nodes=4),
+                PerftBenchCase(name="start-2", position="start", depth=2, nodes=96),
+            ],
+        )
+
+    def test_prints_every_case(self) -> None:
+        result = CliRunner().invoke(app, ["bench", "engine", "--repeat", "2"])
+
+        lines = result.stdout.splitlines()
+        assert result.exit_code == 0
+        assert lines[0].split() == ["case", "nodes", "median", "s", "spread", "nodes/s"]
+        assert [line.split()[:2] for line in lines[1:3]] == [
+            ["start-1", "4"],
+            ["start-2", "96"],
+        ]
+        assert lines[3].startswith("geometric mean ")
+        assert lines[3].endswith("nodes/s over 2 runs per case")
+
+    def test_selects_cases(self) -> None:
+        result = CliRunner().invoke(
+            app, ["bench", "engine", "--repeat", "1", "--case", "start-2"]
+        )
+
+        assert result.exit_code == 0
+        assert [line.split()[0] for line in result.stdout.splitlines()[1:-1]] == [
+            "start-2"
+        ]
+
+    def test_profile(self, tmp_path: Path) -> None:
+        out = tmp_path / "bench.prof"
+
+        result = CliRunner().invoke(
+            app, ["bench", "engine", "--repeat", "1", "--profile", str(out)]
+        )
+
+        assert result.exit_code == 0
+        assert pstats.Stats(str(out)).get_stats_profile().func_profiles
+
+    def test_unknown_case(self) -> None:
+        result = CliRunner().invoke(app, ["bench", "engine", "--case", "nope"])
+
+        assert result.exit_code == 2
+        assert "Unknown benchmark case `nope`" in error_text(result.stderr)
+
+    def test_mismatch(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            bench,
+            "ENGINE_BENCH_CASES",
+            [PerftBenchCase(name="start-1", position="start", depth=1, nodes=5)],
+        )
+
+        result = CliRunner().invoke(app, ["bench", "engine", "--repeat", "1"])
+
+        assert result.exit_code == 1
+        assert "mismatch: Benchmark case `start-1` visited `4` nodes" in result.stderr
 
 
 class TestPlay:

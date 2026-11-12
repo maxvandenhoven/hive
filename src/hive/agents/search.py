@@ -270,7 +270,7 @@ class SearchAgent(Agent):
         if queen_coord is None:
             return 0.0
 
-        return float(sum(state.is_occupied(c) for c in get_neighbors(queen_coord)))
+        return float(state.count_occupied_neighbors(queen_coord))
 
     def mobility_score(self, state: GameState, player: Player) -> float:
         """Compare the number of legal moves of the player and of the opponent.

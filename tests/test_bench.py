@@ -4,7 +4,22 @@ from typing import Any
 
 import pytest
 
-from hive.bench import PerftResult, PerftSuite, divide, perft, timed_perft
+from hive.agents.factory import AgentSpec
+from hive.bench import (
+    ENGINE_BENCH_CASES,
+    EngineBenchCase,
+    EngineBenchMismatchError,
+    EngineBenchReport,
+    EngineBenchResult,
+    EngineBenchSample,
+    PerftBenchCase,
+    PerftResult,
+    PerftSuite,
+    SearchBenchCase,
+    divide,
+    perft,
+    timed_perft,
+)
 from hive.engine.grid import get_neighbors
 from hive.engine.rules import Rules
 from hive.engine.state import GameBoard, GameState, Move, Piece, PieceType, Player
@@ -19,6 +34,9 @@ def snapshot(state: GameState) -> tuple[Any, ...]:
         {player: dict(hand) for player, hand in state.hand.items()},
         dict(state.queen_coord),
     )
+
+
+SUITE = PerftSuite.load(Path(__file__).parent / "data" / "perft" / "base.json")
 
 
 def write_suite(path: Path, positions: list[dict[str, Any]], **rules: Any) -> Path:
@@ -175,3 +193,115 @@ class TestPerftSuite:
 
         with pytest.raises(ValueError, match=r"rules\.starting_player"):
             PerftSuite.load(path)
+
+
+class TestPerftPosition:
+    def test_expected_count_prefers_reference(self, tmp_path: Path) -> None:
+        path = write_suite(
+            path=tmp_path / "suite.json",
+            positions=[
+                {
+                    "name": "p",
+                    "moves": [],
+                    "counts": {"1": 4},
+                    "engine_counts": {"1": 5, "2": 96},
+                }
+            ],
+        )
+        position = PerftSuite.load(path).position("p")
+
+        assert position.expected_count(1) == 4
+        assert position.expected_count(2) == 96
+        assert position.expected_count(3) is None
+
+
+class TestEngineBenchCase:
+    def test_perft_case(self) -> None:
+        case = PerftBenchCase(name="p", position="start", depth=2, nodes=96)
+
+        sample = case.sample(SUITE)
+
+        assert sample.nodes == 96
+        assert sample.seconds > 0
+
+    def test_search_case(self) -> None:
+        case = SearchBenchCase(
+            name="s",
+            position="beetle_moves",
+            agent=AgentSpec(kind="negamax", params={"depth": 1}),
+            nodes=6,
+        )
+
+        assert case.sample(SUITE).nodes == 6
+
+    def test_mismatch(self) -> None:
+        case = PerftBenchCase(name="p", position="start", depth=2, nodes=95)
+
+        with pytest.raises(EngineBenchMismatchError, match="`96` nodes, but `95`"):
+            case.sample(SUITE)
+
+    def test_search_case_needs_search_agent(self) -> None:
+        case = SearchBenchCase(
+            name="s", position="start", agent=AgentSpec(kind="random"), nodes=0
+        )
+
+        with pytest.raises(ValueError, match="needs a search agent"):
+            case.sample(SUITE)
+
+    @pytest.mark.parametrize(
+        "case", [pytest.param(case, id=case.name) for case in ENGINE_BENCH_CASES]
+    )
+    def test_cases_match_suite(self, case: EngineBenchCase) -> None:
+        position = SUITE.position(case.position)
+
+        if isinstance(case, PerftBenchCase):
+            assert position.expected_count(case.depth) == case.nodes
+
+    def test_case_names_are_unique(self) -> None:
+        names = [case.name for case in ENGINE_BENCH_CASES]
+
+        assert len(names) == len(set(names))
+
+
+class TestEngineBenchResult:
+    def test_statistics(self) -> None:
+        case = PerftBenchCase(name="p", position="start", depth=2, nodes=96)
+        result = EngineBenchResult(
+            case=case,
+            samples=[
+                EngineBenchSample(nodes=96, seconds=seconds)
+                for seconds in [3.0, 1.0, 2.0]
+            ],
+        )
+
+        assert result.median_seconds == 2.0
+        assert result.nodes_per_second == 48.0
+        assert result.spread == 1.0
+
+
+class TestEngineBenchReport:
+    def test_measure(self) -> None:
+        cases = [
+            PerftBenchCase(name="a", position="start", depth=1, nodes=4),
+            PerftBenchCase(name="b", position="start", depth=2, nodes=96),
+        ]
+
+        report = EngineBenchReport.measure(cases=cases, suite=SUITE, repeat=3)
+
+        assert [result.case for result in report.results] == cases
+        assert [len(result.samples) for result in report.results] == [3, 3]
+
+    def test_repeat_below_one(self) -> None:
+        with pytest.raises(ValueError, match="at least `1` run"):
+            EngineBenchReport.measure(cases=[], suite=SUITE, repeat=0)
+
+    def test_geometric_mean(self) -> None:
+        results = [
+            EngineBenchResult(
+                case=PerftBenchCase(name=name, position="start", depth=1, nodes=nodes),
+                samples=[EngineBenchSample(nodes=nodes, seconds=1.0)],
+            )
+            for name, nodes in [("a", 10), ("b", 1000)]
+        ]
+
+        assert EngineBenchReport(results=results).nodes_per_second == pytest.approx(100)

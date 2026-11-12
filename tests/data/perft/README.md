@@ -28,6 +28,8 @@ for named positions. No reference engine is a dependency; the numbers are copied
   `{"piece", "from", "to"}` with axial coordinates `[q, r]` and `from` set to `null` for
   a placement.
 - `counts` maps a depth to the reference perft count at that depth.
+- `engine_counts` (optional) maps a depth to the perft count of this engine where no
+  reference count is known (see below).
 - `legal_moves` (optional) is the complete reference list of legal moves, so the test
   compares exact move sets and not just their number.
 - `uhp` (nokamute positions only) is the original UHP game string, for traceability.
@@ -80,6 +82,16 @@ for named positions. No reference engine is a dependency; the numbers are copied
 Only depth 0 and 1 are known for these positions. Deeper counts need running a reference
 engine, for example `nokamute perft "<uhp game string>"` from a local build, and adding
 the numbers here with the engine commit.
+
+### Engine counts: this engine
+
+`engine_counts` holds the depth 2 and 3 counts of the nokamute positions that are not
+finished games, produced by this engine at commit `41b8a30` (2026-10-29), before the WP 27
+speedups. They are not reference counts: they match the references only as far as the
+depth 1 move sets do. They guard the speed work instead, since a faster engine has to keep
+producing the same trees. `tests/engine/test_perft.py` checks them like the reference
+counts, and `hive bench perft` and `hive bench engine` report a mismatch. Replace them by
+reference counts when a reference engine has been run on these positions.
 
 ## Rule settings
 
