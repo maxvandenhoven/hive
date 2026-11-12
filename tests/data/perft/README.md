@@ -93,6 +93,10 @@ producing the same trees. `tests/engine/test_perft.py` checks them like the refe
 counts, and `hive bench perft` and `hive bench engine` report a mismatch. Replace them by
 reference counts when a reference engine has been run on these positions.
 
+The depth 4 counts of `ant_moves` (2,729,747) and `long_hive` (11,797,660) were added with
+the Rust core (WP 43) for the native benchmark cases. Both the Rust core and the frozen
+Python engine (`tests/oracle/`) produced them on 2026-11-12.
+
 ## Rule settings
 
 Both references use the same rules, which `base.json` sets as:
