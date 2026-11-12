@@ -1,0 +1,11 @@
+{
+  "structure-search-all": {
+    "pinned_material": 0.025,
+    "free_ants": 0.25,
+    "beetle_control": 0.25,
+    "table_deeper_hits": true,
+    "late_move_reductions": 3,
+    "null_move_reduction": 2,
+    "queen_attack_ordering": true
+  }
+}

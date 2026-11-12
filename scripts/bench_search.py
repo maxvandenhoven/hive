@@ -40,6 +40,7 @@ def main() -> None:
             observations.append({"repeat": repeat, "position": name, **info})
 
     depths = [depth for row in observations if isinstance(depth := row.get("depth"), int)]
+    speeds = [speed for row in observations if isinstance(speed := row.get("nps"), int)]
     result = {
         "machine": platform.platform(),
         "params": json.loads(args.params),
@@ -48,6 +49,7 @@ def main() -> None:
         "repeat": args.repeat,
         "mean_depth": statistics.mean(depths),
         "max_depth": max(depths),
+        "mean_nodes_per_s": statistics.mean(speeds),
         "observations": observations,
     }
     args.out.write_text(json.dumps(result, indent=2) + "\n")

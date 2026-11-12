@@ -53,6 +53,7 @@ fn decide(
         late_move_reductions: 0,
         null_move_reduction: 0,
         queen_attack_ordering: false,
+        queen_threat_extension: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut recorder = Recorder::default();
@@ -152,6 +153,7 @@ fn a_forced_win_is_final_at_depth_one() {
         late_move_reductions: 0,
         null_move_reduction: 0,
         queen_attack_ordering: false,
+        queen_threat_extension: false,
     };
     let mut recorder = Recorder::default();
     Searcher::new(rules, config).think(&mut state, &mut recorder);
@@ -268,6 +270,7 @@ fn aspiration_and_helpers_preserve_scores_and_state_with_a_warm_table() {
                 late_move_reductions: 0,
                 null_move_reduction: 0,
                 queen_attack_ordering: false,
+                queen_threat_extension: false,
             };
             let mut searcher = Searcher::new(rules, config);
 
@@ -331,6 +334,7 @@ fn cancellation_joins_helpers_and_restores_the_position() {
         late_move_reductions: 0,
         null_move_reduction: 0,
         queen_attack_ordering: false,
+        queen_threat_extension: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut observer = StopObserver { remaining: 200, reports: Vec::new() };
@@ -369,6 +373,7 @@ fn observer_panic_cancels_helpers_before_joining() {
         late_move_reductions: 0,
         null_move_reduction: 0,
         queen_attack_ordering: false,
+        queen_threat_extension: false,
     };
     Searcher::new(rules, config).think(&mut state, &mut PanickingObserver);
 }
@@ -392,6 +397,7 @@ fn search_refinements_restore_the_state_and_visit_fewer_nodes() {
             late_move_reductions: 3,
             null_move_reduction: 2,
             queen_attack_ordering: true,
+            queen_threat_extension: true,
             ..plain
         };
         let mut nodes = Vec::new();

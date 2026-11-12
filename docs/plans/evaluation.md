@@ -36,6 +36,24 @@ tuning to fix the score scale, since aspiration windows use that scale too.
 | mobility | Compare full legal move counts; expensive because both sides generate moves |
 | positioning | Compare owned top pieces adjacent to the enemy queen |
 | material_on_board / material_in_hand | Existing piece-value balance terms |
+| tempo | Bonus for the side to move, against the odd-even effect of the depth |
+| mobile_queen … mobile_ant | Per type: top, unpinned pieces that can make a first step (sliders need a free slide), once their queen is placed |
+| placement_cells | Free cells next to own and not next to enemy tops, for players with a hand |
+
+Structural terms count integers per player and multiply by the weights at the end, so the
+score does not depend on the board scan order, which depends on the move history (an
+earlier float version broke the score parity of helper threads).
+
+## Configurable search
+
+Every refinement is off by default, so the parity tests of the plain search still hold.
+
+| Parameter | Effect |
+|---|---|
+| table_deeper_hits | Reuse table entries searched deeper than the node needs |
+| late_move_reductions | N: moves after the first N of inner nodes (depth ≥ 3) are scouted one ply shallower; improvements are searched again at full depth (needs PVS) |
+| null_move_reduction | R: at scout nodes with depth ≥ R + 2, own queen placed with ≤ 3 neighbours and static score ≥ beta, pass and search R + 1 plies shallower; cut off if still ≥ beta |
+| queen_attack_ordering | Order moves onto or next to the enemy queen right after the killer moves |
 
 `free_ants` is a cheap structural proxy, not an exact movement count: an unpinned ant
 can still be blocked by gates. Likewise pinned material measures covering/connectivity,
@@ -116,3 +134,57 @@ during the run. On success it archives the incumbent under `configs/evaluation/h
 and replaces `champion.json` with the candidate, source revision and evidence path.
 Commit that manifest and the evidence together. Failed/inconclusive candidates leave the
 champion unchanged. Thus each promoted configuration becomes the next fixed opponent.
+
+## Fast ratchet (session protocol)
+
+The strict gate needs hours of ten-second games, so day-to-day tuning uses a fast gate
+(`--gate fast`, `FAST_CHAMPION_GATE`): at least 50 opening pairs at one second per move,
+promoting when the one-sided 95% normal lower bound of the pair scores exceeds 0.5. Pair
+scores (the candidate's points over both colours of one opening) are independent, so the
+normal approximation of their mean is appropriate at 50 pairs; Hoeffding's bound is
+reported too. One trial takes about ten minutes with eight concurrent matches of two
+threads on the 16-thread development machine (both sides share the same load).
+
+1. Screen candidates at 0.25 s with 24 pairs on development seeds (~1.5 min each).
+2. Run the best one or two at 1 s with 50 pairs and `--gate fast --phase confirmation
+   --promote` on a fresh seed range. A promotion makes the candidate the next champion.
+3. Report speed for every change: `scripts/bench_search.py --budget 1` on the fixed
+   positions (mean completed depth, nodes/s) and the in-game depth and nodes/s of both
+   sides from the trial.
+
+Trials run from a clean git worktree at a committed revision, so rebuilding the main
+checkout cannot disturb running workers and every report names a clean revision.
+The strict ten-second gate remains the release check before relying on a champion.
+
+## Results log
+
+Speed: `bench_search.py --budget 1 --repeat 2`, two threads, on the four fixed positions
+(no other load). Generation 0 (b90be45 config): mean depth 8.25, max 10, 7.8 M nodes/s.
+
+| Change (overlay on the champion) | Depth @1 s | knodes/s |
+|---|---|---|
+| table_deeper_hits | 8.25 | 7688 |
+| late_move_reductions 3 | 10.12 | 4244 |
+| null_move_reduction 2 | 10.25 | 4464 |
+| queen_attack_ordering | 8.25 | 7589 |
+| all four search refinements | 12.88 | 4615 |
+| structure (pinned 0.025, free ants 0.25, beetles 0.25) | 7.38 | 2542 |
+| mobile pieces (ant 0.3, beetle/queen 0.2, spider/grasshopper 0.1) | 7.50 | 2540 |
+| placement_cells 0.05 | 8.00 | 5912 |
+
+Trials against the champion (score = candidate points per game; W-D-L; depth and
+knodes/s are in-game means, candidate vs champion):
+
+| Trial | Candidate | Score | W-D-L (caps) | Normal lower | Depth cand/champ | knodes/s cand/champ |
+|---|---|---|---|---|---|---|
+| screen-search-v1 (0.25 s, 24 pairs, seed 100, gen 0) | table_deeper_hits | 0.490 | 18-11-19 (11) | 0.409 | 5.64 / 5.71 | 2448 / 2400 |
+| | late_move_reductions 3 | 0.438 | 16-10-22 (9) | 0.338 | 6.67 / 5.65 | 1773 / 2192 |
+| | null_move_reduction 2 | 0.583 | 23-10-15 (10) | 0.506 | 6.26 / 5.68 | 2014 / 2106 |
+| | queen_attack_ordering | 0.500 | 16-16-16 (16) | 0.457 | 5.86 / 5.87 | 2493 / 2635 |
+| | all four search refinements | 0.521 | 19-12-17 (11) | 0.413 | 7.69 / 5.71 | 1730 / 2600 |
+| | structure | 0.729 | 29-12-7 (12) | 0.660 | 4.48 / 5.81 | 1052 / 2726 |
+| | structure + all four refinements | 0.792 | 35-6-7 (6) | 0.704 | 5.74 / 5.77 | 991 / 2886 |
+
+Lesson: evaluation knowledge beats raw depth. LMR alone gains a ply yet loses games, and
+the structure terms win while searching 1.3 plies shallower; combined, the refinements
+win back the depth the evaluation costs.
