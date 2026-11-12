@@ -1,0 +1,8 @@
+{
+ "ants-0125":{"free_ants":0.125},
+ "ants-05":{"free_ants":0.5},
+ "ants-pins":{"free_ants":0.25,"pinned_material":0.025},
+ "ants-pins-strong":{"free_ants":0.25,"pinned_material":0.05},
+ "ants-beetles":{"free_ants":0.25,"beetle_control":0.25},
+ "structure":{"free_ants":0.25,"pinned_material":0.025,"beetle_control":0.25}
+}

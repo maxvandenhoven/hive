@@ -15,6 +15,7 @@ the order in which work happens. Topic files go deeper on each area:
 | [`synthetic-data.md`](synthetic-data.md) | Scene generation, Blender tilesets, rendering, datasets, YOLO training |
 | [`tooling.md`](tooling.md) | Code style, ruff/ty/pytest, Makefile, Claude Code hooks, CI |
 | [`deployment.md`](deployment.md) | Docker image, Kubernetes manifests, Argo CD, Tailscale, homelab prerequisites |
+| [`evaluation.md`](evaluation.md) | Configurable evaluation, paired champion trials, tuning and promotion gates |
 | [`performance.md`](performance.md) | Engine speed (M6: profiling, Rust core, autoresearch) and agent strength (M7: repetition, alpha-beta, tuning), with all measurements |
 | [`rust-core.md`](rust-core.md) | Rust core of the engine and the search: crates, Python API contract, representation, search kernel, correctness gates |
 

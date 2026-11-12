@@ -3,7 +3,7 @@
 pub mod board;
 pub mod errors;
 pub mod grid;
-mod movement;
+pub(crate) mod movement;
 pub mod moves;
 mod perft;
 pub mod piece;

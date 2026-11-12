@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from hive.agents.factory import AgentSpec
 from hive.engine.rules import Rules
-from hive.engine.state import Player
+from hive.engine.state import Move, Player
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult
 from hive.match.worker import DEFAULT_GRACE_S, AgentWorker
 
@@ -47,6 +47,7 @@ class MatchRunner:
         seed: The match seed.
         grace_s: The number of seconds an agent may take to return after it was stopped
             before its worker is restarted.
+        opening: Checked opening moves played before timed decisions.
         preload: Modules imported in the workers before the agents are built, which
             register agent kinds that are not built in.
     """
@@ -59,6 +60,7 @@ class MatchRunner:
     seed: int
     grace_s: float = DEFAULT_GRACE_S
     preload: Sequence[str] = ()
+    opening: tuple[Move | None, ...] = ()
 
     def seat_seed(self, player: Player) -> int:
         """Get the seed of the agent of a seat.
@@ -88,12 +90,16 @@ class MatchRunner:
         """
         start = time.monotonic()
         state = self.rules.create_initial_state()
+        for move in self.opening:
+            self.rules.apply_checked_move(state=state, move=move)
+
         result = MatchResult(
             rules=self.rules,
             white_spec=self.white_spec,
             black_spec=self.black_spec,
             seed=self.seed,
             budget_s=self.budget_s,
+            opening=self.opening,
         )
 
         with ExitStack() as stack:

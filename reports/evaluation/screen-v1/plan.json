@@ -1,0 +1,77 @@
+{
+  "champion": {
+    "generation": 0,
+    "name": "baseline-b90be45",
+    "source_revision": "b90be45",
+    "spec": {
+      "kind": "negamax",
+      "label": "champion",
+      "params": {
+        "queen_safety": 1.0,
+        "mobility": 0.0,
+        "positioning": 0.0,
+        "material_on_board": 0.0,
+        "material_in_hand": 0.0,
+        "queen_danger": 0.0,
+        "queen_escape": 0.0,
+        "pinned_material": 0.0,
+        "free_ants": 0.0,
+        "beetle_control": 0.0,
+        "alpha_beta": true,
+        "table_megabytes": 32,
+        "aspiration_window": 0.5,
+        "principal_variation_search": true,
+        "threads": 2
+      }
+    },
+    "evidence": null
+  },
+  "champion_sha256": "5c7a181aef6822459a99b69942fe825bcfc61617000bc71f9d0b62be1c362350",
+  "revision": "b90be451570b275200b12b65cfe37aa8b656a386",
+  "dirty": true,
+  "phase": "screening",
+  "seed": 0,
+  "pairs": 8,
+  "budget_s": 0.1,
+  "alpha": 0.05,
+  "results": {},
+  "candidates": {
+    "queen_danger-0.1": {
+      "queen_danger": 0.1
+    },
+    "queen_danger-0.3": {
+      "queen_danger": 0.3
+    },
+    "queen_escape-0.1": {
+      "queen_escape": 0.1
+    },
+    "queen_escape-0.5": {
+      "queen_escape": 0.5
+    },
+    "pinned_material-0.025": {
+      "pinned_material": 0.025
+    },
+    "pinned_material-0.1": {
+      "pinned_material": 0.1
+    },
+    "free_ants-0.25": {
+      "free_ants": 0.25
+    },
+    "free_ants-1": {
+      "free_ants": 1
+    },
+    "beetle_control-0.25": {
+      "beetle_control": 0.25
+    },
+    "beetle_control-1": {
+      "beetle_control": 1
+    },
+    "balanced": {
+      "queen_danger": 0.1,
+      "queen_escape": 0.2,
+      "pinned_material": 0.05,
+      "free_ants": 0.5,
+      "beetle_control": 0.5
+    }
+  }
+}

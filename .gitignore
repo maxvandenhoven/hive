@@ -212,6 +212,7 @@ test*.ipynb
 # Gauntlet reports, apart from the checked-in WP 28 experiments.
 reports/*
 !reports/wp28-*.json
+!reports/evaluation/
 
 # The frontend keeps shared code in `frontend/src/lib/`, which the Python `lib/` above hides
 !frontend/src/lib/
