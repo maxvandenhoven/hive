@@ -98,6 +98,7 @@ agent parameter next to `depth`:
 | `positioning` | 0.0 | Own top pieces next to the opponent's queen minus the reverse |
 | `material_on_board` | 0.0 | Value of own pieces on the board minus the opponent's (`SEARCH_PIECE_VALUES`) |
 | `material_in_hand` | 0.0 | Value of own pieces in hand minus the opponent's |
+| `alpha_beta` | `true` | Not a term: whether the search prunes with alpha-beta (WP 28), searching the best line of the previous depth first. Same scores, far fewer nodes; among equally scored moves another may be chosen |
 
 Terms with weight 0 are skipped, so an unused expensive term costs nothing. Flat weights
 keep the params of a spec plain numbers next to `depth`, which keeps the API parameter
