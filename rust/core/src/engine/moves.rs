@@ -89,6 +89,12 @@ impl Move {
     pub const fn bits(self) -> u32 {
         self.0.get()
     }
+
+    /// Read a move from the bits of [`Move::bits`], or `None` for bits that are not a
+    /// move (zero, which tables use for "no move").
+    pub fn from_stored_bits(bits: u32) -> Option<Self> {
+        (bits & PRESENT_BIT != 0).then(|| Move::from_bits(bits))
+    }
 }
 
 impl fmt::Debug for Move {

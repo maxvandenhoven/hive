@@ -131,7 +131,8 @@ class TestAgentSpecFromYaml:
             "  params.mobility: Input should be a valid number, unable to parse string "
             "as a number (got 'high').",
             "  params.depht: Unknown param, expected one of: depth, queen_safety, "
-            "mobility, positioning, material_on_board, material_in_hand, alpha_beta.",
+            "mobility, positioning, material_on_board, material_in_hand, alpha_beta, "
+            "table_megabytes.",
         ]
 
 
@@ -336,6 +337,7 @@ class TestListAgents:
             "material_on_board",
             "material_in_hand",
             "alpha_beta",
+            "table_megabytes",
         ]
         assert properties["depth"] == {
             "anyOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}],

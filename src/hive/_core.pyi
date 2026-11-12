@@ -733,6 +733,7 @@ class Searcher:
         material_in_hand: float = 0.0,
         stop_check_interval: int = 1024,
         alpha_beta: bool = True,
+        table_megabytes: int = 32,
     ) -> None:
         """Create a searcher.
 
@@ -753,10 +754,15 @@ class Searcher:
                 `turn.should_stop`.
             alpha_beta: Whether to prune with alpha-beta, which finds the same scores in
                 far fewer nodes but may choose another of several equally scored moves.
+            table_megabytes: The size of the transposition table in MB, zero for none.
+                Negamax with alpha-beta uses it and orders moves by killers and history.
 
         Raises:
             ValueError: If `algorithm` is unknown or `depth` is less than one.
         """
+
+    def clear(self) -> None:
+        """Forget the transposition table, killer moves and history, before a new game."""
 
     @property
     def nodes(self) -> int:
