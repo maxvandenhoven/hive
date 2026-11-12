@@ -596,3 +596,154 @@ class TestOpenapi:
         result = CliRunner().invoke(app, ["openapi", "--output", "openapi.json"])
 
         assert result.exit_code == 1
+
+
+class TestDataScenes:
+    def test_writes_scenes(self, tmp_path: Path) -> None:
+        result = CliRunner().invoke(
+            app,
+            ["data", "scenes", "--count", "3", "--start", "4", "--seed", "1"]
+            + ["--out", str(tmp_path), "--jobs", "1"],
+        )
+
+        assert result.exit_code == 0
+        assert sorted(path.name for path in tmp_path.iterdir()) == [
+            "000004.json",
+            "000005.json",
+            "000006.json",
+        ]
+
+    def test_reads_config(self, tmp_path: Path) -> None:
+        config = tmp_path / "scenes.toml"
+        config.write_text("tilt_deg = [5.0, 5.0]\n")
+        result = CliRunner().invoke(
+            app,
+            ["data", "scenes", "--count", "1", "--out", str(tmp_path / "out")]
+            + ["--config", str(config), "--jobs", "1"],
+        )
+        scene = json.loads((tmp_path / "out" / "000000.json").read_text())
+
+        assert result.exit_code == 0
+        assert scene["camera"]["tilt_deg"] == 5.0
+
+    def test_rejects_invalid_config(self, tmp_path: Path) -> None:
+        config = tmp_path / "scenes.toml"
+        config.write_text("unknown = 1\n")
+        result = CliRunner().invoke(
+            app,
+            ["data", "scenes", "--count", "1", "--out", str(tmp_path)]
+            + ["--config", str(config)],
+        )
+
+        assert result.exit_code == 2
+        assert "unknown" in error_text(result.stderr)
+
+
+def test_data_schema(tmp_path: Path) -> None:
+    out = tmp_path / "scene.schema.json"
+    result = CliRunner().invoke(app, ["data", "schema", "--out", str(out)])
+
+    assert result.exit_code == 0
+    assert json.loads(out.read_text())["title"] == "Scene"
+
+
+class TestDataExport:
+    def test_exports_renders(self, tmp_path: Path) -> None:
+        from hive.data.testing import write_test_render
+
+        write_test_render(renders=tmp_path / "renders", scene_id="000000")
+        result = CliRunner().invoke(
+            app,
+            ["data", "export", "--renders", str(tmp_path / "renders"), "--version", "v1"]
+            + ["--out", str(tmp_path), "--debug", "1", "--jobs", "1"],
+        )
+
+        assert result.exit_code == 0
+        assert (tmp_path / "synth-v1" / "data.yaml").exists()
+        assert (tmp_path / "synth-v1" / "debug" / "000000.jpg").exists()
+
+    def test_rejects_unknown_task(self, tmp_path: Path) -> None:
+        result = CliRunner().invoke(
+            app,
+            ["data", "export", "--renders", str(tmp_path), "--version", "v1"]
+            + ["--task", "pose"],
+        )
+
+        assert result.exit_code == 2
+        assert "Unknown task" in error_text(result.stderr)
+
+    def test_rejects_missing_renders(self, tmp_path: Path) -> None:
+        result = CliRunner().invoke(
+            app,
+            ["data", "export", "--renders", str(tmp_path / "none"), "--version", "v1"]
+            + ["--out", str(tmp_path)],
+        )
+
+        assert result.exit_code == 2
+        assert "No renders" in error_text(result.stderr)
+
+
+class TestVisionDetect:
+    def test_detects_and_writes_results(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import cv2
+        import numpy as np
+
+        from hive.engine.state import PieceType
+        from hive.vision.types import TileObservation
+        from hive.vision.yolo.reader import YoloReader
+
+        class FakeReader:
+            name = "fake"
+
+            def read(self, image: np.ndarray) -> list[TileObservation]:
+                return [
+                    TileObservation(
+                        center=(20.0, 15.0),
+                        box=(10.0, 5.0, 30.0, 25.0),
+                        polygon=None,
+                        piece_type=PieceType.SPIDER,
+                        owner=Player.BLACK,
+                        score=0.9,
+                    )
+                ]
+
+        monkeypatch.setattr(YoloReader, "load", lambda **_: FakeReader())
+        photo = tmp_path / "photo.png"
+        cv2.imwrite(str(photo), np.zeros((40, 60, 3), dtype=np.uint8))
+        result = CliRunner().invoke(
+            app,
+            ["vision", "detect", str(photo), "--model", "model.onnx"]
+            + ["--out", str(tmp_path / "out")],
+        )
+        detections = json.loads((tmp_path / "out" / "photo.json").read_text())
+
+        assert result.exit_code == 0
+        assert detections[0]["piece_type"] == "spider"
+        assert detections[0]["owner"] == "black"
+        assert (tmp_path / "out" / "photo.jpg").exists()
+
+    def test_rejects_unreadable_images(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from hive.vision.yolo.reader import YoloReader
+
+        monkeypatch.setattr(YoloReader, "load", lambda **_: object())
+        result = CliRunner().invoke(
+            app, ["vision", "detect", str(tmp_path / "missing.jpg"), "--model", "m.onnx"]
+        )
+
+        assert result.exit_code == 2
+        assert "Cannot read the image" in error_text(result.stderr)
+
+
+def test_data_sequences(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        app,
+        ["data", "sequences", "--count", "1", "--plies", "3", "--takes", "2"]
+        + ["--out", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert len(list(tmp_path.glob("000-00?-?.json"))) == 6

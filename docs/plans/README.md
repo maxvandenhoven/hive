@@ -92,8 +92,9 @@ Explicitly out of scope for now (documented under [Future work](#10-future-work)
                        └─────────────────────────────────────────────────────────────────────────────┘
 
  offline (workstation, NVIDIA GPU):
-   hive data scenes ──JSON──▶ blender -b -P blender/render.py ──▶ images + YOLO labels
-        ──▶ scripts/train (Ultralytics) ──▶ model.onnx ──▶ Garage ──▶ api YoloReader
+   hive data scenes ──JSON──▶ blender -b -P blender/render.py ──▶ images + instance maps
+        ──▶ hive data export ──▶ YOLO dataset ──▶ scripts/train (Ultralytics) ──▶ model.onnx
+        ──▶ Garage ──▶ api YoloReader
 ```
 
 Dependency direction inside the package is strictly one way:
@@ -117,11 +118,11 @@ Each decision has a short rationale. Topic files go into detail.
 | D9 | Same `AgentSpec(kind, params)` + factory drives the API agent picker and the gauntlet CLI. | One way to name and configure agents everywhere. |
 | D10 | Stateful backend: Postgres stores games, moves, photos; Garage (S3) stores photo bytes, datasets and models. The engine stays stateless per request: load moves, replay, answer. | Game management and replay in the UI; pods can restart freely. |
 | D11 | Moves stored as JSON mirroring the engine `Move`. | Simple and exact. UHP notation can be added as an export later. |
-| D12 | Photo tracking: each photo is matched against the boards produced by all legal moves (plus two-move sequences as recovery). | Hidden stack contents are known from history; detection noise is corrected by legality. |
+| D12 | Photo tracking: each photo is matched against the boards produced by all legal moves (plus two-move sequences as recovery) by likelihood, in board coordinates so photos may be taken from any angle; unclear photos ask for another photo, whose evidence is added, and the previous photo's tile readings are remembered. | Hidden stack contents are known from history; detection noise is corrected by legality; a wrong move is worse than one more photo. |
 | D13 | Two vision readers behind one `BoardReader` protocol: classical CV first, YOLO second. Shared grid fitting and matching. | The classical reader needs no training data, unblocks the app early, and is the baseline YOLO must beat. |
 | D14 | YOLO trained with Ultralytics, exported to ONNX, served with ONNX Runtime. | Keeps torch out of the API image. |
 | D15 | Blender is decoupled from the package: `hive data scenes` writes scene JSON, `blender/render.py` (Blender's bundled Python) reads it. | Blender bundles its own Python version; the package requires 3.13. |
-| D16 | Tilesets are folders under `blender/tilesets/<id>/` with a `tileset.toml` manifest and one file per tile; the renderer picks one per image. Assets in Git LFS. Detection classes are tileset-agnostic. | Adding a physical set is adding a folder; per-tileset evaluation via metadata. |
+| D16 | Tilesets are folders under `blender/tilesets/<id>/` with a `tileset.toml` manifest and one file per tile; the renderer picks one per image. Modelled tile assets in Git LFS; CC0 surfaces and environments are downloaded by `make render-assets`. Detection classes are tileset-agnostic. | Adding a physical set is adding a folder; per-tileset evaluation via metadata. |
 | D17 | Frontend: Vite + React + TypeScript, Tailwind + shadcn/ui, TanStack Query, OpenAPI-generated client, built files served by FastAPI. Board rendering behind a renderer interface (SVG first). | One origin, typed API, consistent reusable components, swappable 2D/3D rendering. |
 | D18 | Agent thinking streams to the UI via server-sent events. | Live "depth 3: Ant → (2,-1)" refinement, simple to implement. |
 | D19 | Deploy: GitHub Actions → GHCR → Argo CD (pull) → homelab cluster; Tailscale operator for HTTPS ingress; CloudNativePG; SOPS secrets; Prometheus/Grafana/Loki. App manifests live in this repo (`deploy/`), CI commits image tag bumps. Cluster platform lives in a separate homelab repo. | GitOps with audit trail and `git revert` rollbacks; no cluster credentials in CI. |
@@ -153,8 +154,8 @@ hive/
 │  ├─ engine/                  # grid.py, state.py, rules.py, codec.py, record.py, errors.py
 │  ├─ agents/                  # base.py, factory.py, random.py, search.py, minimax.py, negamax.py, testing.py
 │  ├─ match/                   # turn.py, worker.py, runner.py, records.py, gauntlet.py
-│  ├─ vision/                  # [vision] reader.py, classical/, yolo/, grid_fit.py, matcher.py, eval/
-│  ├─ data/                    # scenes.py (scene JSON), datasets.py (manifests, export)
+│  ├─ vision/                  # [vision] classes.py, types.py, reader.py, yolo/, lattice.py, grid_fit.py, resolver.py, tracking.py, sequences.py, testing.py, classical/, eval/
+│  ├─ data/                    # scenes.py (scene JSON), datasets.py (labels, export, manifests), testing.py
 │  ├─ api/                     # [api] app.py, settings.py, db/, storage.py, routes/, pool.py, metrics.py
 │  ├─ plotting/                # existing matplotlib/svg plotting (optional extra `plotting`)
 │  ├─ assets/                  # insect SVG/PNG assets
@@ -166,6 +167,8 @@ hive/
 │  └─ tooling/                 # comment checker used by `make lint`
 ├─ blender/
 │  ├─ render.py                # runs under Blender's Python, no `hive` import
+│  ├─ hiveblend/               # stage, tilesets and geometry used by render.py
+│  ├─ assets.toml              # CC0 surfaces and HDRIs, downloaded to .cache/ by `make render-assets`
 │  └─ tilesets/<tileset-id>/   # tileset.toml, one .blend per tile, textures/ (Git LFS)
 ├─ frontend/                   # Vite + React + TypeScript app
 └─ deploy/
@@ -328,9 +331,9 @@ Some work needs things only the project owner can provide:
 
 | Needed by | Task |
 |---|---|
-| WP 18 | Flat, evenly lit photos of each tile face of the physical set (templates for the classical reader) and a first batch of real game photos. |
-| WP 20 | A hand-labeled real test set (50–100 photos, split by game) and a few recorded games with one photo per turn. |
-| WP 22 | The modeled tileset `pocket-edition-normal-001` (one file per tile). The renderer is built against a procedural placeholder tileset first, so this does not block WP 22. |
+| WP 18 | Flat, evenly lit photos of each tile face of the physical set (templates for the classical reader, and the artwork for the next synthetic dataset) and a first batch of real game photos. |
+| WP 20 | A hand-labeled real test set (50–100 photos, split by game) and a few recorded games with one photo per turn. These are now the main blocker: the move resolver (WP 17) and the YOLO reader (WP 24) are only evaluated on synthetic games and 9 real photos (see `vision.md` §Status and next steps). |
+| WP 22 | The modeled tileset `pocket-edition-normal-001` (one file per tile, see its template `tileset.toml`). The renderer uses the procedural bakelite tileset (20 mm sides, 10 mm high, debossed insects) until then, so this does not block WP 22. |
 | WP 26 | Homelab platform in the homelab GitOps repo: Argo CD, Tailscale operator, CloudNativePG, Garage, kube-prometheus-stack, Loki, SOPS key. |
 
 ## 10. Future work

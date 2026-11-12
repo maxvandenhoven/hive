@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +14,7 @@ from pydantic import ValidationError
 from hive import __version__, bench
 from hive.agents.factory import AgentSpec, InvalidAgentSpecError
 from hive.bench import PerftSuite
+from hive.data.scenes import SCENE_SCHEMA_PATH, Scene, ScenesConfig
 from hive.engine.rules import Rules
 from hive.engine.state import Move
 from hive.match.gauntlet import (
@@ -689,3 +691,417 @@ def format_move(move: Move | None) -> str:
         return f"{piece} -> {move.target_coord}"
 
     return f"{piece} {move.source_coord} -> {move.target_coord}"
+
+
+data_app = typer.Typer(
+    no_args_is_help=True, help="Synthetic scenes and datasets for the vision models."
+)
+app.add_typer(data_app, name="data")
+
+
+@data_app.command(
+    "scenes", help="Generate scene JSON files from random games for the Blender renderer."
+)
+def data_scenes(
+    count: Annotated[int, typer.Option(min=1, help="The number of scenes.")],
+    out: Annotated[Path, typer.Option(help="The directory for the scene files.")],
+    seed: Annotated[int, typer.Option(help="The seed of the batch.")] = 0,
+    start: Annotated[
+        int, typer.Option(min=0, help="The index of the first scene, to extend a batch.")
+    ] = 0,
+    config: Annotated[
+        Path | None,
+        typer.Option(help="A TOML file with sampling ranges that replace the defaults."),
+    ] = None,
+    jobs: Annotated[
+        int | None,
+        typer.Option(min=1, help="The number of worker processes; defaults to the CPUs."),
+    ] = None,
+) -> None:
+    """Generate scene JSON files from random games for the Blender renderer.
+
+    Args:
+        count: The number of scenes.
+        out: The directory for the scene files.
+        seed: The seed of the batch.
+        start: The index of the first scene.
+        config: A TOML file with sampling ranges, or `None` for the defaults.
+        jobs: The number of worker processes, or `None` for one per CPU.
+
+    Raises:
+        typer.BadParameter: If the config file cannot be read or is invalid.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    try:
+        scenes_config = ScenesConfig.load(config)
+    except (OSError, ValueError) as e:
+        raise typer.BadParameter(str(e), param_hint="--config") from e
+
+    begin = time.perf_counter()
+    paths = scenes_config.write_scenes(
+        rules=Rules(),
+        out=out,
+        seed=seed,
+        indices=range(start, start + count),
+        jobs=jobs or os.cpu_count() or 1,
+    )
+    logger.info(
+        "Wrote %d scenes to `%s` in %.1f s.", len(paths), out, time.perf_counter() - begin
+    )
+
+
+@data_app.command(
+    "sequences",
+    help="Generate scenes of games after every move, with several photos per move, to "
+    "test tracking games from photos.",
+)
+def data_sequences(
+    count: Annotated[int, typer.Option(min=1, help="The number of games.")],
+    out: Annotated[Path, typer.Option(help="The directory for the scene files.")],
+    plies: Annotated[int, typer.Option(min=1, help="The number of moves per game.")] = 40,
+    takes: Annotated[int, typer.Option(min=1, help="The number of photos per move.")] = 3,
+    seed: Annotated[int, typer.Option(help="The seed of the batch.")] = 0,
+    config: Annotated[
+        Path | None,
+        typer.Option(help="A TOML file with sampling ranges that replace the defaults."),
+    ] = None,
+) -> None:
+    """Generate scenes of games after every move, with several photos per move.
+
+    Args:
+        count: The number of games.
+        out: The directory for the scene files.
+        plies: The number of moves per game.
+        takes: The number of photos per move.
+        seed: The seed of the batch.
+        config: A TOML file with sampling ranges, or `None` for the defaults.
+
+    Raises:
+        typer.BadParameter: If the config file cannot be read or is invalid.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    try:
+        scenes_config = ScenesConfig.load(config)
+    except (OSError, ValueError) as e:
+        raise typer.BadParameter(str(e), param_hint="--config") from e
+
+    paths = scenes_config.write_sequences(
+        rules=Rules(), out=out, seed=seed, count=count, plies=plies, takes=takes
+    )
+    logger.info("Wrote %d scenes of %d games to `%s`.", len(paths), count, out)
+
+
+@data_app.command("schema", help="Write the JSON Schema of the scene files.")
+def data_schema(
+    out: Annotated[
+        Path, typer.Option(help="The file to write the schema to.")
+    ] = SCENE_SCHEMA_PATH,
+) -> None:
+    """Write the JSON Schema of the scene files.
+
+    Args:
+        out: The file to write the schema to.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(Scene.json_schema(), indent=2) + "\n")
+    logger.info("Wrote the scene schema to `%s`.", out)
+
+
+def require_vision_extra() -> None:
+    """Check that the `vision` extra is installed.
+
+    Raises:
+        typer.Exit: With code 1 and a hint if it is not.
+    """
+    try:
+        import cv2  # noqa: F401
+        import onnxruntime  # noqa: F401
+    except ImportError as e:
+        logger.error("This command needs the `vision` extra: `uv sync --extra vision`.")
+        raise typer.Exit(code=1) from e
+
+
+@data_app.command(
+    "export", help="Label Blender renders and write them as a versioned YOLO dataset."
+)
+def data_export(
+    renders: Annotated[
+        Path, typer.Option(help="The render folder written by `blender/render.py`.")
+    ],
+    version: Annotated[str, typer.Option(help="The dataset version, for example v001.")],
+    name: Annotated[str, typer.Option(help="The dataset name.")] = "synth",
+    out: Annotated[
+        Path, typer.Option(help="The folder the dataset folder is created in.")
+    ] = Path("data/synth/datasets"),
+    task: Annotated[
+        str,
+        typer.Option(
+            help="`segment` writes face polygons (which also train detection models), "
+            "`detect` writes boxes."
+        ),
+    ] = "segment",
+    val_fraction: Annotated[
+        float, typer.Option(min=0.0, max=1.0, help="The fraction of validation images.")
+    ] = 0.1,
+    min_visible: Annotated[
+        float,
+        typer.Option(
+            min=0.0,
+            max=1.0,
+            help="Faces with this visible fraction or less are not labeled.",
+        ),
+    ] = 0.5,
+    debug: Annotated[
+        int,
+        typer.Option(min=0, help="Draw the labels of this many images into `debug/`."),
+    ] = 0,
+    jobs: Annotated[
+        int | None,
+        typer.Option(min=1, help="The number of worker processes; defaults to the CPUs."),
+    ] = None,
+) -> None:
+    """Label Blender renders and write them as a versioned YOLO dataset.
+
+    Args:
+        renders: The render folder written by `blender/render.py`.
+        version: The dataset version.
+        name: The dataset name.
+        out: The folder the dataset folder `<name>-<version>` is created in.
+        task: `segment` or `detect`.
+        val_fraction: The fraction of validation images.
+        min_visible: The visible fraction of a face at or below which it is not labeled.
+        debug: The number of images to draw the labels of into `debug/`.
+        jobs: The number of worker processes, or `None` for one per CPU.
+
+    Raises:
+        typer.BadParameter: If the task is unknown, the dataset exists or there are no
+            renders.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    require_vision_extra()
+
+    import cv2
+
+    from hive.data.datasets import DatasetExport, DatasetImage, draw_labels, read_image
+
+    if task not in ("segment", "detect"):
+        msg = f"Unknown task `{task}`; use `segment` or `detect`."
+        raise typer.BadParameter(msg, param_hint="--task")
+
+    export = DatasetExport(
+        renders=renders,
+        out=out / f"{name}-{version}",
+        name=name,
+        version=version,
+        task=task,
+        val_fraction=val_fraction,
+        min_visible=min_visible,
+    )
+    begin = time.perf_counter()
+
+    try:
+        manifest = export.run(jobs=jobs or os.cpu_count() or 1)
+    except (FileExistsError, FileNotFoundError) as e:
+        raise typer.BadParameter(str(e)) from e
+
+    logger.info(
+        "Exported %s images with %d labels to `%s` in %.1f s.",
+        sum(manifest.images.values()),
+        manifest.labels,
+        export.out,
+        time.perf_counter() - begin,
+    )
+
+    if debug > 0:
+        (export.out / "debug").mkdir()
+
+        with (export.out / "meta.jsonl").open() as file:
+            for _, line in zip(range(debug), file, strict=False):
+                image = DatasetImage.from_json(json.loads(line))
+                photo = read_image(path=export.out / image.image, flags=cv2.IMREAD_COLOR)
+                cv2.imwrite(
+                    str(export.out / "debug" / f"{image.scene_id}.jpg"),
+                    draw_labels(image=photo, labels=image.labels),
+                )
+
+        logger.info(
+            "Drew the labels of %d images into `%s`.", debug, export.out / "debug"
+        )
+
+
+vision_app = typer.Typer(no_args_is_help=True, help="Read boards from photos.")
+app.add_typer(vision_app, name="vision")
+
+
+@vision_app.command(
+    "detect", help="Detect the tile faces in photos with a YOLO model in ONNX format."
+)
+def vision_detect(
+    images: Annotated[list[Path], typer.Argument(help="The photos to read.")],
+    model: Annotated[Path, typer.Option(help="The `model.onnx` file.")],
+    out: Annotated[
+        Path | None,
+        typer.Option(help="Write annotated images and detections as JSON here."),
+    ] = None,
+    score: Annotated[
+        float, typer.Option(min=0.0, max=1.0, help="The lowest score that counts.")
+    ] = 0.35,
+    iou: Annotated[
+        float,
+        typer.Option(
+            min=0.0,
+            max=1.0,
+            help="The overlap above which the weaker detection is dropped.",
+        ),
+    ] = 0.5,
+) -> None:
+    """Detect the tile faces in photos with a YOLO model in ONNX format.
+
+    Args:
+        images: The photos to read.
+        model: The ONNX model file.
+        out: The folder for annotated images and detections as JSON, or `None` to only
+            log the detections.
+        score: The lowest class score that counts as a detection.
+        iou: The overlap above which the weaker of two detections is dropped.
+
+    Raises:
+        typer.BadParameter: If a photo cannot be read.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    require_vision_extra()
+
+    import cv2
+
+    from hive.vision.yolo.reader import YoloReader
+
+    reader = YoloReader.load(model_path=model, score_threshold=score, iou_threshold=iou)
+
+    if out is not None:
+        out.mkdir(parents=True, exist_ok=True)
+
+    for path in images:
+        photo = cv2.imread(str(path), cv2.IMREAD_COLOR)
+
+        if photo is None:
+            msg = f"Cannot read the image `{path}`."
+            raise typer.BadParameter(msg, param_hint="IMAGES")
+
+        begin = time.perf_counter()
+        observations = reader.read(photo)
+        elapsed_ms = (time.perf_counter() - begin) * 1000
+        logger.info("%s: %d tiles in %.0f ms", path, len(observations), elapsed_ms)
+
+        for observation in sorted(observations, key=lambda o: (o.center[1], o.center[0])):
+            logger.info(
+                "  %-18s %.2f at (%.0f, %.0f)",
+                observation.tile_class.name,
+                observation.score,
+                *observation.center,
+            )
+
+        if out is not None:
+            canvas = photo.copy()
+
+            for observation in observations:
+                observation.draw(canvas)
+
+            cv2.imwrite(str(out / f"{path.stem}.jpg"), canvas)
+            detections = [observation.to_json() for observation in observations]
+            (out / f"{path.stem}.json").write_text(json.dumps(detections, indent=1))
+
+
+@vision_app.command(
+    "track",
+    help="Track rendered games photo by photo and check every resolved move; write a "
+    "report, a frame per photo and an animation per game.",
+)
+def vision_track(
+    dataset: Annotated[
+        Path, typer.Option(help="The dataset exported from rendered `data sequences`.")
+    ],
+    model: Annotated[Path, typer.Option(help="The `model.onnx` file.")],
+    out: Annotated[
+        Path, typer.Option(help="The folder for the report, frames and animations.")
+    ],
+    score: Annotated[
+        float, typer.Option(min=0.0, max=1.0, help="The lowest score that counts.")
+    ] = 0.25,
+) -> None:
+    """Track rendered games photo by photo and check every resolved move.
+
+    Args:
+        dataset: The dataset exported from rendered `data sequences`.
+        model: The ONNX model file.
+        out: The folder for the report, frames and animations.
+        score: The lowest class score that counts as a detection.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    require_vision_extra()
+
+    from hive.vision.sequences import SequenceTracker
+    from hive.vision.yolo.reader import YoloReader
+
+    reader = YoloReader.load(model_path=model, score_threshold=score)
+    tracker = SequenceTracker(
+        dataset=dataset, reader=reader, rules=Rules(), frames=out / "frames"
+    )
+    report = tracker.run()
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "report.json").write_text(json.dumps(report.to_json(), indent=1))
+
+    for ply in report.plies:
+        statuses = ", ".join(
+            f"{photo.status} ({photo.probability:.2f})"
+            if photo.probability is not None
+            else photo.status
+            for photo in ply.photos
+        )
+        logger.info(
+            "game %s move %2d: %-8s %-40s photos: %s",
+            ply.sequence,
+            ply.ply,
+            ply.outcome,
+            format_move(ply.true_move),
+            statuses,
+        )
+
+    logger.info("Summary: %s", report.summary)
+    write_animations(frames=out / "frames", out=out)
+    logger.info("Wrote the report, frames and animations to `%s`.", out)
+
+
+def write_animations(frames: Path, out: Path) -> None:
+    """Join the frames of every game into an animated GIF, if Pillow is installed.
+
+    Args:
+        frames: The folder with one subfolder of frames per game.
+        out: The folder for the animations.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        logger.info("Install the `plotting` extra for animations of the frames.")
+        return
+
+    for folder in sorted(path for path in frames.iterdir() if path.is_dir()):
+        images = [Image.open(path) for path in sorted(folder.glob("*.jpg"))]
+
+        if not images:
+            continue
+
+        width = 1200
+        resized = [
+            image.resize((width, round(image.height * width / image.width)))
+            for image in images
+        ]
+        resized[0].save(
+            out / f"game-{folder.name}.gif",
+            save_all=True,
+            append_images=resized[1:],
+            duration=900,
+            loop=0,
+        )

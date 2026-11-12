@@ -1,0 +1,66 @@
+# Table surfaces and room lighting for the renderer, all CC0 from Poly Haven
+# (https://polyhaven.com/license). `make render-assets` downloads them into
+# `blender/.cache/`, which is not committed. Without them the renderer falls back to
+# procedural surfaces and a plain room light.
+
+resolution = "2k"
+hdri_resolution = "1k"
+
+# Indoor environments for the `environment` preset and as fill light for the others.
+hdris = [
+    "comfy_cafe",
+    "hotel_room",
+    "kiara_interior",
+    "lythwood_lounge",
+    "lythwood_room",
+    "old_room",
+    "reading_room",
+    "small_empty_room_1",
+    "small_empty_room_3",
+    "wooden_lounge",
+    "white_home_studio",
+    "yoga_room",
+    "unfinished_office",
+    "unfinished_office_night",
+    "hospital_room",
+    "brown_photostudio_02",
+    "studio_small_08",
+    "newman_cafeteria",
+    "entrance_hall",
+    "small_empty_house",
+]
+
+# Surface ids by kind; the scene's `background.surface` picks the kind.
+[surfaces]
+wood = [
+    "wood_table",
+    "wood_table_001",
+    "wood_table_worn",
+    "oak_veneer_01",
+    "black_walnut_veneer_01",
+    "cherry_veneer",
+    "grey_oak_veneer_01",
+    "kitchen_wood",
+    "laminate_floor_02",
+    "herringbone_parquet",
+    "dark_wood",
+    "fine_grained_wood",
+]
+fabric = [
+    "rough_linen",
+    "denim_fabric",
+    "hessian_230",
+    "gingham_check",
+    "poly_wool_herringbone",
+    "dirty_carpet",
+    "fabric_leather_02",
+    "leather_white",
+]
+stone = [
+    "marble_01",
+    "granite_tile",
+    "terrazzo_tiles",
+    "brushed_concrete",
+    "concrete_floor_painted",
+    "large_grey_tiles",
+]

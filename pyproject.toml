@@ -29,11 +29,26 @@ api = [
     "sqlalchemy[asyncio]>=2.1.6",
     "uvicorn>=0.54.0",
 ]
-vision = []
-train = []
+vision = [
+    "numpy>=2.3.4",
+    "onnxruntime>=1.31.1",
+    "opencv-python-headless>=5.0.0.93",
+]
+train = [
+    "onnx>=1.23.2",
+    "onnxslim>=0.1.99",
+    "torch>=2.15.0",
+    "torchvision>=0.29.2",
+    "ultralytics>=8.4.211",
+]
 
 [project.scripts]
 hive = "hive.cli:app"
+
+[tool.uv]
+# Ultralytics depends on `opencv-python`, which installs the same `cv2` module as the
+# headless build of the `vision` extra; the headless build serves both.
+override-dependencies = ["opencv-python; sys_platform == 'never'"]
 
 [build-system]
 requires = ["uv_build>=0.11.2,<0.12.0"]
@@ -56,7 +71,7 @@ dev = [
 [tool.ruff]
 line-length = 90
 indent-width = 4
-include = ["src/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py", "scripts/**/*.py", "blender/**/*.py"]
 
 [tool.ruff.format]
 skip-magic-trailing-comma = true
@@ -100,14 +115,21 @@ convention = "google"
 
 [tool.ty.environment]
 python-version = "3.13"
-extra-paths = ["scripts", "scripts/tooling"]
+extra-paths = ["scripts", "scripts/tooling", "blender"]
 
 [tool.ty.src]
 include = ["src", "tests", "scripts"]
 
+# The `train` extra is not installed in CI, so its imports may not resolve there.
+[[tool.ty.overrides]]
+include = ["scripts/train/**"]
+
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["scripts", "scripts/tooling"]
+pythonpath = ["scripts", "scripts/tooling", "blender"]
 addopts = ["--strict-markers"]
 markers = ["slow: long-running tests, excluded from `make test` (run with `make test-slow`)"]
 

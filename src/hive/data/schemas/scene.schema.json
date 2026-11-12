@@ -1,0 +1,516 @@
+{
+  "$defs": {
+    "Coordinate": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "type": "array"
+    },
+    "Move": {
+      "additionalProperties": false,
+      "description": "A game move that places or moves a piece on the board.\n\nA move with `source_coord` set to `None` represents a placement from the player's\nhand. A move with a `source_coord` represents a movement of an existing piece on the\nboard. The JSON form is `{\"piece\": \"ant\", \"from\": [q, r] | null, \"to\": [q, r]}`, and a\npass (`None` where a move is expected) is `null`.\n\nAttributes:\n    piece_type: The type of piece being placed or moved.\n    source_coord: The axial coordinate `(q, r)` the piece moves from, or `None` if the\n        piece is being placed from the hand.\n    target_coord: The axial coordinate `(q', r')` the piece moves or is placed to.",
+      "properties": {
+        "piece": {
+          "enum": [
+            "queen",
+            "beetle",
+            "grasshopper",
+            "spider",
+            "ant"
+          ],
+          "title": "Piece",
+          "type": "string"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Coordinate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "$ref": "#/$defs/Coordinate"
+        }
+      },
+      "required": [
+        "piece",
+        "from",
+        "to"
+      ],
+      "title": "Move",
+      "type": "object"
+    },
+    "SceneBackground": {
+      "additionalProperties": false,
+      "description": "The table surface the hive lies on.\n\nAttributes:\n    surface: The kind of surface, for example `wood`; the renderer picks a texture of\n        that kind.\n    variant_seed: Picks the texture and its colour variation.\n    rotation_deg: The rotation of the texture.\n    scale: The scale of the texture relative to its real size.",
+      "properties": {
+        "surface": {
+          "title": "Surface",
+          "type": "string"
+        },
+        "variant_seed": {
+          "title": "Variant Seed",
+          "type": "integer"
+        },
+        "rotation_deg": {
+          "title": "Rotation Deg",
+          "type": "number"
+        },
+        "scale": {
+          "title": "Scale",
+          "type": "number"
+        }
+      },
+      "required": [
+        "surface",
+        "variant_seed",
+        "rotation_deg",
+        "scale"
+      ],
+      "title": "SceneBackground",
+      "type": "object"
+    },
+    "SceneCamera": {
+      "additionalProperties": false,
+      "description": "A phone camera looking at the hive.\n\nAttributes:\n    distance: The distance from the camera to the hive centre in tile widths.\n    tilt_deg: The angle between the view direction and straight down.\n    azimuth_deg: The direction the camera is in, seen from the hive, anti-clockwise\n        from the east.\n    roll_deg: The rotation of the camera around its view direction.\n    focal_mm: The 35 mm equivalent focal length.\n    frame_offset: Where the hive centre appears in the frame, from -1 (left, bottom)\n        to 1 (right, top).\n    portrait: Whether the image is taller than wide.\n    aperture_f: The 35 mm equivalent f-number, with the focus on the hive centre, so\n        close and steep photos blur the far side of the hive slightly.",
+      "properties": {
+        "distance": {
+          "title": "Distance",
+          "type": "number"
+        },
+        "tilt_deg": {
+          "title": "Tilt Deg",
+          "type": "number"
+        },
+        "azimuth_deg": {
+          "title": "Azimuth Deg",
+          "type": "number"
+        },
+        "roll_deg": {
+          "title": "Roll Deg",
+          "type": "number"
+        },
+        "focal_mm": {
+          "title": "Focal Mm",
+          "type": "number"
+        },
+        "frame_offset": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Frame Offset",
+          "type": "array"
+        },
+        "portrait": {
+          "title": "Portrait",
+          "type": "boolean"
+        },
+        "aperture_f": {
+          "title": "Aperture F",
+          "type": "number"
+        }
+      },
+      "required": [
+        "distance",
+        "tilt_deg",
+        "azimuth_deg",
+        "roll_deg",
+        "focal_mm",
+        "frame_offset",
+        "portrait",
+        "aperture_f"
+      ],
+      "title": "SceneCamera",
+      "type": "object"
+    },
+    "SceneCell": {
+      "additionalProperties": false,
+      "description": "An occupied cell of the board.\n\nAttributes:\n    coord: The axial coordinate of the cell in the engine.\n    x: The grid position to the east of the hive centre, in tile widths.\n    y: The grid position to the north of the hive centre, in tile widths.\n    stack: The tiles of the cell, bottom to top.\n    jitter: The deviation of every tile of the stack, bottom to top.",
+      "properties": {
+        "coord": {
+          "$ref": "#/$defs/Coordinate"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "stack": {
+          "items": {
+            "$ref": "#/$defs/SceneTile"
+          },
+          "title": "Stack",
+          "type": "array"
+        },
+        "jitter": {
+          "items": {
+            "$ref": "#/$defs/SceneJitter"
+          },
+          "title": "Jitter",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coord",
+        "x",
+        "y",
+        "stack",
+        "jitter"
+      ],
+      "title": "SceneCell",
+      "type": "object"
+    },
+    "SceneDistractor": {
+      "additionalProperties": false,
+      "description": "An object on the table that is not a tile, which the detector must ignore.\n\nAttributes:\n    kind: The kind of object.\n    x: The position to the east of the hive centre, in tile widths.\n    y: The position to the north of the hive centre, in tile widths.\n    size: The length, width and height of the object in tile widths.\n    rot_deg: The rotation around the vertical axis in degrees.\n    color_seed: Picks the colour and finish of the object.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SceneDistractorKind"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "size": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Size",
+          "type": "array"
+        },
+        "rot_deg": {
+          "title": "Rot Deg",
+          "type": "number"
+        },
+        "color_seed": {
+          "title": "Color Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "x",
+        "y",
+        "size",
+        "rot_deg",
+        "color_seed"
+      ],
+      "title": "SceneDistractor",
+      "type": "object"
+    },
+    "SceneDistractorKind": {
+      "enum": [
+        "box",
+        "cylinder",
+        "rod"
+      ],
+      "type": "string"
+    },
+    "SceneJitter": {
+      "additionalProperties": false,
+      "description": "The deviation of a tile from its exact grid position.\n\nAttributes:\n    dx: The offset to the east in tile widths.\n    dy: The offset to the north in tile widths.\n    rot_deg: The rotation in degrees, anti-clockwise.",
+      "properties": {
+        "dx": {
+          "title": "Dx",
+          "type": "number"
+        },
+        "dy": {
+          "title": "Dy",
+          "type": "number"
+        },
+        "rot_deg": {
+          "title": "Rot Deg",
+          "type": "number"
+        }
+      },
+      "required": [
+        "dx",
+        "dy",
+        "rot_deg"
+      ],
+      "title": "SceneJitter",
+      "type": "object"
+    },
+    "SceneLighting": {
+      "additionalProperties": false,
+      "description": "The light sources of a scene.\n\nAttributes:\n    preset: The kind of lighting, which the renderer turns into lights.\n    color_temp_k: The colour temperature of the main light in kelvin.\n    intensity: The brightness relative to the preset's normal exposure.\n    direction_deg: The direction the main light comes from, anti-clockwise from east.\n    elevation_deg: The height of the main light above the table in degrees.\n    environment_strength: The brightness of the surrounding room light.",
+      "properties": {
+        "preset": {
+          "$ref": "#/$defs/SceneLightingPreset"
+        },
+        "color_temp_k": {
+          "title": "Color Temp K",
+          "type": "number"
+        },
+        "intensity": {
+          "title": "Intensity",
+          "type": "number"
+        },
+        "direction_deg": {
+          "title": "Direction Deg",
+          "type": "number"
+        },
+        "elevation_deg": {
+          "title": "Elevation Deg",
+          "type": "number"
+        },
+        "environment_strength": {
+          "title": "Environment Strength",
+          "type": "number"
+        }
+      },
+      "required": [
+        "preset",
+        "color_temp_k",
+        "intensity",
+        "direction_deg",
+        "elevation_deg",
+        "environment_strength"
+      ],
+      "title": "SceneLighting",
+      "type": "object"
+    },
+    "SceneLightingPreset": {
+      "enum": [
+        "window",
+        "ceiling",
+        "lamp",
+        "flash",
+        "environment"
+      ],
+      "type": "string"
+    },
+    "SceneLoosePiece": {
+      "additionalProperties": false,
+      "description": "An unplayed tile lying next to the hive.\n\nAttributes:\n    piece_type: The insect on the tile.\n    owner: The player the tile belongs to.\n    x: The position to the east of the hive centre, in tile widths.\n    y: The position to the north of the hive centre, in tile widths.\n    rot_deg: The rotation in degrees, anti-clockwise.\n    flipped: Whether the tile lies upside down, showing its plain bottom.",
+      "properties": {
+        "piece": {
+          "enum": [
+            "queen",
+            "beetle",
+            "grasshopper",
+            "spider",
+            "ant"
+          ],
+          "title": "Piece",
+          "type": "string"
+        },
+        "owner": {
+          "enum": [
+            "white",
+            "black"
+          ],
+          "title": "Owner",
+          "type": "string"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "rot_deg": {
+          "title": "Rot Deg",
+          "type": "number"
+        },
+        "flipped": {
+          "title": "Flipped",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "piece",
+        "owner",
+        "x",
+        "y",
+        "rot_deg",
+        "flipped"
+      ],
+      "title": "SceneLoosePiece",
+      "type": "object"
+    },
+    "ScenePost": {
+      "additionalProperties": false,
+      "description": "Camera effects applied to the rendered image.\n\nAttributes:\n    blur_px: The standard deviation of a Gaussian blur in pixels.\n    noise: The standard deviation of sensor noise, relative to full scale.\n    jpeg_quality: The JPEG quality of the saved image.",
+      "properties": {
+        "blur_px": {
+          "title": "Blur Px",
+          "type": "number"
+        },
+        "noise": {
+          "title": "Noise",
+          "type": "number"
+        },
+        "jpeg_quality": {
+          "title": "Jpeg Quality",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blur_px",
+        "noise",
+        "jpeg_quality"
+      ],
+      "title": "ScenePost",
+      "type": "object"
+    },
+    "SceneTile": {
+      "additionalProperties": false,
+      "description": "One tile of a stack on the board.\n\nAttributes:\n    piece_type: The insect on the tile.\n    owner: The player the tile belongs to.\n    turn: The orientation of the insect in steps of 60 degrees, anti-clockwise.",
+      "properties": {
+        "piece": {
+          "enum": [
+            "queen",
+            "beetle",
+            "grasshopper",
+            "spider",
+            "ant"
+          ],
+          "title": "Piece",
+          "type": "string"
+        },
+        "owner": {
+          "enum": [
+            "white",
+            "black"
+          ],
+          "title": "Owner",
+          "type": "string"
+        },
+        "turn": {
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Turn",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "piece",
+        "owner",
+        "turn"
+      ],
+      "title": "SceneTile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Everything the renderer needs for one image, in tile widths.\n\nAttributes:\n    schema_version: The version of the scene JSON.\n    scene_id: The unique id, also the file name.\n    seed: The seed of the scene, which the renderer also uses for its own choices\n        such as the tileset.\n    moves: The moves of the random game, which replay to the board.\n    board: The occupied cells, ordered by coordinate.\n    loose_pieces: The unplayed tiles next to the hive.\n    distractors: The other objects on the table.\n    tile_gap: The space between neighbouring tiles in tile widths.\n    camera: The camera.\n    lighting: The lighting.\n    background: The table surface.\n    post: The camera effects.",
+  "properties": {
+    "schema_version": {
+      "const": 2,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "scene_id": {
+      "title": "Scene Id",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "moves": {
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Move"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Moves",
+      "type": "array"
+    },
+    "board": {
+      "items": {
+        "$ref": "#/$defs/SceneCell"
+      },
+      "title": "Board",
+      "type": "array"
+    },
+    "loose_pieces": {
+      "items": {
+        "$ref": "#/$defs/SceneLoosePiece"
+      },
+      "title": "Loose Pieces",
+      "type": "array"
+    },
+    "distractors": {
+      "items": {
+        "$ref": "#/$defs/SceneDistractor"
+      },
+      "title": "Distractors",
+      "type": "array"
+    },
+    "tile_gap": {
+      "title": "Tile Gap",
+      "type": "number"
+    },
+    "camera": {
+      "$ref": "#/$defs/SceneCamera"
+    },
+    "lighting": {
+      "$ref": "#/$defs/SceneLighting"
+    },
+    "background": {
+      "$ref": "#/$defs/SceneBackground"
+    },
+    "post": {
+      "$ref": "#/$defs/ScenePost"
+    }
+  },
+  "required": [
+    "schema_version",
+    "scene_id",
+    "seed",
+    "moves",
+    "board",
+    "loose_pieces",
+    "distractors",
+    "tile_gap",
+    "camera",
+    "lighting",
+    "background",
+    "post"
+  ],
+  "title": "Scene",
+  "type": "object"
+}

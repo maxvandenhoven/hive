@@ -214,3 +214,12 @@ reports/
 
 # The frontend keeps shared code in `frontend/src/lib/`, which the Python `lib/` above hides
 !frontend/src/lib/
+
+# Progress renders and scratch output
+tmp/
+
+# Downloaded render assets (`make render-assets`)
+blender/.cache/
+
+# Generated scenes, renders, datasets and training runs
+/data/

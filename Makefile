@@ -26,7 +26,7 @@ lint: lint-python lint-frontend
 
 lint-python:
 	@uv run ruff check --fix --output-format concise
-	@uv run python scripts/tooling/check_comments.py src tests scripts
+	@uv run python scripts/tooling/check_comments.py src tests scripts blender
 	@uv run python scripts/tooling/check_docstrings.py src
 
 lint-frontend: frontend/node_modules
@@ -56,6 +56,25 @@ test-frontend: frontend/node_modules
 .PHONY: test-slow
 test-slow:
 	@uv run pytest -m slow
+
+
+# Downloads the CC0 table surfaces and room lighting of the Blender renderer.
+.PHONY: render-assets
+render-assets:
+	@uv run python scripts/fetch_render_assets.py
+
+
+# Generates three scenes, renders them with Blender and exports them as a dataset with
+# drawn labels in `tmp/render-smoke/`; skipped when Blender is not installed.
+.PHONY: render-smoke
+render-smoke:
+	@if ! command -v blender > /dev/null; then echo "Blender is not installed; skipped."; exit 0; fi; \
+		rm -rf tmp/render-smoke && \
+		uv run hive data scenes --count 3 --seed 0 --out tmp/render-smoke/scenes && \
+		blender -b --factory-startup -P blender/render.py -- --scenes tmp/render-smoke/scenes \
+			--out tmp/render-smoke/renders --samples 16 > tmp/render-smoke/render.log 2>&1 && \
+		uv run hive data export --renders tmp/render-smoke/renders --version smoke \
+			--out tmp/render-smoke --debug 3
 
 
 .PHONY: perft
