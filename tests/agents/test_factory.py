@@ -136,7 +136,7 @@ class TestAgentSpecFromYaml:
             "mobile_queen, mobile_beetle, mobile_grasshopper, mobile_spider, mobile_ant, "
             "placement_cells, alpha_beta, table_megabytes, aspiration_window, threads, "
             "principal_variation_search, table_deeper_hits, late_move_reductions, "
-            "null_move_reduction, queen_attack_ordering.",
+            "null_move_reduction, queen_attack_ordering, queen_threat_extension.",
         ]
 
 
@@ -361,6 +361,7 @@ class TestListAgents:
             "late_move_reductions",
             "null_move_reduction",
             "queen_attack_ordering",
+            "queen_threat_extension",
         ]
         assert properties["depth"] == {
             "anyOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}],

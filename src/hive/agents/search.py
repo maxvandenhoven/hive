@@ -68,6 +68,7 @@ class SearchAgent(Agent):
         null_move_reduction: Extra depth reduction of a null move at scout nodes,
             zero for none.
         queen_attack_ordering: Order moves next to the enemy queen after killers.
+        queen_threat_extension: Search a ply deeper once a queen has five neighbours.
         searcher: The search of the Rust core, configured with the params.
         nodes: The number of nodes the last decision visited.
     """
@@ -110,6 +111,7 @@ class SearchAgent(Agent):
         late_move_reductions: Annotated[int, Field(ge=0, le=255)] = 0,
         null_move_reduction: Annotated[int, Field(ge=0, le=8)] = 0,
         queen_attack_ordering: bool = False,
+        queen_threat_extension: bool = False,
     ) -> None:
         """Initialize the search agent.
 
@@ -154,6 +156,8 @@ class SearchAgent(Agent):
             null_move_reduction: Extra depth reduction of a null move at scout nodes,
                 zero for none.
             queen_attack_ordering: Order moves next to the enemy queen after killers.
+            queen_threat_extension: Search a ply deeper once a queen has five neighbours.
+        queen_threat_extension: Search a ply deeper once a queen has five neighbours.
         """
         super().__init__(rules=rules, seed=seed)
         self.depth = depth
@@ -183,6 +187,7 @@ class SearchAgent(Agent):
         self.late_move_reductions = late_move_reductions
         self.null_move_reduction = null_move_reduction
         self.queen_attack_ordering = queen_attack_ordering
+        self.queen_threat_extension = queen_threat_extension
         self.searcher = Searcher(
             rules,
             algorithm=self.ALGORITHM,
@@ -214,6 +219,7 @@ class SearchAgent(Agent):
             late_move_reductions=late_move_reductions,
             null_move_reduction=null_move_reduction,
             queen_attack_ordering=queen_attack_ordering,
+            queen_threat_extension=queen_threat_extension,
         )
         self.nodes = 0
 

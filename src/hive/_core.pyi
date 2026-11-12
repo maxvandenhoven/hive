@@ -753,6 +753,7 @@ class Searcher:
         late_move_reductions: int = 0,
         null_move_reduction: int = 0,
         queen_attack_ordering: bool = False,
+        queen_threat_extension: bool = False,
     ) -> None:
         """Create a searcher.
 
@@ -796,6 +797,7 @@ class Searcher:
             null_move_reduction: Extra depth reduction of a null move at scout nodes,
                 zero for none.
             queen_attack_ordering: Order moves next to the enemy queen after killers.
+            queen_threat_extension: Search a ply deeper once a queen has five neighbours.
 
         Raises:
             ValueError: If the algorithm, depth, window or thread count is invalid.

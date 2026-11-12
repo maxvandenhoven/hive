@@ -1,0 +1,9 @@
+{
+  "deeper-hits": {"table_deeper_hits": true},
+  "lmr3": {"late_move_reductions": 3},
+  "null2": {"null_move_reduction": 2},
+  "queen-order": {"queen_attack_ordering": true},
+  "search-all": {"table_deeper_hits": true, "late_move_reductions": 3, "null_move_reduction": 2, "queen_attack_ordering": true},
+  "structure": {"pinned_material": 0.025, "free_ants": 0.25, "beetle_control": 0.25},
+  "structure-search-all": {"pinned_material": 0.025, "free_ants": 0.25, "beetle_control": 0.25, "table_deeper_hits": true, "late_move_reductions": 3, "null_move_reduction": 2, "queen_attack_ordering": true}
+}

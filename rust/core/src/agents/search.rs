@@ -77,6 +77,9 @@ pub struct SearchConfig {
     pub null_move_reduction: u32,
     /// Order the moves onto or next to the opponent's queen right after the killer moves.
     pub queen_attack_ordering: bool,
+    /// Search a move one ply deeper when it brings a queen to five or more occupied
+    /// neighbours, so threats to win are resolved, up to twice the iteration's depth.
+    pub queen_threat_extension: bool,
 }
 
 impl SearchConfig {
@@ -101,6 +104,7 @@ impl SearchConfig {
             late_move_reductions: 0,
             null_move_reduction: 0,
             queen_attack_ordering: false,
+            queen_threat_extension: false,
         }
     }
 }
@@ -208,6 +212,8 @@ pub struct Searcher {
     ordering: Vec<(u64, Move)>,
     /// Root move rotation that diversifies helper searches.
     worker_index: usize,
+    /// The depth of the iteration in progress, which limits extensions.
+    root_depth: u32,
 }
 
 impl Searcher {
@@ -227,6 +233,7 @@ impl Searcher {
             history: vec![0; PieceType::COUNT * HISTORY_CELLS],
             ordering: Vec::new(),
             worker_index: 0,
+            root_depth: 0,
         }
     }
 
@@ -298,6 +305,7 @@ impl Searcher {
             self.reserve(depth);
             let root_player = state.current_player();
 
+            self.root_depth = depth;
             let mut root = Node::root(depth);
             let mut width = self.config.aspiration_window;
 
@@ -358,7 +366,8 @@ impl Searcher {
 
     /// Make sure there is a move buffer and a line for every ply of a depth.
     fn reserve(&mut self, depth: u32) {
-        let plies = depth as usize + 2;
+        let extended = if self.config.queen_threat_extension { 2 * depth } else { depth };
+        let plies = extended as usize + 2;
 
         while self.buffers.len() < plies {
             self.buffers.push(Vec::with_capacity(256));
@@ -599,11 +608,14 @@ impl Searcher {
         let outer_cutoff = std::mem::replace(&mut self.cutoff, false);
         let mut alpha = node.alpha;
         let mut best = f64::NEG_INFINITY;
+        let crowding = queen_crowding(state);
 
         for position in 0..moves.len().max(1) {
             let mv = moves.get(position).copied();
-            let child = Node {
-                depth: node.depth - 1,
+            state.apply_move(mv);
+            let extend = self.extends(state, node, crowding);
+            let mut child = Node {
+                depth: node.depth - 1 + u32::from(extend),
                 ply: node.ply + 1,
                 alpha: -node.beta,
                 beta: -alpha,
@@ -616,8 +628,9 @@ impl Searcher {
                 && index > 0
                 && node.depth >= 3
                 && mv.is_some()
+                && !extend
                 && position >= late as usize;
-            state.apply_move(mv);
+            child.allow_null = !extend;
             let result = self.search_child(state, child, position > 0, reduce, observer);
             state.undo_move(mv);
 
@@ -716,6 +729,20 @@ impl Searcher {
         } else {
             Ok(score)
         }
+    }
+
+    /// Check whether the move just applied at a node is extended: the option is on, the
+    /// extended line stays within twice the iteration's depth, and a queen's occupied
+    /// neighbours grew to five or more from `before`, its count at the node.
+    fn extends(&self, state: &GameState, node: Node, before: [usize; 2]) -> bool {
+        if !self.config.queen_threat_extension
+            || node.ply + node.depth >= 2 * self.root_depth
+        {
+            return false;
+        }
+
+        let after = queen_crowding(state);
+        (0..2).any(|index| after[index] >= 5 && after[index] > before[index])
     }
 
     /// Try a null move at a node if [`Searcher::null_move_applies`]: pass, and search the
@@ -852,6 +879,15 @@ impl Searcher {
         self.buffers[index] = moves;
         Ok(best)
     }
+}
+
+/// Count the occupied neighbours of both queens, by player index, zero if unplaced.
+fn queen_crowding(state: &GameState) -> [usize; 2] {
+    Player::ALL.map(|player| {
+        state
+            .queen_coord(player)
+            .map_or(0, |queen| state.board().count_occupied_neighbors(queen.cell()))
+    })
 }
 
 /// Get the slot of a move in the history table: its piece type and target cell.
