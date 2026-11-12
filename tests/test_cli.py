@@ -736,3 +736,14 @@ class TestVisionDetect:
 
         assert result.exit_code == 2
         assert "Cannot read the image" in error_text(result.stderr)
+
+
+def test_data_sequences(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        app,
+        ["data", "sequences", "--count", "1", "--plies", "3", "--takes", "2"]
+        + ["--out", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert len(list(tmp_path.glob("000-00?-?.json"))) == 6

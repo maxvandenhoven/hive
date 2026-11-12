@@ -27,6 +27,9 @@ class TileObservation(JsonCodec):
         piece_type: The insect on the tile.
         owner: The player the tile belongs to, which is its colour.
         score: The confidence between 0 and 1.
+        class_scores: The score of every tile class in class id order, if the reader
+            gives them; they tell how likely the other classes are when the best one is
+            wrong.
     """
 
     center: tuple[float, float]
@@ -35,6 +38,7 @@ class TileObservation(JsonCodec):
     piece_type: PieceType
     owner: Player
     score: float
+    class_scores: tuple[float, ...] | None = None
 
     @property
     def tile_class(self) -> TileClass:

@@ -466,6 +466,31 @@ class ScenesConfig(JsonCodec):
         """
         rng = random.Random(seed)
         state, moves = self.play_game(rules=rules, rng=rng)
+
+        return self.compose_scene(
+            state=state, moves=moves, scene_id=scene_id, seed=seed, rng=rng
+        )
+
+    def compose_scene(
+        self,
+        state: GameState,
+        moves: list[Move | None],
+        scene_id: str,
+        seed: int,
+        rng: random.Random,
+    ) -> Scene:
+        """Lay out a position on the table and sample everything around it.
+
+        Args:
+            state: The position.
+            moves: The moves that lead to the position.
+            scene_id: The id of the scene.
+            seed: The seed of the scene, recorded for the renderer.
+            rng: The random number generator.
+
+        Returns:
+            The scene.
+        """
         tile_gap = rng.uniform(*self.tile_gap)
         board = self.sample_board(state=state, tile_gap=tile_gap, rng=rng)
         radius = max(math.hypot(cell.x, cell.y) for cell in board) + 0.5 if board else 0.5
@@ -497,6 +522,111 @@ class ScenesConfig(JsonCodec):
                 jpeg_quality=rng.randint(*self.jpeg_quality),
             ),
         )
+
+    def sample_sequence(
+        self, rules: Rules, sequence: int, seed: int, plies: int, takes: int
+    ) -> list[Scene]:
+        """Sample photos of one game after every move, to test tracking a game.
+
+        The game grows the hive with mostly placements and lets beetles climb when they
+        can, so stacks occur. Every photo of every ply has its own camera, lighting,
+        table, clutter and tiles in hand; the extra takes of a ply stand in for the
+        photos a person takes again when the first one is unclear.
+
+        Args:
+            rules: The rules of the game.
+            sequence: The index of the game, which is part of the scene ids.
+            seed: The seed of the batch.
+            plies: The number of moves; the game stops earlier when it ends.
+            takes: The number of photos per ply.
+
+        Returns:
+            The scenes, with ids `<sequence>-<ply>-<take>`, in order.
+        """
+        rng = random.Random(derive_scene_seed(seed=seed, index=sequence))
+        state = rules.create_initial_state()
+        moves: list[Move | None] = []
+        scenes: list[Scene] = []
+
+        while len(moves) < plies and not rules.is_finished(state):
+            move = self.pick_growing_move(rules=rules, state=state, rng=rng)
+            state.apply_move(move)
+            moves.append(move)
+
+            for take in range(takes):
+                index = (sequence * 1000 + len(moves)) * 10 + take
+                scene_seed = derive_scene_seed(seed=seed, index=index)
+                scenes.append(
+                    self.compose_scene(
+                        state=state,
+                        moves=list(moves),
+                        scene_id=f"{sequence:03d}-{len(moves):03d}-{take}",
+                        seed=scene_seed,
+                        rng=random.Random(scene_seed),
+                    )
+                )
+
+        return scenes
+
+    def pick_growing_move(
+        self, rules: Rules, state: GameState, rng: random.Random
+    ) -> Move | None:
+        """Pick a move that mostly grows the hive and sometimes stacks a beetle.
+
+        Args:
+            rules: The rules of the game.
+            state: The position.
+            rng: The random number generator.
+
+        Returns:
+            A legal move.
+        """
+        legal_moves = rules.legal_moves(state)
+        climbs = [
+            move
+            for move in legal_moves
+            if move is not None
+            and move.source_coord is not None
+            and state.is_occupied(move.target_coord)
+        ]
+        placements = [
+            move for move in legal_moves if move is not None and move.source_coord is None
+        ]
+        roll = rng.random()
+
+        if climbs and roll < 0.35:
+            return rng.choice(climbs)
+
+        if placements and roll < 0.8:
+            return rng.choice(placements)
+
+        return rng.choice(legal_moves)
+
+    def write_sequences(
+        self, rules: Rules, out: Path, seed: int, count: int, plies: int, takes: int
+    ) -> list[Path]:
+        """Sample game sequences and write their scenes as JSON files.
+
+        Args:
+            rules: The rules of the games.
+            out: The directory for the scene files, created if needed.
+            seed: The seed of the batch.
+            count: The number of games.
+            plies: The number of moves per game.
+            takes: The number of photos per ply.
+
+        Returns:
+            The written files in order.
+        """
+        out.mkdir(parents=True, exist_ok=True)
+
+        return [
+            scene.write(out)
+            for sequence in range(count)
+            for scene in self.sample_sequence(
+                rules=rules, sequence=sequence, seed=seed, plies=plies, takes=takes
+            )
+        ]
 
     def play_game(
         self, rules: Rules, rng: random.Random

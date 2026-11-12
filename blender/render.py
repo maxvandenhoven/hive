@@ -218,6 +218,7 @@ class SceneRenderer:
                 {"coord": cell["coord"], "stack": cell["stack"]}
                 for cell in scene["board"]
             ],
+            "moves": scene["moves"],
             "instances": instances,
             "render_s": round(time.perf_counter() - begin, 2),
         }

@@ -248,3 +248,33 @@ def test_camera_covers_steep_and_close_views(scenes: list[Scene]) -> None:
         config.aperture_f[0] <= scene.camera.aperture_f <= config.aperture_f[1]
         for scene in scenes
     )
+
+
+def test_sequence_grows_one_legal_move_at_a_time() -> None:
+    scenes = ScenesConfig().sample_sequence(
+        rules=Rules(), sequence=2, seed=4, plies=30, takes=2
+    )
+
+    assert scenes[0].scene_id == "002-001-0"
+    assert scenes[1].scene_id == "002-001-1"
+    assert len(scenes) == 60
+
+    for previous, scene in zip(scenes[::2], scenes[2::2], strict=False):
+        assert scene.moves[:-1] == previous.moves
+        GameRecord(rules=Rules(), moves=scene.moves).replay()
+
+    takes = scenes[-2:]
+
+    assert takes[0].moves == takes[1].moves
+    assert takes[0].camera != takes[1].camera
+    assert any(len(cell.stack) > 1 for scene in scenes for cell in scene.board)
+
+
+def test_write_sequences_names_files_in_order(tmp_path: Path) -> None:
+    paths = ScenesConfig().write_sequences(
+        rules=Rules(), out=tmp_path, seed=0, count=2, plies=3, takes=2
+    )
+
+    assert [path.name for path in paths] == sorted(path.name for path in paths)
+    assert len(paths) == 12
+    assert paths[-1].name == "001-003-1.json"

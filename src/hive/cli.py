@@ -751,6 +751,48 @@ def data_scenes(
     )
 
 
+@data_app.command(
+    "sequences",
+    help="Generate scenes of games after every move, with several photos per move, to "
+    "test tracking games from photos.",
+)
+def data_sequences(
+    count: Annotated[int, typer.Option(min=1, help="The number of games.")],
+    out: Annotated[Path, typer.Option(help="The directory for the scene files.")],
+    plies: Annotated[int, typer.Option(min=1, help="The number of moves per game.")] = 40,
+    takes: Annotated[int, typer.Option(min=1, help="The number of photos per move.")] = 3,
+    seed: Annotated[int, typer.Option(help="The seed of the batch.")] = 0,
+    config: Annotated[
+        Path | None,
+        typer.Option(help="A TOML file with sampling ranges that replace the defaults."),
+    ] = None,
+) -> None:
+    """Generate scenes of games after every move, with several photos per move.
+
+    Args:
+        count: The number of games.
+        out: The directory for the scene files.
+        plies: The number of moves per game.
+        takes: The number of photos per move.
+        seed: The seed of the batch.
+        config: A TOML file with sampling ranges, or `None` for the defaults.
+
+    Raises:
+        typer.BadParameter: If the config file cannot be read or is invalid.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    try:
+        scenes_config = ScenesConfig.load(config)
+    except (OSError, ValueError) as e:
+        raise typer.BadParameter(str(e), param_hint="--config") from e
+
+    paths = scenes_config.write_sequences(
+        rules=Rules(), out=out, seed=seed, count=count, plies=plies, takes=takes
+    )
+    logger.info("Wrote %d scenes of %d games to `%s`.", len(paths), count, out)
+
+
 @data_app.command("schema", help="Write the JSON Schema of the scene files.")
 def data_schema(
     out: Annotated[
@@ -970,3 +1012,96 @@ def vision_detect(
             cv2.imwrite(str(out / f"{path.stem}.jpg"), canvas)
             detections = [observation.to_json() for observation in observations]
             (out / f"{path.stem}.json").write_text(json.dumps(detections, indent=1))
+
+
+@vision_app.command(
+    "track",
+    help="Track rendered games photo by photo and check every resolved move; write a "
+    "report, a frame per photo and an animation per game.",
+)
+def vision_track(
+    dataset: Annotated[
+        Path, typer.Option(help="The dataset exported from rendered `data sequences`.")
+    ],
+    model: Annotated[Path, typer.Option(help="The `model.onnx` file.")],
+    out: Annotated[
+        Path, typer.Option(help="The folder for the report, frames and animations.")
+    ],
+    score: Annotated[
+        float, typer.Option(min=0.0, max=1.0, help="The lowest score that counts.")
+    ] = 0.25,
+) -> None:
+    """Track rendered games photo by photo and check every resolved move.
+
+    Args:
+        dataset: The dataset exported from rendered `data sequences`.
+        model: The ONNX model file.
+        out: The folder for the report, frames and animations.
+        score: The lowest class score that counts as a detection.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    require_vision_extra()
+
+    from hive.vision.sequences import SequenceTracker
+    from hive.vision.yolo.reader import YoloReader
+
+    reader = YoloReader.load(model_path=model, score_threshold=score)
+    tracker = SequenceTracker(
+        dataset=dataset, reader=reader, rules=Rules(), frames=out / "frames"
+    )
+    report = tracker.run()
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "report.json").write_text(json.dumps(report.to_json(), indent=1))
+
+    for ply in report.plies:
+        statuses = ", ".join(
+            f"{photo.status} ({photo.probability:.2f})"
+            if photo.probability is not None
+            else photo.status
+            for photo in ply.photos
+        )
+        logger.info(
+            "game %s move %2d: %-8s %-40s photos: %s",
+            ply.sequence,
+            ply.ply,
+            ply.outcome,
+            format_move(ply.true_move),
+            statuses,
+        )
+
+    logger.info("Summary: %s", report.summary)
+    write_animations(frames=out / "frames", out=out)
+    logger.info("Wrote the report, frames and animations to `%s`.", out)
+
+
+def write_animations(frames: Path, out: Path) -> None:
+    """Join the frames of every game into an animated GIF, if Pillow is installed.
+
+    Args:
+        frames: The folder with one subfolder of frames per game.
+        out: The folder for the animations.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        logger.info("Install the `plotting` extra for animations of the frames.")
+        return
+
+    for folder in sorted(path for path in frames.iterdir() if path.is_dir()):
+        images = [Image.open(path) for path in sorted(folder.glob("*.jpg"))]
+
+        if not images:
+            continue
+
+        width = 1200
+        resized = [
+            image.resize((width, round(image.height * width / image.width)))
+            for image in images
+        ]
+        resized[0].save(
+            out / f"game-{folder.name}.gif",
+            save_all=True,
+            append_images=resized[1:],
+            duration=900,
+            loop=0,
+        )

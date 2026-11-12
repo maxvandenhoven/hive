@@ -233,6 +233,7 @@ class YoloReader:
         best_scores = scores[np.arange(len(scores)), class_ids]
         candidates = best_scores >= self.score_threshold
         predictions = predictions[candidates]
+        scores = scores[candidates]
         class_ids = class_ids[candidates]
         best_scores = best_scores[candidates]
 
@@ -274,6 +275,7 @@ class YoloReader:
                     piece_type=tile_class.piece_type,
                     owner=tile_class.owner,
                     score=float(best_scores[keep[index]]),
+                    class_scores=tuple(float(value) for value in scores[keep[index]]),
                 )
             )
 
