@@ -7,6 +7,7 @@
 //! nodes are visited, scores are equal, and the root keeps the first best move in the
 //! documented order of legal moves.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use crate::agents::evaluation::{EvaluationWeights, Evaluator};
@@ -51,6 +52,12 @@ pub struct SearchConfig {
     /// The size of the transposition table in MB, zero for none. Negamax with alpha-beta
     /// uses it, and orders moves by killer moves and a history table too.
     pub table_megabytes: usize,
+    /// Initial half-width around the previous score, zero for full windows.
+    pub aspiration_window: f64,
+    /// Total search threads, including the reporting thread. Negamax only.
+    pub threads: usize,
+    /// Scout later moves with a minimal window, re-searching improvements exactly.
+    pub principal_variation_search: bool,
 }
 
 /// The place of a node in the search: its remaining depth, its ply from the root, its
@@ -145,6 +152,8 @@ pub struct Searcher {
     history: Vec<u32>,
     /// Scratch space for ordering moves: the sort key and the move.
     ordering: Vec<(u64, Move)>,
+    /// Root move rotation that diversifies helper searches.
+    worker_index: usize,
 }
 
 impl Searcher {
@@ -163,6 +172,7 @@ impl Searcher {
             killers: Vec::new(),
             history: vec![0; PieceType::COUNT * HISTORY_CELLS],
             ordering: Vec::new(),
+            worker_index: 0,
         }
     }
 
@@ -194,24 +204,82 @@ impl Searcher {
     /// The state is searched in place and restored before returning, also when the
     /// observer stops the search.
     pub fn think(&mut self, state: &mut GameState, observer: &mut impl SearchObserver) {
+        if self.config.threads <= 1 || self.config.algorithm != SearchAlgorithm::Negamax {
+            self.think_serial(state, observer);
+            return;
+        }
+
+        self.table.share();
+        let stop = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            let _cancel_helpers = SearchCancellation { stop: &stop };
+            for index in 1..self.config.threads {
+                let mut helper = self.clone();
+                helper.worker_index = index;
+                let mut position = state.clone();
+                let stop = &stop;
+                scope.spawn(move || {
+                    helper.think_serial(&mut position, &mut HelperObserver { stop });
+                });
+            }
+
+            self.think_serial(state, observer);
+        });
+    }
+
+    /// Run iterative deepening on one thread; only the main thread calls the client.
+    fn think_serial(
+        &mut self,
+        state: &mut GameState,
+        observer: &mut impl SearchObserver,
+    ) {
         self.nodes = 0;
         self.previous_line.clear();
         let start = Instant::now();
         let mut depth = 1;
+        let mut previous_score = 0.0;
 
         while !observer.should_stop() {
             self.cutoff = false;
             self.reserve(depth);
             let root_player = state.current_player();
 
-            let root = Node::root(depth);
-            let result = match self.config.algorithm {
-                SearchAlgorithm::Negamax => self.negamax(state, root, observer),
-                SearchAlgorithm::Minimax => {
-                    self.minimax(state, root, root_player, observer)
+            let mut root = Node::root(depth);
+            let mut width = self.config.aspiration_window;
+
+            if depth > 1 && self.config.alpha_beta && width > 0.0 {
+                root.alpha = previous_score - width;
+                root.beta = previous_score + width;
+            }
+
+            let score = loop {
+                self.cutoff = false;
+                let result = match self.config.algorithm {
+                    SearchAlgorithm::Negamax => self.negamax(state, root, observer),
+                    SearchAlgorithm::Minimax => {
+                        self.minimax(state, root, root_player, observer)
+                    }
+                };
+                let Ok(score) = result else { return };
+
+                if score > root.alpha && score < root.beta {
+                    break score;
+                }
+
+                // A failed window is only a bound. Widen before publishing a result.
+                if observer.should_stop() {
+                    return;
+                }
+
+                width *= 4.0;
+                if width >= SEARCH_WIN_SCORE || !width.is_finite() {
+                    root = Node::root(depth);
+                } else {
+                    root.alpha = score - width;
+                    root.beta = score + width;
                 }
             };
-            let Ok(score) = result else { return };
+            previous_score = score;
 
             let report = DepthReport {
                 depth,
@@ -281,6 +349,11 @@ impl Searcher {
             decoded.sort_unstable_by_key(|&(coord_move, _)| coord_move);
             moves.clear();
             moves.extend(decoded.into_iter().map(|(_, mv)| mv));
+
+            if !moves.is_empty() {
+                let rotation = self.worker_index % moves.len();
+                moves.rotate_left(rotation);
+            }
         }
     }
 
@@ -366,7 +439,7 @@ impl Searcher {
     /// move, and child scores are negated. With alpha-beta, the search of a node stops as
     /// soon as a move scores at least `beta`, which the opponent will not allow. Results
     /// are stored in the transposition table and reused when a position recurs at the
-    /// same remaining depth or deeper; moves are ordered by the table, killers and
+    /// same remaining depth; moves are ordered by the table, killers and
     /// history.
     fn negamax(
         &mut self,
@@ -396,7 +469,7 @@ impl Searcher {
             table_move = entry.best_move();
             let score = from_table_score(entry.score, node.ply);
             let usable = index > 0
-                && u32::from(entry.depth) >= node.depth
+                && u32::from(entry.depth) == node.depth
                 && match entry.bound {
                     TableBound::Exact => true,
                     TableBound::Lower => score >= node.beta,
@@ -435,7 +508,7 @@ impl Searcher {
                     .follows_principal_variation(follows, node.ply, mv),
             };
             state.apply_move(mv);
-            let result = self.negamax(state, child, observer);
+            let result = self.search_child(state, child, position > 0, observer);
             state.undo_move(mv);
 
             let Ok(child_score) = result else {
@@ -488,6 +561,32 @@ impl Searcher {
         }
 
         Ok(best)
+    }
+
+    /// Scout a later child, then search its full window if it improves the best score.
+    fn search_child(
+        &mut self,
+        state: &mut GameState,
+        child: Node,
+        scout: bool,
+        observer: &mut impl SearchObserver,
+    ) -> Result<f64, Stopped> {
+        if !scout
+            || !self.config.alpha_beta
+            || !self.config.principal_variation_search
+            || !child.beta.is_finite()
+        {
+            return self.negamax(state, child, observer);
+        }
+
+        let narrow = Node { alpha: child.beta.next_down(), ..child };
+        let score = self.negamax(state, narrow, observer)?;
+
+        if score > child.alpha && score < child.beta {
+            self.negamax(state, child, observer)
+        } else {
+            Ok(score)
+        }
     }
 
     /// Search a node with minimax: the score is from the perspective of `root_player`,
@@ -578,4 +677,31 @@ fn decode_line(state: &GameState, line: &[Option<Move>]) -> Vec<Option<CoordMove
     }
 
     decoded
+}
+
+/// A helper only polls the shared cancellation flag; its table entries help the main
+/// search, but incomplete or speculative helper results are never submitted.
+struct HelperObserver<'a> {
+    /// Set when the reporting thread finishes or is stopped by its observer.
+    stop: &'a AtomicBool,
+}
+
+impl SearchObserver for HelperObserver<'_> {
+    fn should_stop(&mut self) -> bool {
+        self.stop.load(Ordering::Relaxed)
+    }
+
+    fn report(&mut self, _report: &DepthReport) {}
+}
+
+/// Cancels helpers on normal return and when a client observer unwinds with a panic.
+struct SearchCancellation<'a> {
+    /// The flag polled by every helper.
+    stop: &'a AtomicBool,
+}
+
+impl Drop for SearchCancellation<'_> {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
 }

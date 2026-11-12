@@ -1,0 +1,5811 @@
+{
+  "config": {
+    "participants": [
+      {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 2
+        },
+        "label": "previous"
+      },
+      {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 4
+        },
+        "label": "threads4"
+      }
+    ],
+    "games_per_pair": 2,
+    "budget_s": 1.0,
+    "max_turns": 30,
+    "seed": 0,
+    "jobs": 1,
+    "grace_s": 1.0,
+    "rules": {
+      "piece_counts": {
+        "queen": 1,
+        "beetle": 2,
+        "grasshopper": 3,
+        "spider": 2,
+        "ant": 3
+      },
+      "starting_player": "white",
+      "queen_by_turn": 4,
+      "allow_queen_first_turn": true,
+      "move_before_queen": false,
+      "max_turns": null
+    },
+    "replays": true
+  },
+  "participants": [
+    {
+      "label": "previous",
+      "spec": {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 2
+        },
+        "label": "previous"
+      },
+      "wins": 1,
+      "draws": 0,
+      "losses": 1,
+      "turn_caps": 0,
+      "elo": 0.0,
+      "decision_stats": {
+        "decisions": 29,
+        "depth_reached": {
+          "1": 1,
+          "2": 1,
+          "3": 1,
+          "4": 1,
+          "5": 1,
+          "6": 1,
+          "7": 14,
+          "8": 4,
+          "9": 4,
+          "10": 1
+        },
+        "nodes_per_s": 5767217.068965517,
+        "close_reasons": {
+          "final": 7,
+          "deadline": 22,
+          "worker_failed": 0,
+          "no_candidate": 0
+        },
+        "elapsed_s": {
+          "count": 29,
+          "mean": 0.7719532843430301,
+          "p50": 1.000789440004155,
+          "p90": 1.0015317719662562,
+          "max": 1.001682094996795
+        },
+        "overrun_s": {
+          "count": 29,
+          "mean": 0.0012781353133473673,
+          "p50": 0.001421419030521065,
+          "p90": 0.0022623210097663105,
+          "max": 0.0026188819902017713
+        },
+        "overruns": 0,
+        "failures": 0,
+        "worker_restarts": 0,
+        "illegal_submissions": 0,
+        "mean_depth": 6.793103448275862,
+        "timeout_rate": 0.7586206896551724,
+        "overrun_rate": 0.0,
+        "flagged": false
+      },
+      "games": 2,
+      "win_rate": 0.5,
+      "win_rate_interval": [
+        0.09453120573423074,
+        0.9054687942657693
+      ]
+    },
+    {
+      "label": "threads4",
+      "spec": {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 4
+        },
+        "label": "threads4"
+      },
+      "wins": 1,
+      "draws": 0,
+      "losses": 1,
+      "turn_caps": 0,
+      "elo": 0.0,
+      "decision_stats": {
+        "decisions": 29,
+        "depth_reached": {
+          "1": 1,
+          "2": 1,
+          "3": 1,
+          "4": 1,
+          "5": 1,
+          "6": 1,
+          "7": 12,
+          "8": 6,
+          "9": 4,
+          "10": 1
+        },
+        "nodes_per_s": 5676833.137931035,
+        "close_reasons": {
+          "final": 8,
+          "deadline": 21,
+          "worker_failed": 0,
+          "no_candidate": 0
+        },
+        "elapsed_s": {
+          "count": 29,
+          "mean": 0.7673266824146187,
+          "p50": 1.0006373510113917,
+          "p90": 1.0013855409924872,
+          "max": 1.0015840380219743
+        },
+        "overrun_s": {
+          "count": 29,
+          "mean": 0.0013740781758879792,
+          "p50": 0.0015692029846832156,
+          "p90": 0.002717608993407339,
+          "max": 0.002852072997484356
+        },
+        "overruns": 0,
+        "failures": 0,
+        "worker_restarts": 0,
+        "illegal_submissions": 0,
+        "mean_depth": 6.862068965517241,
+        "timeout_rate": 0.7241379310344828,
+        "overrun_rate": 0.0,
+        "flagged": false
+      },
+      "games": 2,
+      "win_rate": 0.5,
+      "win_rate_interval": [
+        0.09453120573423074,
+        0.9054687942657693
+      ]
+    }
+  ],
+  "matches": [
+    {
+      "index": 0,
+      "white": "previous",
+      "black": "threads4",
+      "seed": 8889166143547984643,
+      "outcome": "win",
+      "winner": "white",
+      "plies": 29,
+      "duration_s": 22.52443668601336
+    },
+    {
+      "index": 1,
+      "white": "threads4",
+      "black": "previous",
+      "seed": 7661244365878278962,
+      "outcome": "win",
+      "winner": "white",
+      "plies": 29,
+      "duration_s": 22.509789358999114
+    }
+  ],
+  "replays": [
+    {
+      "rules": {
+        "piece_counts": {
+          "queen": 1,
+          "beetle": 2,
+          "grasshopper": 3,
+          "spider": 2,
+          "ant": 3
+        },
+        "starting_player": "white",
+        "queen_by_turn": 4,
+        "allow_queen_first_turn": true,
+        "move_before_queen": false,
+        "max_turns": null
+      },
+      "white": {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 2
+        },
+        "label": "previous"
+      },
+      "black": {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 4
+        },
+        "label": "threads4"
+      },
+      "seed": 8889166143547984643,
+      "budget_s": 1.0,
+      "decisions": [
+        {
+          "ply": 0,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0009145889780484,
+          "overrun_s": 0.0012195249437354505,
+          "close_reason": "deadline",
+          "candidates": 11,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              0,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 10,
+            "nodes": 3669268,
+            "score": 0.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  1,
+                  0
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  0
+                ],
+                "to": [
+                  1,
+                  -1
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  2,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  2,
+                  -2
+                ],
+                "to": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  1,
+                  2
+                ],
+                "to": [
+                  1,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  2,
+                  1
+                ],
+                "to": [
+                  2,
+                  -2
+                ]
+              }
+            ],
+            "nps": 4745132
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 1,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0006373510113917,
+          "overrun_s": 0.0015917110140435398,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -1,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 1874529,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -1,
+                  0
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  0
+                ],
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -2,
+                  0
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -1,
+                  1
+                ]
+              }
+            ],
+            "nps": 5740228
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 2,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0004249510238878,
+          "overrun_s": 0.001433679019100964,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              -1,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 5655058,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  0
+                ],
+                "to": [
+                  -1,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  2
+                ],
+                "to": [
+                  1,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  2,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  -2,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  2,
+                  -2
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              }
+            ],
+            "nps": 7367006
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 3,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.001304771983996,
+          "overrun_s": 0.0025313780060969293,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -2,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 1895141,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -2,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  1
+                ],
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  1
+                ],
+                "to": [
+                  -3,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              }
+            ],
+            "nps": 4690235
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 4,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.000650024972856,
+          "overrun_s": 0.001572486013174057,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              -2,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 6912247,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  -1,
+                  1
+                ],
+                "to": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  -2,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              }
+            ],
+            "nps": 7570840
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 5,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0009847730398178,
+          "overrun_s": 0.0017044740379787982,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              -3,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 1467679,
+            "score": -1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -3,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  -3,
+                  0
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  1
+                ],
+                "to": [
+                  -1,
+                  -1
+                ]
+              }
+            ],
+            "nps": 5833867
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 6,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0015141839976422,
+          "overrun_s": 0.0017234560218639672,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": [
+              -2,
+              2
+            ],
+            "to": [
+              -4,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1082964,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  -4,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  0,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              }
+            ],
+            "nps": 7302532
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 7,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0015840380219743,
+          "overrun_s": 0.002745345002040267,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              -3,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 1646660,
+            "score": -1.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -3,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  2
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  1,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              }
+            ],
+            "nps": 5094339
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 8,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.001682094996795,
+          "overrun_s": 0.0026188819902017713,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -5,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1448264,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -5,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              }
+            ],
+            "nps": 7491482
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 9,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0013855409924872,
+          "overrun_s": 0.002717608993407339,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -1,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 894436,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -6,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -6,
+                  1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 5234895
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 10,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0008281120099127,
+          "overrun_s": 0.0022028469829820096,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -4,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1632241,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  2
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              }
+            ],
+            "nps": 6729884
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 11,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0013995199697092,
+          "overrun_s": 0.0021567000076174736,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -1,
+              -1
+            ],
+            "to": [
+              -1,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1118828,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 6583666
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 12,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0006479859584942,
+          "overrun_s": 0.001303570985328406,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -4,
+              -1
+            ],
+            "to": [
+              -3,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 3274245,
+            "score": 0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 3861511
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 13,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0010900989873335,
+          "overrun_s": 0.0025385500048287213,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -2,
+              3
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1355261,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  3
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 7184217
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 14,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0009885299950838,
+          "overrun_s": 0.0012386059970594943,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -5,
+              1
+            ],
+            "to": [
+              -4,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1094455,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              }
+            ],
+            "nps": 5124216
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 15,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.001165688969195,
+          "overrun_s": 0.002852072997484356,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -2,
+              3
+            ],
+            "to": [
+              0,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 2055323,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 6211640
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 16,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.000789440004155,
+          "overrun_s": 0.001917746034450829,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -4,
+              1
+            ],
+            "to": [
+              -4,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 2710923,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  1
+                ],
+                "to": [
+                  -4,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  2
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              }
+            ],
+            "nps": 8274816
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 17,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0010867380187847,
+          "overrun_s": 0.0024508339702151716,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              0,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 3744031,
+            "score": 0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 4906461
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 18,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0012769710156135,
+          "overrun_s": 0.002038479025941342,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -4,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 3013069,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 7207049
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 19,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0013181820395403,
+          "overrun_s": 0.0015665750252082944,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              0,
+              -1
+            ],
+            "to": [
+              -2,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 939241,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  1
+                ]
+              }
+            ],
+            "nps": 3744054
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 20,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0007890340057202,
+          "overrun_s": 0.001015707035548985,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -4,
+              -1
+            ],
+            "to": [
+              -2,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 4217453,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  -3
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              }
+            ],
+            "nps": 9571043
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 21,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 0.8715957719832659,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -2,
+              0
+            ],
+            "to": [
+              -2,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 5773125,
+            "score": -999992.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  -3
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -5,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -3
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 6628323
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 22,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 0.3286489759921096,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -5,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 2953745,
+            "score": 999993.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -5,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  2
+                ],
+                "to": [
+                  -5,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 9003020
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 23,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 0.026072702021338046,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 7,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              -2,
+              3
+            ]
+          },
+          "last_info": {
+            "depth": 6,
+            "nodes": 136097,
+            "score": -999994.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  3
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  -6,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 5342225
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 24,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 0.010423913015983999,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 6,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -4,
+              2
+            ],
+            "to": [
+              -4,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 5,
+            "nodes": 74026,
+            "score": 999995.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  -5,
+                  -1
+                ]
+              }
+            ],
+            "nps": 7394680
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 25,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0010218730312772095,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 5,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": [
+              -2,
+              3
+            ],
+            "to": [
+              -6,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 4,
+            "nodes": 1863,
+            "score": -999996.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  -6,
+                  0
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 3313325
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 26,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0007080300129018724,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 4,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -2,
+              -2
+            ]
+          },
+          "last_info": {
+            "depth": 3,
+            "nodes": 1305,
+            "score": 999997.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 3369168
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 27,
+          "player": "black",
+          "agent_label": "threads4",
+          "seed": 7262059062787020259,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00042606599163264036,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 3,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -2,
+              1
+            ],
+            "to": [
+              -2,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 2,
+            "nodes": 166,
+            "score": -999998.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 1701901
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 28,
+          "player": "white",
+          "agent_label": "previous",
+          "seed": 5834096385479329674,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00024699000641703606,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -2,
+              -2
+            ],
+            "to": [
+              -2,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 32,
+            "score": 999999.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 3197442
+          },
+          "worker_restarted": false,
+          "failure": null
+        }
+      ],
+      "outcome": "win",
+      "winner": "white",
+      "duration_s": 22.52443668601336
+    },
+    {
+      "rules": {
+        "piece_counts": {
+          "queen": 1,
+          "beetle": 2,
+          "grasshopper": 3,
+          "spider": 2,
+          "ant": 3
+        },
+        "starting_player": "white",
+        "queen_by_turn": 4,
+        "allow_queen_first_turn": true,
+        "move_before_queen": false,
+        "max_turns": null
+      },
+      "white": {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 4
+        },
+        "label": "threads4"
+      },
+      "black": {
+        "kind": "negamax",
+        "params": {
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 2
+        },
+        "label": "previous"
+      },
+      "seed": 7661244365878278962,
+      "budget_s": 1.0,
+      "decisions": [
+        {
+          "ply": 0,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0005203179898672,
+          "overrun_s": 0.0010150800226256251,
+          "close_reason": "deadline",
+          "candidates": 11,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              0,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 10,
+            "nodes": 2256305,
+            "score": 0.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  1,
+                  0
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  0
+                ],
+                "to": [
+                  1,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  2,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  1,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  3,
+                  0
+                ]
+              }
+            ],
+            "nps": 4290921
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 1,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0007523259846494,
+          "overrun_s": 0.0016620149835944176,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -1,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 2387254,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -1,
+                  0
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  0
+                ],
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -2,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -2
+                ]
+              }
+            ],
+            "nps": 5796111
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 2,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0010335660190322,
+          "overrun_s": 0.0020795430173166096,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              -1,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 5120384,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  0
+                ],
+                "to": [
+                  -1,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  1,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  -2,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  2
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              }
+            ],
+            "nps": 6907102
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 3,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0011854069889523,
+          "overrun_s": 0.0022623210097663105,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -2,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 2434915,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -2,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  1
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  1
+                ],
+                "to": [
+                  -3,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  -1
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              }
+            ],
+            "nps": 5093466
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 4,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0004956349730492,
+          "overrun_s": 0.0015692029846832156,
+          "close_reason": "deadline",
+          "candidates": 10,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              -2,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 9,
+            "nodes": 5558789,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -3,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -2
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              }
+            ],
+            "nps": 6807221
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 5,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0009569519897923,
+          "overrun_s": 0.0017300709732808173,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              -3,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 1546637,
+            "score": -1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -3,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "queen",
+                "from": [
+                  -3,
+                  0
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -3,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -2
+                ],
+                "to": [
+                  -3,
+                  0
+                ]
+              }
+            ],
+            "nps": 6366131
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 6,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0001789689995348,
+          "overrun_s": 0.0005989049677737057,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": [
+              -2,
+              2
+            ],
+            "to": [
+              -4,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 753164,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  2
+                ],
+                "to": [
+                  -4,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  1,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              }
+            ],
+            "nps": 6523812
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 7,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0005122320144437,
+          "overrun_s": 0.001085427007637918,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              -3,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 1835640,
+            "score": -1.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  3
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  3
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              }
+            ],
+            "nps": 5376030
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 8,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0003612309810705,
+          "overrun_s": 0.0015384579892270267,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -5,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1296752,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -5,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              }
+            ],
+            "nps": 7255457
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 9,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0007769339717925,
+          "overrun_s": 0.0010686659952625632,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -1,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 935745,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  0
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  0
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 5414405
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 10,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.000639719015453,
+          "overrun_s": 0.0017201390000991523,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -4,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1656007,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -3,
+                  -2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              }
+            ],
+            "nps": 6575244
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 11,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0015317719662562,
+          "overrun_s": 0.0024731879821047187,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -1,
+              -1
+            ],
+            "to": [
+              -1,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1334193,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 6599781
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 12,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0003163199871778,
+          "overrun_s": 0.0006476039998233318,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -4,
+              -1
+            ],
+            "to": [
+              -3,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 2898831,
+            "score": 0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -3,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -3,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -3
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  -3,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  -3
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              }
+            ],
+            "nps": 3930635
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 13,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0016234680078924,
+          "overrun_s": 0.002212252002209425,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -2,
+              3
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 1549062,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  3
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -5,
+                  3
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  3
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 7474324
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 14,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0008279829635285,
+          "overrun_s": 0.002616684010718018,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -5,
+              1
+            ],
+            "to": [
+              -4,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 3767882,
+            "score": 0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -5,
+                  1
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -3,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  -2
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  2
+                ]
+              }
+            ],
+            "nps": 3805647
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 15,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0012026900076307,
+          "overrun_s": 0.0019898360478691757,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -2,
+              3
+            ],
+            "to": [
+              0,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 2218091,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -3,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 6582124
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 16,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0006062780157663,
+          "overrun_s": 0.001665680028963834,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -4,
+              1
+            ],
+            "to": [
+              -4,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 2576988,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  1
+                ],
+                "to": [
+                  -4,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -4,
+                  0
+                ],
+                "to": [
+                  0,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -2
+                ],
+                "to": [
+                  -4,
+                  0
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  2
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              }
+            ],
+            "nps": 7703111
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 17,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0009482860332355,
+          "overrun_s": 0.0015292250318452716,
+          "close_reason": "deadline",
+          "candidates": 9,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              0,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 8,
+            "nodes": 3586060,
+            "score": 0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  2
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 4793612
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 18,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.001286828017328,
+          "overrun_s": 0.0020618020207621157,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -4,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 2329211,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 7438735
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 19,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0011652520042844,
+          "overrun_s": 0.001421419030521065,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              0,
+              -1
+            ],
+            "to": [
+              -2,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 896034,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -1,
+                  -2
+                ]
+              }
+            ],
+            "nps": 3774365
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 20,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 1.0006671770242974,
+          "overrun_s": 0.0014799199998378754,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -4,
+              -1
+            ],
+            "to": [
+              -2,
+              -1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 3230133,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -4,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  -3
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -4,
+                  -1
+                ]
+              }
+            ],
+            "nps": 9729788
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 21,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 1.001116961997468,
+          "overrun_s": 0.0013465199735946953,
+          "close_reason": "deadline",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -2,
+              0
+            ],
+            "to": [
+              -2,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 422935,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  0,
+                  -1
+                ],
+                "to": [
+                  -1,
+                  -3
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -5,
+                  2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -1,
+                  -3
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 2225321
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 22,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 0.3234810730209574,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 8,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -5,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 7,
+            "nodes": 2870571,
+            "score": 999993.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -5,
+                  0
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  2
+                ],
+                "to": [
+                  -1,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -5,
+                  0
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -1
+                ],
+                "to": [
+                  -5,
+                  3
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -1,
+                  -2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -1,
+                  0
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -1,
+                  -2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              }
+            ],
+            "nps": 8890516
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 23,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 0.023229196027386934,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 7,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              -2,
+              3
+            ]
+          },
+          "last_info": {
+            "depth": 6,
+            "nodes": 125592,
+            "score": -999994.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  -2,
+                  3
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  -5,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -5,
+                  -1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -5,
+                  0
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 5520974
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 24,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 0.010054397978819907,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 6,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -4,
+              2
+            ],
+            "to": [
+              -4,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 5,
+            "nodes": 65933,
+            "score": 999995.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -4,
+                  2
+                ],
+                "to": [
+                  -4,
+                  1
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  -5,
+                  -1
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 6866602
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 25,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0007674489752389491,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 5,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": [
+              -2,
+              3
+            ],
+            "to": [
+              -6,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 4,
+            "nodes": 1184,
+            "score": -999996.0,
+            "pv": [
+              {
+                "piece": "ant",
+                "from": [
+                  -2,
+                  3
+                ],
+                "to": [
+                  -6,
+                  0
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              }
+            ],
+            "nps": 2584617
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 26,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0005847169668413699,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 4,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -2,
+              -2
+            ]
+          },
+          "last_info": {
+            "depth": 3,
+            "nodes": 970,
+            "score": 999997.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -2,
+                  -2
+                ]
+              },
+              {
+                "piece": "ant",
+                "from": null,
+                "to": [
+                  0,
+                  -1
+                ]
+              }
+            ],
+            "nps": 3274151
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 27,
+          "player": "black",
+          "agent_label": "previous",
+          "seed": 4619318108687572534,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00034249399323016405,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 3,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": [
+              -2,
+              1
+            ],
+            "to": [
+              -2,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 2,
+            "nodes": 166,
+            "score": -999998.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -2,
+                  2
+                ]
+              },
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 1438213
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 28,
+          "player": "white",
+          "agent_label": "threads4",
+          "seed": 955187382246957688,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0003464620094746351,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": [
+              -2,
+              -2
+            ],
+            "to": [
+              -2,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 32,
+            "score": 999999.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": [
+                  -2,
+                  -2
+                ],
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 2419843
+          },
+          "worker_restarted": false,
+          "failure": null
+        }
+      ],
+      "outcome": "win",
+      "winner": "white",
+      "duration_s": 22.509789358999114
+    }
+  ],
+  "duration_s": 45.03471915400587,
+  "version": 2
+}

@@ -101,9 +101,9 @@ does not find (candidates in `rust-core.md` §Engine representation and optimisa
 
 ### Repetition (WP 30)
 
-Implemented in the Rust core after WP 45: the position key and history live in the Rust
-`GameState`, the repetition draw in `Rules`, and the draw scoring and tie-breaking in the
-Rust search.
+Planned for the Rust core after WP 45: position history in `GameState`, a repetition
+draw in `Rules`, and draw scoring and seeded tie-breaking in the search. The current
+engine has a position hash but does not yet adjudicate repetition.
 
 The first nm2 vs nm3 gauntlet (WP 09, seed 42, 2 s per move, 100 turns) drew all four
 games at the turn cap. In one game the black agent blocked every white move and then
@@ -120,7 +120,8 @@ gauntlets measure strength rather than stalling:
 
 ### Search and tuning (WP 28)
 
-Implemented in the Rust search kernel (`rust-core.md` §Search kernel), on top of WP 30:
+Implemented in the Rust search kernel (`rust-core.md` §Search kernel); repetition
+awareness will be integrated through WP 30:
 
 - Alpha-beta pruning in negamax, move ordering (moves that fill the opponent queen's
   free neighbors first, killer moves, history heuristic), transposition table keyed by Zobrist hash, iterative deepening
@@ -180,8 +181,163 @@ depths). Time to reach a depth with `negamax`, median of 3 runs on the Ryzen 7 5
 
 The table, killers and history apply to `negamax` (param `table_megabytes`, default 32,
 zero turns them off); `minimax` keeps plain alpha-beta. The table is kept between the
-decisions of a match and cleared by `reset`. Not done yet: lazy SMP threads, aspiration
-windows and evaluator tuning.
+decisions of a match and cleared by `reset`. The continuation below adds optional search refinements and evaluates weights.
+
+
+### Search continuation and weight tuning (WP 28)
+
+The continuation adds three independently configurable search options:
+
+- `aspiration_window`: start each new depth near the previous score and widen failed
+  windows geometrically. Only a completed search inside its window is reported.
+- `principal_variation_search`: scout later moves with the smallest representable score
+  window, then re-search improvements with the full window. This supports fractional
+  evaluator weights without assuming integral scores.
+- `threads`: lazy SMP with one reporting thread and diversified helper root orders. The
+  transposition table is shared through striped locks; one-thread searches avoid locks.
+  Helpers only poll a cancellation flag and never call Python. Scope exit cancels and
+  joins them, including when the observer panics. Reported nodes/NPS count the main
+  thread, not total work across helpers. The configured table budget is shared.
+
+Table score cutoffs now require the same remaining depth. A deeper heuristic search is
+not generally the score of a shallower search; this matters with a warm table or helpers
+searching different depths. Other-depth entries still supply move ordering. Tests compare
+scores with full search, re-use warm tables, replay PV moves, and check cancellation and
+state restoration. Gauntlet CLI concurrency accounts for the largest thread count.
+
+Depth measurements use `scripts/bench_search.py`, a fresh agent per position, one second
+(three repetitions) and ten seconds (one observation per position). The four distinct
+positions are `start`, `long_hive`, `ant_moves`, and `beetle_gate`, using the perft suite
+rules (queen-first opening disabled). Gauntlets and tuning use the app default rules,
+which allow a queen-first opening. An initial run included
+`tournament_opening`, which is identical to `start` under the suite rules; it was replaced
+by a separate serial measurement of `beetle_gate` before calculating the final summaries.
+Searches run sequentially, separately from tuning. Completed depths only are counted.
+These are wall-clock measurements on the Ryzen 7 5800H, not guarantees for other machines.
+
+| Cumulative change | 1 s mean | 1 s maximum | 10 s mean | 10 s maximum |
+|---|---:|---:|---:|---:|
+| Alpha-beta only | 6.75 | 8 | 7.75 | 9 |
+| Table + killers + history (#89) | 8.25 | 10 | 9.75 | 11 |
+| + aspiration (0.5) | 8.25 | 10 | 9.75 | 11 |
+| + principal-variation search | 8.25 | 10 | 9.75 | 11 |
+| + 2 threads | 8.25 | 10 | 10.00 | 11 |
+| 4 threads instead of 2 | 8.33 | 10 | 10.00 | 11 |
+
+The table gives +2 maximum plies over alpha-beta at both budgets. Each subsequent change
+adds **zero** to the global maximum, which is set by the opening. Two threads do add one
+ply to `beetle_gate` at ten seconds (9 to 10), while four add no further depth there. Four
+threads complete an extra ply on one of three one-second `beetle_gate` runs; that marginal
+result should not be treated as a reliable one-ply gain. Ten-second per-position results:
+
+| Configuration | start | long_hive | ant_moves | beetle_gate |
+|---|---:|---:|---:|---:|
+| Alpha-beta | 9 | 7 | 7 | 8 |
+| Table | 11 | 9 | 10 | 9 |
+| + aspiration | 11 | 9 | 10 | 9 |
+| + PVS | 11 | 9 | 10 | 9 |
+| + 2 threads | 11 | 9 | 10 | 10 |
+| 4 threads | 11 | 9 | 10 | 10 |
+
+Depth is coarse: saving time does not necessarily complete another whole ply. Median
+seconds to complete the same depth in the one-second runs (`nodes / nps`, rounded):
+
+| Configuration | start depth 10 | long_hive depth 7 | ant_moves depth 8 |
+|---|---:|---:|---:|
+| Table | 0.933 | 0.486 | 0.484 |
+| + aspiration | 0.896 | 0.374 | 0.355 |
+| + PVS | 0.817 | 0.376 | 0.340 |
+| + 2 threads | 0.640 | 0.426 | 0.278 |
+| 4 threads | 0.598 | 0.475 | 0.266 |
+
+Thus aspiration saves about 23% on `long_hive` and 27% on `ant_moves`; PVS helps the opening
+by another 9% but is neutral on `long_hive`. SMP helps some positions and hurts others.
+All three remain options, with the existing defaults preserved (window 0, PVS false,
+threads 1). Two threads are the better resource tradeoff in this sample. Raw observations
+are `reports/wp28-{alpha-beta,table,aspiration,pvs,threads2,threads4}-{1,10}s.json`.
+
+Each new option also played its predecessor for two colour-swapped games at one second
+per move, seed 0, cap 30 turns (`wp28-{aspiration,pvs,threads2,threads4}-gauntlet.json`).
+Every pairing finished 1–1, with white winning both games; none recorded failures,
+restarts, overruns or illegal submissions. These small matches are smoke tests, not
+strength significance tests. Candidate mean/maximum completed depths were:
+
+| Change | Previous mean / maximum | Candidate mean / maximum |
+|---|---:|---:|
+| Aspiration | 6.72 / 9 | 6.72 / 9 |
+| PVS | 6.76 / 9 | 6.76 / 9 |
+| Two threads | 6.72 / 9 | 6.79 / 10 |
+| Four threads | 6.79 / 10 | 6.86 / 10 |
+
+The requested #89 self-play rerun is `reports/wp28-baseline-gauntlet.json`: two games,
+one second per move, seed 0, 30 turns maximum, one concurrent match. Its participants
+average 6.7 and 6.6 plies respectively, versus the earlier alpha-beta report's 5.4. Both
+games finish in wins, with no worker failures, illegal submissions or recorded overruns.
+Self-play depth is descriptive; the fixed suite above is the controlled speed comparison.
+
+
+The tuning harness, `scripts/tune_search.py`, uses eight seeded legal opening plies,
+then plays both colours from each opening against a fixed opponent. Every move is checked
+by the engine. A turn cap counts as a draw, never as a heuristic win. All moves, openings,
+parameters and decision depths are retained in the JSON reports. The screening round uses
+seeds 0–3, eight candidates, 0.1 seconds per decision and 120 plies maximum (64 games).
+Validation uses disjoint seeds 100–107 and 0.5 seconds per decision. Jobs times search
+threads must fit the CPU count. The two material terms are negatives in the base game,
+so only on-board material is varied; queen safety stays at 1 to fix the weight scale.
+
+| Candidate (queen safety stays 1) | Screening, 0.1 s (8 games) | Validation, 0.5 s (16 games) |
+|---|---:|---:|
+| positioning 0.25 | 81.25% | 53.125% |
+| positioning 0.5 | 81.25% | 40.625% |
+| material_on_board 0.05 | 62.5% | 62.5% |
+| material_on_board 0.1 | 56.25% | not advanced |
+| positioning 0.5, material_on_board 0.1 | 43.75% | not advanced |
+| mobility 0.02 | 62.5% | 56.25% |
+| mobility 0.1 | 43.75% | not advanced |
+| mobility 0.05, positioning 0.5, material_on_board 0.1 | 62.5% | 50% |
+
+Percentages are points per game (win 1, draw 0.5). The initial positioning finalists did
+not convincingly improve on the baseline, so three other screening candidates were also
+validated on the same held-out opening set. Material 0.05 led with 6 wins, 8 draws and
+2 losses. A separate confirmation on seeds 200–203, both colours, at **one second** yielded
+3 wins, 2 draws and 3 losses: **50%**. Across screening, validation and confirmation this
+is 152 games. There is no statistically established weight improvement, so **the default
+weights are retained**. The requirement in issue #39 to establish a significant strength
+increase remains open; this work must not close that issue on speed evidence alone.
+
+The material candidate's fixed-suite maximum stays 10 at one second and 11 at ten seconds
+(zero improvement); its mean stays 8.25 at one second and drops from 9.75 to 9.50 at ten
+seconds (`ant_moves` drops from 10 to 9). Those observations are in `wp28-tuned-{1,10}s.json`.
+Raw tuning reports are `wp28-tuning-{screen,validation,additional,confirmation}.json`.
+
+The app's default-rule opening also reaches **11 completed plies at ten seconds**, both
+with default search options and with aspiration/PVS/two threads, recorded separately in
+`wp28-app-{default,smp}-10s.json`. The new `nm-smp` preset exposes the tested two-thread
+configuration with the original evaluator. It is a performance option, not a claim of
+statistically established playing superiority. Existing defaults stay compatible.
+
+Validation: `make check api-client test test-slow` passes: 1,099 regular Python tests,
+10 slow Python tests, 209 frontend tests, and all Rust tests including the large perft
+case. The generated API client is unchanged. Search tests cover warm-table score parity,
+fractional PVS/aspiration windows, 1/2/4 threads, legal variations, state restoration,
+cancellation and observer panic; boundary and gauntlet CPU-accounting tests pass.
+
+
+Reproduce from the repo root after `uv sync`:
+
+```sh
+uv run python scripts/bench_search.py --budget 10 --repeat 3 \
+  --params '{"aspiration_window": 0.5, "principal_variation_search": true}' \
+  --out reports/wp28-repeat-10s.json
+uv run python scripts/tune_search.py --candidates candidates.json --budget 0.5 \
+  --pairs 8 --seed 100 --jobs 4 --out reports/wp28-validation-repeat.json
+```
+
+The `candidates` mapping inside the screening/validation report is the contents to use
+for `candidates.json`. Exact timed decisions can differ between runs. Screening and
+validation are evidence against the tested opponents and openings, not proof of optimal
+weights or experienced-human strength. Repetition handling (WP 30) remains a separate
+engine/search task; these experiments use the explicit turn cap for non-finishing games.
 
 ## Baseline numbers
 

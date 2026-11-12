@@ -40,16 +40,19 @@ GAUNTLET_ELO_PRIOR_GAMES = 1.0
 """Virtual drawn games added to every pairing, which keeps Elo finite for perfect play."""
 
 
-def default_gauntlet_jobs() -> int:
+def default_gauntlet_jobs(threads: int = 1) -> int:
     """Get the default and largest fair number of concurrent matches.
 
     A match has two worker processes, but only the seat to move thinks, so every match
-    keeps about one CPU busy.
+    keeps `threads` CPUs busy at most.
+
+    Args:
+        threads: The largest search thread count of any participant.
 
     Returns:
-        The number of CPUs, and at least one.
+        The number of matches that fit the CPUs, and at least one.
     """
-    return os.cpu_count() or 1
+    return max(1, (os.cpu_count() or 1) // threads)
 
 
 def wilson_interval(proportion: float, count: int, z: float) -> tuple[float, float]:

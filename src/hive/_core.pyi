@@ -734,6 +734,9 @@ class Searcher:
         stop_check_interval: int = 1024,
         alpha_beta: bool = True,
         table_megabytes: int = 32,
+        aspiration_window: float = 0.0,
+        threads: int = 1,
+        principal_variation_search: bool = False,
     ) -> None:
         """Create a searcher.
 
@@ -756,9 +759,12 @@ class Searcher:
                 far fewer nodes but may choose another of several equally scored moves.
             table_megabytes: The size of the transposition table in MB, zero for none.
                 Negamax with alpha-beta uses it and orders moves by killers and history.
+            aspiration_window: Initial score half-window, zero to disable aspiration.
+            threads: Total negamax search threads sharing one table, at least one.
+            principal_variation_search: Scout later moves before a full-window search.
 
         Raises:
-            ValueError: If `algorithm` is unknown or `depth` is less than one.
+            ValueError: If the algorithm, depth, window or thread count is invalid.
         """
 
     def clear(self) -> None:

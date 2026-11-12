@@ -1,0 +1,401 @@
+{
+  "machine": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+  "params": {
+    "aspiration_window": 0.5,
+    "principal_variation_search": true,
+    "threads": 2
+  },
+  "budget_s": 10.0,
+  "repeat": 1,
+  "mean_depth": 10,
+  "max_depth": 11,
+  "observations": [
+    {
+      "repeat": 0,
+      "position": "start",
+      "depth": 11,
+      "nodes": 30928562,
+      "score": 1.0,
+      "pv": [
+        {
+          "piece": "beetle",
+          "from": null,
+          "to": [
+            0,
+            0
+          ]
+        },
+        {
+          "piece": "beetle",
+          "from": null,
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": null,
+          "to": [
+            0,
+            -1
+          ]
+        },
+        {
+          "piece": "beetle",
+          "from": null,
+          "to": [
+            2,
+            0
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": null,
+          "to": [
+            -1,
+            -1
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": null,
+          "to": [
+            3,
+            0
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            -1,
+            -1
+          ],
+          "to": [
+            -1,
+            1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": null,
+          "to": [
+            2,
+            -1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            2,
+            -2
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": [
+            3,
+            0
+          ],
+          "to": [
+            2,
+            1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            2,
+            -2
+          ],
+          "to": [
+            1,
+            2
+          ]
+        }
+      ],
+      "nps": 4285231
+    },
+    {
+      "repeat": 0,
+      "position": "long_hive",
+      "depth": 9,
+      "nodes": 38963982,
+      "score": 3.0,
+      "pv": [
+        {
+          "piece": "ant",
+          "from": [
+            -10,
+            0
+          ],
+          "to": [
+            11,
+            1
+          ]
+        },
+        null,
+        {
+          "piece": "ant",
+          "from": [
+            -9,
+            0
+          ],
+          "to": [
+            2,
+            -1
+          ]
+        },
+        null,
+        {
+          "piece": "ant",
+          "from": [
+            -8,
+            0
+          ],
+          "to": [
+            1,
+            1
+          ]
+        },
+        null,
+        {
+          "piece": "ant",
+          "from": [
+            1,
+            1
+          ],
+          "to": [
+            2,
+            1
+          ]
+        },
+        null,
+        {
+          "piece": "ant",
+          "from": [
+            11,
+            1
+          ],
+          "to": [
+            1,
+            1
+          ]
+        }
+      ],
+      "nps": 8070441
+    },
+    {
+      "repeat": 0,
+      "position": "ant_moves",
+      "depth": 10,
+      "nodes": 43427205,
+      "score": -1.0,
+      "pv": [
+        {
+          "piece": "ant",
+          "from": [
+            2,
+            -1
+          ],
+          "to": [
+            1,
+            -5
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            4,
+            -6
+          ],
+          "to": [
+            3,
+            -5
+          ]
+        },
+        {
+          "piece": "grasshopper",
+          "from": [
+            1,
+            -6
+          ],
+          "to": [
+            1,
+            -4
+          ]
+        },
+        {
+          "piece": "spider",
+          "from": [
+            5,
+            -6
+          ],
+          "to": [
+            7,
+            -6
+          ]
+        },
+        {
+          "piece": "grasshopper",
+          "from": [
+            2,
+            -5
+          ],
+          "to": [
+            0,
+            -3
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            3,
+            -5
+          ],
+          "to": [
+            -1,
+            1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            -1,
+            -4
+          ],
+          "to": [
+            2,
+            1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            6,
+            -6
+          ],
+          "to": [
+            -2,
+            1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            2,
+            -6
+          ],
+          "to": [
+            1,
+            1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            2,
+            -4
+          ],
+          "to": [
+            0,
+            -1
+          ]
+        }
+      ],
+      "nps": 7948797
+    },
+    {
+      "repeat": 0,
+      "position": "beetle_gate",
+      "depth": 10,
+      "nodes": 46247648,
+      "score": -3.0,
+      "pv": [
+        {
+          "piece": "beetle",
+          "from": [
+            0,
+            0
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "piece": "spider",
+          "from": null,
+          "to": [
+            1,
+            -2
+          ]
+        },
+        {
+          "piece": "beetle",
+          "from": [
+            1,
+            0
+          ],
+          "to": [
+            1,
+            1
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": [
+            1,
+            -1
+          ],
+          "to": [
+            2,
+            -1
+          ]
+        },
+        null,
+        {
+          "piece": "ant",
+          "from": [
+            2,
+            1
+          ],
+          "to": [
+            0,
+            -2
+          ]
+        },
+        null,
+        {
+          "piece": "beetle",
+          "from": [
+            1,
+            0
+          ],
+          "to": [
+            2,
+            -1
+          ]
+        },
+        null,
+        {
+          "piece": "beetle",
+          "from": [
+            0,
+            -1
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        }
+      ],
+      "nps": 7957114
+    }
+  ],
+  "protocol_note": "Replaced duplicate tournament_opening with beetle_gate in a subsequent serial run."
+}

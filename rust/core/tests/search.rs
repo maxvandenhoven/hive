@@ -46,6 +46,9 @@ fn decide(
         stop_check_interval: 32,
         alpha_beta,
         table_megabytes: 16,
+        aspiration_window: 0.0,
+        threads: 1,
+        principal_variation_search: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut recorder = Recorder::default();
@@ -138,6 +141,9 @@ fn a_forced_win_is_final_at_depth_one() {
         stop_check_interval: 32,
         alpha_beta: true,
         table_megabytes: 16,
+        aspiration_window: 0.0,
+        threads: 1,
+        principal_variation_search: false,
     };
     let mut recorder = Recorder::default();
     Searcher::new(rules, config).think(&mut state, &mut recorder);
@@ -206,4 +212,131 @@ fn negamax_orders_its_moves_better_than_minimax() {
 
     assert_eq!(scores(&negamax_reports), scores(&minimax_reports));
     assert!(negamax.nodes() < minimax.nodes());
+}
+
+#[test]
+fn aspiration_and_helpers_preserve_scores_and_state_with_a_warm_table() {
+    for name in ["long_hive", "ant_moves", "tournament_opening"] {
+        let (rules, state) = suite_position(name);
+        let weights = EvaluationWeights {
+            positioning: 0.5,
+            material_on_board: 0.1,
+            ..Default::default()
+        };
+        let (_, reference) = decide(
+            rules,
+            &mut state.clone(),
+            SearchAlgorithm::Negamax,
+            3,
+            weights,
+            false,
+        );
+        let expected: Vec<_> = reference.reports.iter().map(|r| r.score).collect();
+
+        for threads in [1, 2, 4] {
+            let config = SearchConfig {
+                algorithm: SearchAlgorithm::Negamax,
+                depth: Some(3),
+                weights,
+                stop_check_interval: 32,
+                alpha_beta: true,
+                table_megabytes: 1,
+                aspiration_window: 0.01,
+                threads,
+                principal_variation_search: true,
+            };
+            let mut searcher = Searcher::new(rules, config);
+
+            for _ in 0..2 {
+                let mut position = state.clone();
+                let mut recorder = Recorder::default();
+                searcher.think(&mut position, &mut recorder);
+                assert_eq!(position, state);
+                let scores: Vec<_> = recorder.reports.iter().map(|r| r.score).collect();
+                assert_eq!(scores, expected, "{name}, {threads} threads");
+
+                for report in &recorder.reports {
+                    let mut replay = state.clone();
+                    for mv in &report.principal_variation {
+                        let mut legal = Vec::new();
+                        rules.legal_moves(&mut replay, &mut legal);
+                        assert!(mv.map_or(legal.is_empty(), |mv| {
+                            legal.iter().any(|&packed| replay.decode(packed) == mv)
+                        }));
+                        replay.apply_coord_move(*mv).expect("legal variation");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Stops during a depth, including while helpers are still searching.
+struct StopObserver {
+    /// Remaining checks until cancellation.
+    remaining: u32,
+    /// Completed reports.
+    reports: Vec<DepthReport>,
+}
+
+impl SearchObserver for StopObserver {
+    fn should_stop(&mut self) -> bool {
+        self.remaining = self.remaining.saturating_sub(1);
+        self.remaining == 0
+    }
+    fn report(&mut self, report: &DepthReport) {
+        self.reports.push(report.clone());
+    }
+}
+
+#[test]
+fn cancellation_joins_helpers_and_restores_the_position() {
+    let (rules, mut state) = suite_position("long_hive");
+    let before = state.clone();
+    let config = SearchConfig {
+        algorithm: SearchAlgorithm::Negamax,
+        depth: None,
+        weights: EvaluationWeights::default(),
+        stop_check_interval: 1,
+        alpha_beta: true,
+        table_megabytes: 1,
+        aspiration_window: 0.01,
+        threads: 4,
+        principal_variation_search: true,
+    };
+    let mut searcher = Searcher::new(rules, config);
+    let mut observer = StopObserver { remaining: 200, reports: Vec::new() };
+    searcher.think(&mut state, &mut observer);
+    assert_eq!(state, before);
+    assert!(observer.reports.iter().all(|report| !report.is_final));
+    searcher.clear();
+}
+
+/// A failing client must not leave scoped helpers running indefinitely.
+struct PanickingObserver;
+
+impl SearchObserver for PanickingObserver {
+    fn should_stop(&mut self) -> bool {
+        panic!("client observer failed");
+    }
+
+    fn report(&mut self, _report: &DepthReport) {}
+}
+
+#[test]
+#[should_panic(expected = "client observer failed")]
+fn observer_panic_cancels_helpers_before_joining() {
+    let (rules, mut state) = suite_position("long_hive");
+    let config = SearchConfig {
+        algorithm: SearchAlgorithm::Negamax,
+        depth: None,
+        weights: EvaluationWeights::default(),
+        stop_check_interval: 32,
+        alpha_beta: true,
+        table_megabytes: 1,
+        aspiration_window: 0.5,
+        threads: 2,
+        principal_variation_search: true,
+    };
+    Searcher::new(rules, config).think(&mut state, &mut PanickingObserver);
 }

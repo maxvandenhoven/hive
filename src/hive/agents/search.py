@@ -47,6 +47,9 @@ class SearchAgent(Agent):
         material_in_hand: The weight of the in-hand material term.
         alpha_beta: Whether the search prunes with alpha-beta.
         table_megabytes: The size of the transposition table in MB.
+        aspiration_window: Initial score half-window, zero to disable aspiration.
+        threads: Total negamax search threads sharing one table.
+        principal_variation_search: Whether to scout later moves with a narrow window.
         searcher: The search of the Rust core, configured with the params.
         nodes: The number of nodes the last decision visited.
     """
@@ -70,6 +73,9 @@ class SearchAgent(Agent):
         material_in_hand: float = 0.0,
         alpha_beta: bool = True,
         table_megabytes: Annotated[int, Field(ge=0)] = 32,
+        aspiration_window: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0,
+        threads: Annotated[int, Field(ge=1, le=256)] = 1,
+        principal_variation_search: bool = False,
     ) -> None:
         """Initialize the search agent.
 
@@ -93,6 +99,9 @@ class SearchAgent(Agent):
             table_megabytes: The size of the transposition table in MB, zero for none.
                 `negamax` with alpha-beta uses it, and orders moves by killer moves and a
                 history table too; it is kept between decisions of a match.
+            aspiration_window: Initial score half-window, zero to disable aspiration.
+            threads: Total negamax search threads sharing one table, at least one.
+            principal_variation_search: Scout later moves before a full-window search.
         """
         super().__init__(rules=rules, seed=seed)
         self.depth = depth
@@ -103,6 +112,9 @@ class SearchAgent(Agent):
         self.material_in_hand = material_in_hand
         self.alpha_beta = alpha_beta
         self.table_megabytes = table_megabytes
+        self.aspiration_window = aspiration_window
+        self.threads = threads
+        self.principal_variation_search = principal_variation_search
         self.searcher = Searcher(
             rules,
             algorithm=self.ALGORITHM,
@@ -115,6 +127,9 @@ class SearchAgent(Agent):
             stop_check_interval=self.STOP_CHECK_INTERVAL,
             alpha_beta=alpha_beta,
             table_megabytes=table_megabytes,
+            aspiration_window=aspiration_window,
+            threads=threads,
+            principal_variation_search=principal_variation_search,
         )
         self.nodes = 0
 

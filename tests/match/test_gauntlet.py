@@ -388,3 +388,15 @@ class TestRun:
 
         with pytest.raises(AgentWorkerError):
             config.run()
+
+
+def test_search_threads_reduce_fair_parallel_matches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only one seat thinks at a time, but that seat can occupy several CPUs."""
+    from hive.match.gauntlet import default_gauntlet_jobs
+
+    monkeypatch.setattr("hive.match.gauntlet.os.cpu_count", lambda: 8)
+    assert default_gauntlet_jobs() == 8
+    assert default_gauntlet_jobs(threads=4) == 2
+    assert default_gauntlet_jobs(threads=16) == 1
