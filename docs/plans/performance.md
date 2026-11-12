@@ -1,9 +1,11 @@
 # Performance: engine speed (M6) and agent strength (M7)
 
 Correctness comes first (M1, perft parity). Only then does a separate round make the engine
-faster (M6), and after that the agents stronger (M7). Each speed stage happens only if the
-previous one is not enough. Agent strength is measured by gauntlets between agents, and
-the goal of M7 is an agent that beats an experienced human player.
+faster (M6), and after that the agents stronger (M7). The speed round went from profiling
+the Python engine (stage 1) to a Rust core for the engine and the search (stage 2, D30,
+D31), with autoresearch on the Rust core for the long tail (stage 3). Agent strength is
+measured by gauntlets between agents, and the goal of M7 is an agent that beats an
+experienced human player.
 
 ## Stage 1: profiling and targeted speedups (WP 27)
 
@@ -23,28 +25,85 @@ the goal of M7 is an agent that beats an experienced human player.
   were the hot spot, not articulation points, so neither incremental articulation points
   nor Zobrist hashing were needed. See "Engine benchmark (WP 27)" below.
 
-## Stage 2: autoresearch (WP 29)
+## Stage 2: Rust core (WP 42 to 45)
 
-An agent-driven optimisation loop on the engine:
+WP 27 left the time spread over Python loops, dict lookups and object construction, and a
+spike (2026-11-12) showed what a Rust core gives: perft and negamax entirely in Rust were
+40 to 83 times faster than the WP 27 engine (62M nodes/s for `perft-start-5`, 14M for
+`negamax-long-3`), with legal moves and perft counts identical on all suite positions. A
+Python search loop over a Rust engine only reached 4.7 times on `negamax-long-3`, because
+the loop itself costs about 1 µs per node, so the search moves to Rust too. The numbers,
+the design and the correctness gates are in `rust-core.md`.
 
-- Objective: perft nodes/s on the benchmark positions (median of several runs).
-- Hard gates: perft parity at all reference depths, full test suite green, type check green.
+- WP 42: toolchain, Cargo workspace, maturin build, lints, Make targets, hooks, CI and the
+  stub pipeline, with a minimal `hive._core` (`tooling.md` §Rust).
+- WP 43: the engine in pure Rust (`hive-core`) with Zobrist hashing and native perft;
+  parity at all reference depths in `cargo test`, native cases in `hive bench engine`.
+- WP 44: the Rust `GameState`, `Rules` and `Move` replace the Python classes behind the
+  same imports; the Python engine becomes the test oracle for differential tests.
+- WP 45: the search kernel in Rust; `random`, `minimax` and `negamax` keep their behaviour
+  and node counts, and the agents stay registered Python classes.
+- Gate: perft parity, differential tests, node-count parity and `make check test`; each WP
+  records `hive bench engine` before and after below.
+
+### Result (WP 42 to 45)
+
+The engine (WP 43, 44) and the search (WP 45) run in the Rust core. `hive bench engine`
+on the WP 27 engine and on the Rust core, the same machine and session (AMD Ryzen 7 5800H),
+median of 3 and 5 runs; every case visits the same nodes as before:
+
+| Case | WP 27 nodes/s | Rust core nodes/s | Speedup |
+|---|---|---|---|
+| `perft-start-5` (Python loop over the bindings) | 739,644 | 5,264,569 | 7.1x |
+| `perft-ant-3` (Python loop over the bindings) | 291,442 | 4,223,384 | 14.5x |
+| `perft-long-3` (Python loop over the bindings) | 365,777 | 4,694,296 | 12.8x |
+| `negamax-long-3` (Rust search) | 199,771 | 20,832,929 | 104x |
+| `mobility-ant-2` (Rust search) | 3,761 | 577,787 | 154x |
+| geometric mean of the five | 142,734 | 4,170,000 | 29x |
+
+The new cases run entirely in Rust: `perft-start-6-native` 55.8M nodes/s (the Python
+`make perft` walk of the same tree ran at 706,000), `perft-ant-4-native` 28.4M,
+`perft-long-4-native` 32.7M, `negamax-long-4` 21.7M and `mobility-ant-3` 629,000. Against
+the spike, the twisted torus, packed moves and allocation-free generation doubled the
+midgame perft (15M before) and kept the start position (55M). The perft cases through the
+bindings are bounded by the Python loop, as the spike predicted; Python code that walks
+trees should call `Rules.perft` or the search instead.
+
+The gauntlet of the WP 27 baseline (two unbounded `negamax` agents, `--budget 1
+--max-turns 30 --seed 0`, two games) reached a mean search depth of 4.1 per decision
+instead of 2.8. Without pruning a ply costs a factor of 30 to 100, so a hundred times
+faster search buys about one ply; the depth target of 6 is for alpha-beta (WP 28).
+
+Correctness: perft parity at every reference depth up to `start` depth 7 (181,641,900
+nodes) in `cargo test`, the Python perft tests through the bindings, the differential
+tests against the frozen Python engine (300 games of up to 200 plies in the slow profile,
+plus random boards for `from_board`), and the node counts of the search cases. The full
+Python suite passes without changes outside the engine apart from tests that wrote to the
+state's internals, and the published API schema is unchanged.
+
+## Stage 3: autoresearch on the Rust core (WP 29)
+
+An agent-driven optimisation loop on the Rust engine and search, for what design alone
+does not find (candidates in `rust-core.md` §Engine representation and optimisations):
+
+- Objective: nodes/s of the native cases of `hive bench engine` (perft and fixed-depth
+  search, median of several runs), reported per case and as a geometric mean.
+- Hard gates: perft parity at all reference depths, the differential tests against the
+  Python oracle, the search equivalence tests, `make check test`.
 - Each iteration proposes one change on a branch, runs the gates and benchmark, and keeps
   the change only if it passes and improves the objective beyond noise. Results are logged
   (change summary, before/after, kept or reverted).
 - WP 29 builds the harness (benchmark runner with noise control, gate script, results log,
-  prompt/instructions for the agent) and runs a first session.
-
-## Stage 3: Rust core (only if needed)
-
-If profiling and autoresearch leave the engine too slow for useful search depth, port
-`GameState` and `Rules` to Rust with PyO3, keeping the Python interface identical so agents,
-API and vision are unaffected. Perft parity is the acceptance test. Not planned as a work
-package until the data says so.
+  prompt/instructions for the agent) and runs a first session. It can start after WP 44,
+  but gains most once the search runs in Rust (WP 45).
 
 ## Agent strength (M7)
 
 ### Repetition (WP 30)
+
+Implemented in the Rust core after WP 45: the position key and history live in the Rust
+`GameState`, the repetition draw in `Rules`, and the draw scoring and tie-breaking in the
+Rust search.
 
 The first nm2 vs nm3 gauntlet (WP 09, seed 42, 2 s per move, 100 turns) drew all four
 games at the turn cap. In one game the black agent blocked every white move and then
@@ -61,11 +120,18 @@ gauntlets measure strength rather than stalling:
 
 ### Search and tuning (WP 28)
 
+Implemented in the Rust search kernel (`rust-core.md` §Search kernel), on top of WP 30:
+
 - Alpha-beta pruning in negamax, move ordering (moves that fill the opponent queen's
   free neighbors first, killer moves, history heuristic), transposition table keyed by Zobrist hash, iterative deepening
   with aspiration windows as an option.
 - Evaluator weight tuning via gauntlets (grid or random search over weights, evaluated by
   win rate against fixed opponents at a fixed budget).
+- Lazy SMP: a `threads` agent param (default 1) sharing the transposition table; gauntlet
+  fairness counts threads against `cpu_count`.
+- Changes that must not change results (alpha-beta itself, the transposition table, move
+  ordering) give the same root score as plain negamax at the same depth; the rest is
+  judged by gauntlets.
 - Every change is validated by a gauntlet against the previous best at equal time budget,
   with the report committed under `reports/` or attached to the PR.
 

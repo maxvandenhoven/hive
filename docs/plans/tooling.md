@@ -87,6 +87,91 @@ Neither is adopted, and writing a custom reflow tool is out of scope. Instead:
 WP 02 also converted all NumPy-style docstrings to Google style. Return types are no longer
 repeated in `Returns:` because the annotations carry them.
 
+## Rust (WP 42)
+
+The Rust core (`rust-core.md`) keeps the quality bar of the Python code with the standard
+Rust tools: `rustfmt`, `clippy`, the rustdoc lints and `cargo test`, a pinned toolchain
+and a committed lockfile. Python rules carry over where Rust has a tool for them and by
+review where they are style; the bindings reuse the Python checkers through the generated
+stub.
+
+| Rule | Enforced by |
+|---|---|
+| Pinned stable toolchain in `rust-toolchain.toml` (components `rustfmt` and `clippy`), edition 2024, `rust/Cargo.lock` committed, CI builds with `--locked` | rustup, cargo |
+| Line length 90 for code: `max_width = 90` and `use_small_heuristics = "Max"`, so rustfmt fills lines up to 90 characters like `ruff format` instead of breaking calls at 60% of the width. rustfmt decides every split itself, so there is no magic trailing comma to disable | `cargo fmt` |
+| Line length 90 for comments and docs, which stable rustfmt does not check | a `grep` in `make lint-rust` |
+| `clippy::pedantic` at warn level, warnings as errors in `make lint` and CI. Allowed: `module_name_repetitions` (names are domain-prefixed and shared with Python, `MatchOutcome` rather than `outcome::Match`) and `must_use_candidate`. Added: `print_stdout`, `print_stderr` and `dbg_macro` (no prints, like ruff `T20`) and `allow_attributes_without_reason` (`#[expect(lint, reason = "...")]` instead of a bare `#[allow]`, like a `noqa` with a reason) | clippy, `[workspace.lints]` |
+| `unsafe_code = "forbid"`; `unsafe` for speed is a decision recorded in `rust-core.md`, not a local choice | rustc |
+| Every item is documented, private ones included | `missing_docs`, `clippy::missing_docs_in_private_items` |
+| Core docs follow rustdoc conventions: a summary line, prose that explains arguments whose meaning the names and types do not carry, `# Errors` and `# Panics` sections, `# Examples` doc tests on the main entry points, intra-doc links such as ``[`GameState`]``, single backticks for inline code. They do not list every argument, which goes against Rust convention | `clippy::missing_errors_doc`, `missing_panics_doc`, `cargo doc` with warnings as errors (broken links) |
+| Binding doc comments are the Python docstrings: Google style with `Args:`, `Returns:` and `Raises:`, as in `src/`. They are repeated with the signatures in the hand-written stub `src/hive/_core.pyi` (as pydantic-core and orjson do), where ruff `D`, `ty` and the two checkers (which read `*.pyi` too) check them like any Python file. A summary that ends on its first line stays within 76 characters, so it fits the stub | the Python checkers on the stub; `tests/test_core_stub.py` fails when the stub and the bindings differ in classes, members, parameters or docstrings |
+| Python style rules that apply as they are: comments start with a capital letter and end with a period from 5 words; a blank line before and after `if`, `for`, `while`, `loop` and `match` statements unless they start or end their block, and before the tail expression of a function with three or more statements; behaviour as methods on the type that owns the data (free functions only for hex math); specific, domain-prefixed names; no long parameter lists (config structs and newtypes are Rust's answer to keyword arguments; clippy's `too_many_arguments` flags more than 7) | review (`CLAUDE.md`) |
+| Visibility: public fields for plain values (`Move`, the `Rules` config), private fields behind methods where an invariant needs them (the board, its caches, the hash), `pub(crate)` for crate helpers | review |
+| Errors: `thiserror` enums in the core, which the bindings map to `IllegalMoveError` and `InvalidBoardError` with the current message texts; `expect("why")` rather than `unwrap()` outside tests | review |
+| Tests: unit tests inline in `#[cfg(test)] mod tests` (they may test private items, the Rust convention), integration tests in `rust/core/tests/`, doc tests on entry points; the Python suite tests the bindings | `cargo test`, pytest |
+
+Configuration:
+
+```toml
+# rust/rustfmt.toml
+edition = "2024"
+max_width = 90
+use_small_heuristics = "Max"
+
+# rust/Cargo.toml (each crate sets `[lints] workspace = true`)
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_docs_in_private_items = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro = "warn"
+allow_attributes_without_reason = "warn"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+```
+
+Lints warn rather than deny, so a half-finished edit still builds; `make lint-rust` and CI
+pass `-D warnings`. The PyO3 macros compiled under `forbid(unsafe_code)` with PyO3 0.25 in
+the spike; WP 42 confirms this for the PyO3 version it adopts, or the binding crate uses
+`deny` with an `expect` and a reason where the macros need it. Panics stay `unwind` (the
+default), because PyO3 turns them into Python exceptions and `abort` would kill the API
+process.
+
+Build and editable installs:
+
+- `pyproject.toml` uses maturin as the build backend instead of `uv_build`, with
+  `manifest-path = "rust/python/Cargo.toml"`, `python-source = "src"` and `module-name =
+  "hive._core"`.
+- `[tool.uv] cache-keys` lists `pyproject.toml`, `rust/**/*.rs`, `rust/**/Cargo.toml` and
+  `rust/Cargo.lock`, so `uv sync` and `uv run` rebuild the extension after a Rust edit.
+  The editable build puts `src/hive/_core*.so` next to the Python sources (gitignored),
+  and cargo's incremental artifacts stay in `rust/target/` (gitignored).
+- One release profile serves uv, the tests, the benchmarks and the image. In the spike a
+  rebuild after an edit took 3.7 s with fat LTO and one codegen unit (0.8 s without LTO);
+  if the full core rebuilds slowly, WP 29 measures what fat LTO is worth.
+- Contributors and CI need `rustup`; it installs the pinned toolchain on first use.
+
+Left out on purpose (evaluated in this plan, not adopted):
+
+- Nightly rustfmt: comment wrapping (`wrap_comments`, `comment_width`), import grouping
+  and `error_on_line_overflow` are nightly-only. A moving toolchain is not worth it; the
+  line-length `grep` covers the one check that matters, and comments are filled by hand as
+  in Python.
+- A custom comment and blank-line checker for Rust (for example with tree-sitter): the
+  rules stay review rules, as several Python rules are.
+- `cargo-deny`, `cargo-llvm-cov`, `proptest` and `pyo3-log`: the core has few
+  dependencies; perft parity, the differential tests and the Python suite are the coverage
+  that matters; Hypothesis drives the property tests through the bindings; the hot core
+  does not log, and search progress goes through the turn context.
+
 ## Makefile
 
 One root `Makefile`; every command a session needs is a target.
@@ -108,9 +193,13 @@ One root `Makefile`; every command a session needs is a target.
 | `make install-hooks` | install pre-commit hooks (including commit-msg) |
 
 `format`, `lint`, `type` and `test` each run a `-python` and a `-frontend` target (for
-example `make lint-python`), so CI runs the two halves in separate jobs. The frontend targets
-run `npm ci` first when `frontend/node_modules` is missing or older than the lockfile.
-Frontend targets are added by WP 13; dev targets by WP 10.
+example `make lint-python`), so CI runs the two halves in separate jobs. From WP 42,
+`format`, `lint` and `test` also run a `-rust` target: `format-rust` is `cargo fmt`,
+`lint-rust` is `cargo clippy --all-targets -- -D warnings`, `cargo doc` with warnings as
+errors and the comment line-length `grep`, and `test-rust` is `cargo test`. Rust needs no
+`type-rust`: clippy compiles everything, and `type-python` runs `ty` over the stub. The
+frontend targets run `npm ci` first when `frontend/node_modules` is missing or older than
+the lockfile. Frontend targets are added by WP 13; dev targets by WP 10.
 
 Frontend tooling (WP 13): ESLint uses `typescript-eslint` `strictTypeChecked` with the React
 hooks and React refresh rules; Prettier uses a print width of 90 and sorts Tailwind classes.
@@ -128,14 +217,18 @@ because `openapi-typescript` 7 declares a TypeScript 5 peer dependency.
   file only; for
   `frontend/src/**/*.{ts,tsx,css}` runs `prettier --write` (once `npm ci` has run). It exits
   0 when the file is not formattable and prints remaining lint and comment errors to stderr
-  with exit code 2, so Claude sees and fixes them.
+  with exit code 2, so Claude sees and fixes them. From WP 42 it also formats edited
+  `rust/**/*.rs` files with `rustfmt` and reports comment lines over 90 characters; clippy
+  needs the whole crate, so it runs in the Stop hook.
 - **Stop**: `make check`, so type errors surface before a session ends. (Replaces the
-  current `make format lint`.)
+  current `make format lint`.) With the Rust half (clippy, `cargo doc`), its timeout goes
+  up from 120 to 300 seconds.
 
 ## Pre-commit
 
 `.pre-commit-config.yaml`: `end-of-file-fixer`, commitizen on `commit-msg` (conventional
-commits), and a local hook running `make check` on commit.
+commits), and a local hook running `make check` on commit, which includes the Rust half
+from WP 42.
 
 ## CI (`.github/workflows/ci.yaml`)
 
@@ -146,7 +239,13 @@ On every PR and on `main`:
   available on GitHub-hosted runners), coverage floor.
 - Frontend (from WP 13): `npm ci`, lint, format check, typecheck, test, build, and a check
   that `make api-client` produces no diff in `frontend/src/api/schema.ts`.
-- `uv.lock` and `package-lock.json` must be up to date (`--locked` / `npm ci`).
+- Rust (from WP 42): the toolchain from `rust-toolchain.toml` with a cargo cache
+  (`Swatinem/rust-cache`), `make format-rust` as a check, `make lint-rust`,
+  `make test-rust` (including perft parity), against a bare `uv venv` for PyO3. The Python
+  and frontend jobs build the extension in `uv sync` with the same cache; GitHub's runners
+  have rustup, which installs the pinned toolchain on first use.
+- `uv.lock`, `rust/Cargo.lock` and `package-lock.json` must be up to date (`--locked` /
+  `npm ci`).
 
 Release workflow (`release.yaml`) is added in WP 25, see `deployment.md`.
 
@@ -156,4 +255,4 @@ Release workflow (`release.yaml`) is added in WP 25, see `deployment.md`.
 - Conventional commits, enforced by commitizen, for example `feat(engine): ...`,
   `refactor(agents): ...`, `test(engine): ...`, `docs(plans): ...`, `build: ...`, `ci: ...`.
 - PRs reference their issue with `Closes #N`.
-- `uv.lock` is committed.
+- `uv.lock` and `rust/Cargo.lock` are committed.

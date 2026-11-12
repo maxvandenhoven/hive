@@ -5,6 +5,25 @@ games with it, the vision matcher enumerates legal moves with it, and the synthe
 generator plays random valid games with it. It lives in `src/hive/engine/` and imports
 nothing from the rest of the package.
 
+## Rust core (WP 43, WP 44)
+
+From WP 44 the engine is implemented in Rust (D30, `rust-core.md`), and this file stays
+the contract the Rust core keeps: the `Rules` API, the validated entry points, the
+invariants, the move order and the JSON forms. What changes for callers:
+
+- `GameState.board`, `hand` and `queen_coord` return new dicts on every access, so
+  changing them does not change the state; tests that edited them build their states
+  with `Rules.from_board` or `apply_placement` instead.
+- `Move` is frozen and hashable.
+- Helpers that only served the Python implementation (`piece_lifted`, `can_slide`,
+  `slideable_neighbors`, the per-piece `*_targets`, `PIECE_TARGET_COORDS`, ...) are gone,
+  see `rust-core.md` §Python API contract.
+- Invariant 6 (the grid bound) is new.
+
+The Python engine stays in `tests/oracle/` as a frozen reference for differential tests
+(D32). The sections below describe how the engine got here and still hold as its
+contract.
+
 ## Current state (before M1)
 
 Source: `packages/hive-engine/src/hive_engine/`.
@@ -190,9 +209,14 @@ These hold for every `GameState` reachable through the entry points:
 3. For each player and piece type: pieces on board + pieces in hand = `piece_counts`.
 4. `queen_coord[p]` is the coordinate of `p`'s queen if placed, else `None`.
 5. `current_player` alternates every ply, including passes.
+6. From WP 43: at most 28 pieces in total (`Rules` validates `piece_counts`), so every
+   cell within two steps of a connected hive has its own index in the 32 × 32 grid of the
+   Rust core (`rust-core.md` §Engine representation and optimisations).
 
 Move order: `placement_moves` and `movement_moves` return sorted lists (by piece type, then
 source and target coordinate), and `legal_moves` returns placements before movements. The
 order therefore depends only on the position. The board dict's iteration order does not:
 `piece_lifted` and `undo_move` delete and re-add coordinates, which moves them to the end
-(#47). Seeded agents that pick moves by index rely on the sorted order.
+(#47). Seeded agents that pick moves by index rely on the sorted order. The Rust core
+generates moves in its own order and sorts them at the Python boundary, so the order
+of `legal_moves` stays the same.
