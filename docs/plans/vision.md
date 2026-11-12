@@ -105,11 +105,54 @@ No training data; uses templates from photos of the physical tiles.
 
 ### YOLO reader (WP 24)
 
-- Model trained with Ultralytics on synthetic data (`synthetic-data.md`), exported to ONNX.
-- Inference with `onnxruntime` (CPU), letterbox preprocessing and NMS implemented in numpy
-  (no Ultralytics or torch at inference time).
+- Model trained with Ultralytics on synthetic data (`synthetic-data.md`), exported to ONNX
+  with the raw head: `(1, 4 + 10 [+ 32], anchors)` plus mask prototypes for segmentation
+  models.
+- `hive.vision.yolo.reader.YoloReader`: inference with `onnxruntime` (CPU), letterbox
+  preprocessing, decoding, class-agnostic NMS (tiles never overlap, so two classes on one
+  tile are one uncertain tile) and mask decoding in numpy and OpenCV, with no Ultralytics or
+  torch at inference time. Its output matches Ultralytics' predictions on the same model.
+  The reader checks the model's class names against `TileClass`; for segmentation models the
+  observation centre is the mask centroid, otherwise the box centre.
+- `hive vision detect PHOTO... --model model.onnx --out DIR` runs it from the command line
+  and writes annotated images and the observations as JSON.
 - The model file is downloaded from Garage at API startup
-  (`models/<name>/<version>/model.onnx`, version from `HIVE_MODEL_VERSION`) and cached.
+  (`models/<name>/<version>/model.onnx`, version from `HIVE_MODEL_VERSION`) and cached
+  (not implemented yet).
+
+### First synthetic results (WP 24)
+
+`hive-yolo` v001: YOLO26n detection, 640 px, 80 epochs on `synth-v001` (1000 renders of
+the procedural bakelite tileset, 913 train and 87 val images), trained in 9 minutes on an
+RTX 3070 Laptop GPU (7 s per epoch; 207 s per epoch on the Ryzen 7 5800H CPU).
+
+| Synthetic val (87 images, 1114 tiles) | Value |
+|---|---|
+| Box precision / recall | 0.996 / 0.999 |
+| mAP50 / mAP50-95 | 0.995 / 0.954 (per class 0.944–0.968) |
+| Labeled tiles found with the right owner and insect (score ≥ 0.35) | 1114 / 1114 |
+| Extra detections | 15, of which 14 are tiles cut off at the image edge (≤ 50% visible, not labeled) |
+| `YoloReader` latency on the CPU (ONNX Runtime, 16 threads) | p50 51 ms, p95 118 ms |
+
+These numbers are on synthetic images of the same tileset, so they measure the pipeline,
+not real-world accuracy; the real test set (WP 20) decides that.
+
+`hive-yolo-seg` v001: YOLO26n segmentation with the same data and settings (22 minutes):
+box mAP50-95 0.943, mask mAP50 0.995 and mask mAP50-95 0.873 on the synthetic val split.
+
+First real photos: 9 phone photos of one board of 10 Hive Pocket tiles (two tables, tilts
+from about 10° to 60°), checked by eye, score threshold 0.25:
+
+| Model | Tiles right | False positives | Errors |
+|---|---|---|---|
+| `hive-yolo` v001 | 85 / 90 | 2 (0.67, 0.33), at the image edge | 4 in one steep close-up, black queen as spider (0.73) in another |
+| `hive-yolo-seg` v001 | 86 / 90 | 1 (0.34), at the image edge | 4 in the steep close-up |
+
+Correct tiles mostly score 0.9–0.98. The errors are in close-ups at about 50–60° tilt,
+outside the 0–35° training range, and on the black queen, whose real artwork is an orange
+bee while the SVG is yellow line art. Scene schema version 2 raised the tilt range to 60°
+and added close framing, depth of field, colour variation and distractor objects for the
+next dataset.
 
 ## Evaluation (WP 20)
 
