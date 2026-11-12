@@ -133,6 +133,18 @@ to three photos per move, entered by hand after three):
 | 5% | 280 | 65 | 6 | 8 | 1 |
 | 10% | 262 | 76 | 6 | 4 | 1 |
 
+Single photos without retakes (12 other games, the same cameras and noise): how often
+the correct move ranks first and among the first three candidates, and what the resolver
+decides. The WP 17 target of 99% ranked first is not met on single photos: most misses are
+photos where the changed tiles are out of view or the detector misread the new tile, which
+the resolver mostly reports as ambiguous and a further photo resolves.
+
+| Detector confusion | Correct first | Correct in top 3 | Resolved | Ambiguous | Failed | Resolved wrong |
+|---|---|---|---|---|---|---|
+| 0% | 95.5% | 98.0% | 84.5% | 15.3% | 0.3% | 1 of 354 |
+| 5% | 90.8% | 94.2% | 77.5% | 22.2% | 0.3% | 3 of 360 |
+| 10% | 92.8% | 96.7% | 74.4% | 23.6% | 1.9% | 1 of 360 |
+
 Rendered games (`hive data sequences`, 2 games of 40 moves with placements, moves and
 beetles climbing onto stacks; every photo with its own camera up to 45° tilt, lighting,
 table, clutter and tiles in hand; three photos per move rendered, used only when needed),
@@ -237,3 +249,155 @@ breakdowns. A comparison command renders a markdown table of several reports.
 
 Data policy for now: train on synthetic only; real photos are for validation and test, split
 by game (never by photo, since consecutive photos are near duplicates).
+
+## Using the pipeline
+
+From a photo to detections, on the command line (needs the `vision` extra and a model
+from `scripts/train/train_yolo.py`, see `synthetic-data.md` §Training):
+
+```
+uv run hive vision detect photo.jpg --model data/models/hive-yolo-seg/v001/model.onnx \
+    --out tmp/detect [--score 0.35]
+```
+
+It logs every tile face with its class, score and centre, and writes an annotated image
+and the observations as JSON per photo.
+
+From photos of a game to moves, in code:
+
+```python
+from hive.engine.rules import Rules
+from hive.vision.grid_fit import BoardFitError, ObservedBoard
+from hive.vision.resolver import ResolutionStatus
+from hive.vision.tracking import GameTracker
+from hive.vision.yolo.reader import YoloReader
+
+reader = YoloReader.load(model_path=Path("model.onnx"), score_threshold=0.25)
+tracker = GameTracker(rules=Rules())          # or state=... for a position from the editor
+
+for image in photos_after_every_move:          # BGR arrays, as cv2.imread gives them
+    try:
+        observed = ObservedBoard.fit(
+            observations=reader.read(image), image_size=(image.shape[1], image.shape[0])
+        )
+    except BoardFitError:
+        ...                                    # no tiles: ask for another photo
+        continue
+
+    resolution = tracker.add_photo(observed)
+
+    if resolution.status is ResolutionStatus.RESOLVED:
+        ...                                    # tracker.state is the new position
+    elif resolution.status is ResolutionStatus.AMBIGUOUS:
+        ...                                    # show resolution.reason and candidates;
+                                               # the next photo is combined with this one
+    else:
+        ...                                    # FAILED: retake, or tracker.confirm(moves)
+```
+
+Evaluating on rendered games: `hive data sequences`, render, `hive data export`, then
+`hive vision track --dataset ... --model ... --out tmp/tracking`, which writes
+`report.json`, a frame per photo (`frames/<game>/<id>.jpg`: the photo with its
+detections next to the tracked board and the decision) and an animated GIF per game
+(Pillow, from the `plotting` extra). See `synthetic-data.md` §Game sequences.
+
+## Status and next steps
+
+State after the branch `feature/wp21-24-synthetic-data-yolo` (M3 and M4 started out of
+order: the synthetic pipeline, the YOLO reader and the move resolver first, the app work
+not yet).
+
+### Done
+
+| WP | Part | Where |
+|---|---|---|
+| 21 | Scene generation, sampling config, JSON Schema, game sequences | `src/hive/data/scenes.py`, `hive data scenes`, `hive data sequences`, `hive data schema` |
+| 22 | Blender renderer, procedural bakelite tileset, template for the modelled set, CC0 assets, smoke test | `blender/`, `make render-assets`, `make render-smoke` |
+| 23 | Labels from instance maps, post effects, Ultralytics layout, manifests | `src/hive/data/datasets.py`, `hive data export` |
+| 24 | Training and ONNX export, ONNX reader with numpy NMS and masks, first synthetic and real-photo results | `scripts/train/train_yolo.py`, `src/hive/vision/yolo/reader.py`, `hive vision detect` |
+| 17 | Grid fitting, move resolution with several photos, tile memory, two-move recovery, tracker, simulator | `src/hive/vision/{lattice,grid_fit,resolver,tracking,testing}.py` |
+| 20 (part) | Tracking evaluation on rendered games | `src/hive/vision/sequences.py`, `hive vision track` |
+
+### Still missing
+
+- **WP 16 photo capture and storage**: no upload endpoint, no photo rows, no camera button.
+- **WP 19 camera move flow**: the API does not run the reader, fit or resolver; no
+  `HIVE_READER` or `HIVE_MODEL_VERSION` settings; no proposal, candidate or retake
+  screens; no verification mode for agent moves (checking a photo against the expected
+  move with a diff).
+- **WP 18 classical reader**: not started; there is no baseline to compare YOLO with.
+- **WP 20 evaluation harness**: no `hive vision eval` with tile, board and game metrics on
+  labeled real photos, no `sequences.jsonl` export of recorded app games, no
+  `hive vision compare`. Only the rendered-game tracking evaluation exists.
+- **WP 23 and 24 storage**: no `--upload` or `hive data pull`; datasets and models live in
+  the local `data/` folder, not in Garage.
+- **Real data**: no hand-labeled real test set and no real game recorded move by move. The
+  only real data are 9 photos of one arrangement (85 or 86 of 90 tiles right).
+- **Modelled tileset**: `pocket-edition-normal-001` is a template; the renders use the
+  procedural tileset with the SVG line art, not the real artwork.
+
+### Limitations
+
+- **Synthetic-to-real gap**: the models are trained on 1000 renders of procedural tiles
+  whose insects are the app's line-art SVGs at 62% of the tile, while the real set has
+  filled, detailed artwork at about 75% and an orange (not yellow) queen. Synthetic
+  validation scores (mAP50 0.995) overstate real accuracy; the real misreads concentrate
+  on the black queen and on steep close-ups.
+- **Camera range**: the models saw tilts up to 35°; the scene config now goes to 60° with
+  closer framing, depth of field and distractors, but no model is trained on that yet, so
+  the rendered tracking test used tilts up to 45°.
+- **First move**: before the first move every detection could be the first tile; a prior
+  favours lone tiles near the middle of the photo, so a first tile at the edge next to
+  tiles in hand may need two or three photos.
+- **Skipped photos**: two moves without a photo usually end ambiguous; when the change of
+  one move is out of view, the pair can pass as a single wrong move (1 of 6 in a stress
+  test). The confirmation step of the app must stay.
+- **Assumptions of the fit**: one flat table; tiles roughly on the lattice (bumped tiles
+  are tolerated up to about a third of a tile); principal point at the image centre; at
+  least one tile clearly detected.
+- **Identical-looking states**: positions that differ only below identical top tiles, or
+  by swapping identical pieces, are one outcome; stack contents come from the history.
+- **Calibration**: the confusion rate (5%), miss rate (2%), extra rate (1%) and thresholds
+  (0.95, 3 nats) are set from simulation and the 9 real photos, not fitted on real data.
+- **Speed**: about 10 ms per resolution, up to about 0.5 s when pairs of moves are
+  searched, plus 50–110 ms for the reader on the CPU; the move pair search grows with the
+  number of legal moves.
+
+### Next steps to evaluate fully
+
+1. **Record real games**: play 3–5 games with the physical set, a photo after every move
+   from varying angles and tables, with the true moves written down (or entered in the
+   app). This is the decisive test; store them as `sequences.jsonl` (WP 20).
+2. **Label a real test set**: 50–100 photos from those games, split by game, in Label
+   Studio or CVAT with YOLO polygon export, for tile-level metrics.
+3. **Build `hive vision eval`** (WP 20): tile, board and game metrics and latency per
+   reader and model version, and `hive vision compare` for a markdown table. Reuse
+   `SequenceTracker` for the game level on real sequences.
+4. **Close the synthetic gap**: photograph each tile face flat (the WP 18 manual task), use
+   those as the artwork of the procedural tileset (or model `pocket-edition-normal-001`),
+   render the next dataset with scene schema 2 (tilt up to 60°, distractors, depth of
+   field), train `hive-yolo-seg` v002 on the GPU, and compare with v001 on the real set.
+5. **Calibrate the resolver** on the real games: fit the confusion, miss and extra rates,
+   then set the acceptance thresholds for a target of at most about 1 wrong resolution in
+   200 moves, and measure how often a second photo is needed.
+6. **Classical baseline** (WP 18), if still wanted, to complete the comparison the plan
+   asks for.
+
+### Next steps to bring it into the app
+
+1. **WP 16 photo capture**: upload endpoint with storage in Garage and a `photo` row per
+   ply; camera button in table games.
+2. **Model serving** (WP 24): upload the model to `models/<name>/<version>/`, download and
+   cache it at API startup from `HIVE_MODEL_VERSION`, gate `/readyz` on it; ONNX Runtime
+   only, no torch in the image.
+3. **Resolver in the API** (WP 19): run reader, fit and resolver in a worker thread per
+   photo; keep the previous photo's observed board per game (or recompute it from the
+   stored photo) and the unclear photos of the current ply; store detections and the
+   resolution with the photo.
+4. **UI** (WP 19): proposed move for confirmation (never commit without it), the
+   candidates sheet for ambiguous photos with "take another photo", the reason of a
+   failed photo, manual entry as fallback, and a border warning when the hive is cut off.
+5. **Agent moves at the table**: a verification mode that scores the expected agent move
+   and reports match or mismatch with the differing hexes, as an alternative to **Done**.
+6. **Observability**: metrics for resolution status, photos per move, latency and
+   corrections, so real accuracy can be followed after release.

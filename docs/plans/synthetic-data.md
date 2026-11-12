@@ -214,3 +214,27 @@ this extra):
   decodes masks for segmentation models. `hive vision detect` runs it on photos.
 - Evaluate with `hive vision eval --reader yolo` on the real test set and compare with the
   classical reader report once WP 20 exists.
+
+## Status and deviations
+
+Done on `feature/wp21-24-synthetic-data-yolo`: scene generation (schema 2), game
+sequences, the renderer with the procedural bakelite tileset, the dataset export, and
+training of `hive-yolo` v001 (detection) and `hive-yolo-seg` v001 (segmentation) on
+`synth-v001` (1000 renders, schema 1 scenes). See `vision.md` §Status and next steps for
+the results, what is missing and what comes next.
+
+Deviations from the original plan, each described in its section:
+
+- Lengths in scenes are tile widths instead of metres, so scenes work with every tileset.
+- Downloaded CC0 assets in `blender/.cache/` instead of committed Git LFS files; Git LFS
+  is still the plan for modelled tilesets.
+- Labels and post effects are computed in `hive data export` from instance maps, not in
+  Blender, so they can change without rendering again and are tested with pytest.
+- Debug overlays come from `hive data export --debug`, not from `render.py --debug`.
+- The renderer validates the scene `schema_version`, not the full JSON Schema.
+- `--upload` and `hive data pull` (Garage) are not implemented yet.
+
+Rendering speed: on the RTX 3070 Laptop GPU about 4.5 s per image per Blender process with
+half of the images in Cycles; on the CPU alone about 5 s with 10% Cycles (two processes).
+Training on the GPU: 80 epochs of YOLO26n on 913 images in 9 minutes (detection) and 22
+minutes (segmentation).

@@ -331,8 +331,8 @@ Some work needs things only the project owner can provide:
 
 | Needed by | Task |
 |---|---|
-| WP 18 | Flat, evenly lit photos of each tile face of the physical set (templates for the classical reader) and a first batch of real game photos. |
-| WP 20 | A hand-labeled real test set (50–100 photos, split by game) and a few recorded games with one photo per turn. |
+| WP 18 | Flat, evenly lit photos of each tile face of the physical set (templates for the classical reader, and the artwork for the next synthetic dataset) and a first batch of real game photos. |
+| WP 20 | A hand-labeled real test set (50–100 photos, split by game) and a few recorded games with one photo per turn. These are now the main blocker: the move resolver (WP 17) and the YOLO reader (WP 24) are only evaluated on synthetic games and 9 real photos (see `vision.md` §Status and next steps). |
 | WP 22 | The modeled tileset `pocket-edition-normal-001` (one file per tile, see its template `tileset.toml`). The renderer uses the procedural bakelite tileset (20 mm sides, 10 mm high, debossed insects) until then, so this does not block WP 22. |
 | WP 26 | Homelab platform in the homelab GitOps repo: Argo CD, Tailscale operator, CloudNativePG, Garage, kube-prometheus-stack, Loki, SOPS key. |
 
