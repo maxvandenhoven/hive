@@ -1,0 +1,12 @@
+{
+  "no-lmr": {"late_move_reductions": 0},
+  "lmr6": {"late_move_reductions": 6},
+  "threat-extension": {"queen_threat_extension": true},
+  "null3": {"null_move_reduction": 3},
+  "mobile": {"free_ants": 0.0, "mobile_ant": 0.3, "mobile_beetle": 0.15, "mobile_queen": 0.2, "mobile_spider": 0.1, "mobile_grasshopper": 0.1},
+  "placement": {"placement_cells": 0.05},
+  "queen-danger": {"queen_danger": 0.1},
+  "tempo": {"tempo": 0.3},
+  "beetle-0.5": {"beetle_control": 0.5},
+  "pinned-0.05": {"pinned_material": 0.05}
+}

@@ -188,3 +188,12 @@ knodes/s are in-game means, candidate vs champion):
 Lesson: evaluation knowledge beats raw depth. LMR alone gains a ply yet loses games, and
 the structure terms win while searching 1.3 plies shallower; combined, the refinements
 win back the depth the evaluation costs.
+
+### Generation 1 (promoted)
+
+`confirm-gen1` (1 s, 50 pairs, seeds 30000–30049, fast gate, revision 4204290):
+structure + all four search refinements scored **0.845** against generation 0,
+81-7-12 with 7 turn caps, normal lower bound 0.795. In-game depth 7.00 vs 6.38 at
+899 vs 2211 knodes/s. Generation 1 = pinned_material 0.025, free_ants 0.25,
+beetle_control 0.25, table_deeper_hits, late_move_reductions 3, null_move_reduction 2,
+queen_attack_ordering (on the b90be45 search settings).
