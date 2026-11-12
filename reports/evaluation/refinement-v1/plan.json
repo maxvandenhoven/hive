@@ -1,0 +1,65 @@
+{
+  "champion": {
+    "generation": 0,
+    "name": "baseline-b90be45",
+    "source_revision": "b90be45",
+    "spec": {
+      "kind": "negamax",
+      "label": "champion",
+      "params": {
+        "queen_safety": 1.0,
+        "mobility": 0.0,
+        "positioning": 0.0,
+        "material_on_board": 0.0,
+        "material_in_hand": 0.0,
+        "queen_danger": 0.0,
+        "queen_escape": 0.0,
+        "pinned_material": 0.0,
+        "free_ants": 0.0,
+        "beetle_control": 0.0,
+        "alpha_beta": true,
+        "table_megabytes": 32,
+        "aspiration_window": 0.5,
+        "principal_variation_search": true,
+        "threads": 2,
+        "depth": null
+      }
+    },
+    "evidence": null
+  },
+  "champion_sha256": "03503ef49cbc344dfba1add94ebff564bd8d42b343cd7762a4febcb9c7a066e4",
+  "revision": "b90be451570b275200b12b65cfe37aa8b656a386",
+  "engine_sha256": "4ab65e1d052013dcdfdac24ae3f544ba71618b6947d9f9afb33e02a13835c39c",
+  "dirty": true,
+  "phase": "screening",
+  "seed": 20,
+  "pairs": 8,
+  "budget_s": 0.1,
+  "alpha": 0.05,
+  "results": {},
+  "candidates": {
+    "ants-0125": {
+      "free_ants": 0.125
+    },
+    "ants-05": {
+      "free_ants": 0.5
+    },
+    "ants-pins": {
+      "free_ants": 0.25,
+      "pinned_material": 0.025
+    },
+    "ants-pins-strong": {
+      "free_ants": 0.25,
+      "pinned_material": 0.05
+    },
+    "ants-beetles": {
+      "free_ants": 0.25,
+      "beetle_control": 0.25
+    },
+    "structure": {
+      "free_ants": 0.25,
+      "pinned_material": 0.025,
+      "beetle_control": 0.25
+    }
+  }
+}

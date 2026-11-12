@@ -69,7 +69,7 @@ impl Targets for Vec<Cell> {
 /// the two cells flanking the step is occupied. Two form a gate the piece cannot pass,
 /// and none would leave it without contact to the hive.
 #[inline]
-fn can_slide(board: &Board, cell: Cell, direction: usize) -> bool {
+pub(crate) fn can_slide(board: &Board, cell: Cell, direction: usize) -> bool {
     board.is_occupied(cell.neighbor(anti_clockwise(direction)))
         != board.is_occupied(cell.neighbor(clockwise(direction)))
 }

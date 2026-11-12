@@ -127,6 +127,18 @@ impl PySearcher {
     ///         board minus the opponent's.
     ///     material_in_hand: The weight of the value of the player's pieces in hand
     ///         minus the opponent's.
+    ///     queen_danger: Nonlinear queen crowding: squared occupied-neighbour counts.
+    ///     queen_escape: Legal queen escapes, excluding covered or pinned queens.
+    ///     pinned_material: Opponent minus own covered or articulation-pinned material.
+    ///     free_ants: Own minus opponent uncovered, unpinned ants after queen placement.
+    ///     beetle_control: Elevated beetle balance, doubled over an enemy queen.
+    ///     tempo: A bonus for the player to move.
+    ///     mobile_queen: Own minus opponent queens that can take a first step.
+    ///     mobile_beetle: Own minus opponent beetles that can move.
+    ///     mobile_grasshopper: Own minus opponent grasshoppers that can move.
+    ///     mobile_spider: Own minus opponent spiders that can take a first step.
+    ///     mobile_ant: Own minus opponent ants that can take a first step.
+    ///     placement_cells: Own minus opponent free cells to place a piece on.
     ///     stop_check_interval: The number of nodes between two calls of
     ///         `turn.should_stop`.
     ///     alpha_beta: Whether to prune with alpha-beta, which finds the same scores in
@@ -136,6 +148,12 @@ impl PySearcher {
     ///     aspiration_window: Initial score half-window, zero to disable aspiration.
     ///     threads: Total negamax search threads sharing one table, at least one.
     ///     principal_variation_search: Scout later moves before a full-window search.
+    ///     table_deeper_hits: Reuse table entries searched deeper than needed.
+    ///     late_move_reductions: Moves searched at full depth before later ones are
+    ///         scouted a ply shallower, zero for none. Needs principal variation search.
+    ///     null_move_reduction: Extra depth reduction of a null move at scout nodes,
+    ///         zero for none.
+    ///     queen_attack_ordering: Order moves next to the enemy queen after killers.
     ///
     /// Raises:
     ///     ValueError: If the algorithm, depth, window or thread count is invalid.
@@ -150,14 +168,34 @@ impl PySearcher {
         positioning = 0.0,
         material_on_board = 0.0,
         material_in_hand = 0.0,
+        queen_danger = 0.0,
+        queen_escape = 0.0,
+        pinned_material = 0.0,
+        free_ants = 0.0,
+        beetle_control = 0.0,
+        tempo = 0.0,
+        mobile_queen = 0.0,
+        mobile_beetle = 0.0,
+        mobile_grasshopper = 0.0,
+        mobile_spider = 0.0,
+        mobile_ant = 0.0,
+        placement_cells = 0.0,
         stop_check_interval = 1024,
         alpha_beta = true,
         table_megabytes = 32,
         aspiration_window = 0.0,
         threads = 1,
-        principal_variation_search = false
+        principal_variation_search = false,
+        table_deeper_hits = false,
+        late_move_reductions = 0,
+        null_move_reduction = 0,
+        queen_attack_ordering = false
     ))]
-    #[expect(clippy::too_many_arguments, reason = "the agent params, passed by keyword")]
+    #[expect(
+        clippy::too_many_arguments,
+        clippy::fn_params_excessive_bools,
+        reason = "the agent params, passed by keyword"
+    )]
     fn new(
         rules: PyRef<'_, PyRules>,
         algorithm: &str,
@@ -167,12 +205,28 @@ impl PySearcher {
         positioning: f64,
         material_on_board: f64,
         material_in_hand: f64,
+        queen_danger: f64,
+        queen_escape: f64,
+        pinned_material: f64,
+        free_ants: f64,
+        beetle_control: f64,
+        tempo: f64,
+        mobile_queen: f64,
+        mobile_beetle: f64,
+        mobile_grasshopper: f64,
+        mobile_spider: f64,
+        mobile_ant: f64,
+        placement_cells: f64,
         stop_check_interval: u64,
         alpha_beta: bool,
         table_megabytes: usize,
         aspiration_window: f64,
         threads: usize,
         principal_variation_search: bool,
+        table_deeper_hits: bool,
+        late_move_reductions: u32,
+        null_move_reduction: u32,
+        queen_attack_ordering: bool,
     ) -> PyResult<Self> {
         let algorithm = match algorithm {
             "minimax" => SearchAlgorithm::Minimax,
@@ -196,12 +250,49 @@ impl PySearcher {
             ));
         }
 
+        if [
+            queen_safety,
+            mobility,
+            positioning,
+            material_on_board,
+            material_in_hand,
+            queen_danger,
+            queen_escape,
+            pinned_material,
+            free_ants,
+            beetle_control,
+            tempo,
+            mobile_queen,
+            mobile_beetle,
+            mobile_grasshopper,
+            mobile_spider,
+            mobile_ant,
+            placement_cells,
+        ]
+        .iter()
+        .any(|weight| !weight.is_finite())
+        {
+            return Err(PyValueError::new_err("Evaluation weights must be finite."));
+        }
+
         let weights = EvaluationWeights {
             queen_safety,
             mobility,
             positioning,
             material_on_board,
             material_in_hand,
+            queen_danger,
+            queen_escape,
+            pinned_material,
+            free_ants,
+            beetle_control,
+            tempo,
+            mobile_queen,
+            mobile_beetle,
+            mobile_grasshopper,
+            mobile_spider,
+            mobile_ant,
+            placement_cells,
         };
         let config = SearchConfig {
             algorithm,
@@ -213,6 +304,10 @@ impl PySearcher {
             aspiration_window,
             threads,
             principal_variation_search,
+            table_deeper_hits,
+            late_move_reductions,
+            null_move_reduction,
+            queen_attack_ordering,
         };
         Ok(PySearcher { inner: Searcher::new(rules.inner, config) })
     }

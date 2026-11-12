@@ -1,0 +1,39 @@
+{
+  "queen_danger-0.1": {
+    "queen_danger": 0.1
+  },
+  "queen_danger-0.3": {
+    "queen_danger": 0.3
+  },
+  "queen_escape-0.1": {
+    "queen_escape": 0.1
+  },
+  "queen_escape-0.5": {
+    "queen_escape": 0.5
+  },
+  "pinned_material-0.025": {
+    "pinned_material": 0.025
+  },
+  "pinned_material-0.1": {
+    "pinned_material": 0.1
+  },
+  "free_ants-0.25": {
+    "free_ants": 0.25
+  },
+  "free_ants-1": {
+    "free_ants": 1
+  },
+  "beetle_control-0.25": {
+    "beetle_control": 0.25
+  },
+  "beetle_control-1": {
+    "beetle_control": 1
+  },
+  "balanced": {
+    "queen_danger": 0.1,
+    "queen_escape": 0.2,
+    "pinned_material": 0.05,
+    "free_ants": 0.5,
+    "beetle_control": 0.5
+  }
+}

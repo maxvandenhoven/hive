@@ -14,8 +14,9 @@ use crate::agents::evaluation::{EvaluationWeights, Evaluator};
 use crate::agents::table::{
     TableBound, TableEntry, TranspositionTable, from_table_score, to_table_score,
 };
+use crate::engine::grid::DIRECTION_COUNT;
 use crate::engine::zobrist::ply_key;
-use crate::engine::{CoordMove, GameState, Move, PieceType, Player, Rules};
+use crate::engine::{Cell, Coord, CoordMove, GameState, Move, PieceType, Player, Rules};
 
 /// The number of cells, the stride of the history table per piece type.
 const HISTORY_CELLS: usize = 1024;
@@ -36,6 +37,10 @@ pub enum SearchAlgorithm {
 
 /// The configuration of a search, from the agent params.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent on/off agent params, set by keyword"
+)]
 pub struct SearchConfig {
     /// The tree search.
     pub algorithm: SearchAlgorithm,
@@ -58,6 +63,46 @@ pub struct SearchConfig {
     pub threads: usize,
     /// Scout later moves with a minimal window, re-searching improvements exactly.
     pub principal_variation_search: bool,
+    /// Reuse transposition table entries searched deeper than needed, not only those of
+    /// the same remaining depth.
+    pub table_deeper_hits: bool,
+    /// The number of moves searched at full depth before later moves of an inner node
+    /// at least three plies deep are scouted one ply shallower, zero for none. A reduced
+    /// move that improves the score is searched again at full depth. Needs principal
+    /// variation search.
+    pub late_move_reductions: u32,
+    /// The extra depth reduction of a null move (a pass) at scout nodes, zero for none.
+    /// When the side to move still scores at least `beta` after passing, the node is cut
+    /// off without searching its moves.
+    pub null_move_reduction: u32,
+    /// Order the moves onto or next to the opponent's queen right after the killer moves.
+    pub queen_attack_ordering: bool,
+}
+
+impl SearchConfig {
+    /// Create a configuration with the given algorithm, depth and weights, and every
+    /// refinement of the search off: alpha-beta and a 32 MB table, one thread.
+    pub fn new(
+        algorithm: SearchAlgorithm,
+        depth: Option<u32>,
+        weights: EvaluationWeights,
+    ) -> Self {
+        SearchConfig {
+            algorithm,
+            depth,
+            weights,
+            stop_check_interval: 1024,
+            alpha_beta: true,
+            table_megabytes: 32,
+            aspiration_window: 0.0,
+            threads: 1,
+            principal_variation_search: false,
+            table_deeper_hits: false,
+            late_move_reductions: 0,
+            null_move_reduction: 0,
+            queen_attack_ordering: false,
+        }
+    }
 }
 
 /// The place of a node in the search: its remaining depth, its ply from the root, its
@@ -76,6 +121,8 @@ struct Node {
     /// Whether every move from the root to the node follows the previous principal
     /// variation, so its next move is searched first.
     on_principal_variation: bool,
+    /// Whether the node may try a null move: not right after another one.
+    allow_null: bool,
 }
 
 impl Node {
@@ -87,7 +134,14 @@ impl Node {
             alpha: f64::NEG_INFINITY,
             beta: f64::INFINITY,
             on_principal_variation: true,
+            allow_null: true,
         }
+    }
+
+    /// Check whether the node has a minimal window, as scouted by principal variation
+    /// search, so its exact score is never needed.
+    fn is_scout(self) -> bool {
+        self.beta.is_finite() && self.alpha >= self.beta.next_down()
     }
 }
 
@@ -400,15 +454,32 @@ impl Searcher {
 
     /// Order the moves of an inner node: the moves in `first` in their order (the move of
     /// the previous principal variation, the table move and the killer moves), then the
-    /// rest by their history, keeping the generation order between equals.
-    fn order_moves(&mut self, first: [Option<Move>; 4], moves: &mut [Move]) {
+    /// moves onto or next to `enemy_queen` if given, then the rest by their history,
+    /// keeping the generation order between equals.
+    fn order_moves(
+        &mut self,
+        first: [Option<Move>; 4],
+        enemy_queen: Option<Cell>,
+        moves: &mut [Move],
+    ) {
         let ordering = &mut self.ordering;
         ordering.clear();
 
         for (position, &mv) in moves.iter().enumerate() {
+            let attacks = enemy_queen.is_some_and(|queen| {
+                let target = mv.target();
+                target == queen
+                    || (0..DIRECTION_COUNT).any(|side| queen.neighbor(side) == target)
+            });
             let rank =
                 first.iter().position(|&candidate| candidate == Some(mv)).map_or_else(
-                    || u64::from(self.history[history_index(mv)]),
+                    || {
+                        if attacks {
+                            u64::from(u32::MAX) - 8
+                        } else {
+                            u64::from(self.history[history_index(mv)])
+                        }
+                    },
                     |priority| u64::from(u32::MAX) - priority as u64,
                 );
             let key = (rank << 16) | (0xffff - (position as u64).min(0xffff));
@@ -420,6 +491,31 @@ impl Searcher {
         for (slot, &(_, mv)) in moves.iter_mut().zip(ordering.iter()) {
             *slot = mv;
         }
+    }
+
+    /// Order the moves of an inner node at a ply with [`Searcher::order_moves`]: first
+    /// the previous principal variation's move if the node follows it, the table move and
+    /// the killers of the ply.
+    fn order_inner_moves(
+        &mut self,
+        state: &GameState,
+        index: usize,
+        follows: bool,
+        table_move: Option<Move>,
+        moves: &mut [Move],
+    ) {
+        let expected = if follows { self.previous_line[index] } else { None };
+        let killers = self.killers[index];
+        let enemy_queen = if self.config.queen_attack_ordering {
+            state.queen_coord(state.current_player().opponent()).map(Coord::cell)
+        } else {
+            None
+        };
+        self.order_moves(
+            [expected, table_move, killers[0], killers[1]],
+            enemy_queen,
+            moves,
+        );
     }
 
     /// Remember a move that caused a cutoff at a ply, as a killer and in the history.
@@ -468,8 +564,13 @@ impl Searcher {
         if use_table && let Some(entry) = self.table.probe(key) {
             table_move = entry.best_move();
             let score = from_table_score(entry.score, node.ply);
+            let depth_matches = if self.config.table_deeper_hits {
+                u32::from(entry.depth) >= node.depth
+            } else {
+                u32::from(entry.depth) == node.depth
+            };
             let usable = index > 0
-                && u32::from(entry.depth) == node.depth
+                && depth_matches
                 && match entry.bound {
                     TableBound::Exact => true,
                     TableBound::Lower => score >= node.beta,
@@ -483,14 +584,16 @@ impl Searcher {
             }
         }
 
+        if self.null_move_cuts_off(state, node, player, observer)? {
+            return Ok(node.beta);
+        }
+
         let mut moves = std::mem::take(&mut self.buffers[index]);
         self.generate(state, node.ply, &mut moves);
         let follows = self.order_principal_variation(node, &mut moves);
 
         if use_table && index > 0 && moves.len() > 1 {
-            let expected = if follows { self.previous_line[index] } else { None };
-            let killers = self.killers[index];
-            self.order_moves([expected, table_move, killers[0], killers[1]], &mut moves);
+            self.order_inner_moves(state, index, follows, table_move, &mut moves);
         }
 
         let outer_cutoff = std::mem::replace(&mut self.cutoff, false);
@@ -506,9 +609,16 @@ impl Searcher {
                 beta: -alpha,
                 on_principal_variation: self
                     .follows_principal_variation(follows, node.ply, mv),
+                allow_null: true,
             };
+            let late = self.config.late_move_reductions;
+            let reduce = late > 0
+                && index > 0
+                && node.depth >= 3
+                && mv.is_some()
+                && position >= late as usize;
             state.apply_move(mv);
-            let result = self.search_child(state, child, position > 0, observer);
+            let result = self.search_child(state, child, position > 0, reduce, observer);
             state.undo_move(mv);
 
             let Ok(child_score) = result else {
@@ -542,33 +652,42 @@ impl Searcher {
         self.cutoff |= outer_cutoff;
 
         if use_table {
-            let bound = if best <= node.alpha {
-                TableBound::Upper
-            } else if best >= node.beta {
-                TableBound::Lower
-            } else {
-                TableBound::Exact
-            };
-            let best_move = self.lines[index].first().copied().flatten();
-            self.table.store(TableEntry {
-                key,
-                score: to_table_score(best, node.ply),
-                best: best_move.map_or(0, Move::bits),
-                depth: u8::try_from(node.depth).unwrap_or(u8::MAX),
-                bound,
-                cutoff: subtree_cutoff,
-            });
+            self.store_node(key, node, best, subtree_cutoff);
         }
 
         Ok(best)
     }
 
+    /// Store the result of a searched node in the transposition table, with its bound
+    /// relative to the node's window and the first move of its line.
+    fn store_node(&mut self, key: u64, node: Node, best: f64, subtree_cutoff: bool) {
+        let bound = if best <= node.alpha {
+            TableBound::Upper
+        } else if best >= node.beta {
+            TableBound::Lower
+        } else {
+            TableBound::Exact
+        };
+        let best_move = self.lines[node.ply as usize].first().copied().flatten();
+        self.table.store(TableEntry {
+            key,
+            score: to_table_score(best, node.ply),
+            best: best_move.map_or(0, Move::bits),
+            depth: u8::try_from(node.depth).unwrap_or(u8::MAX),
+            bound,
+            cutoff: subtree_cutoff,
+        });
+    }
+
     /// Scout a later child, then search its full window if it improves the best score.
+    /// A reduced child is scouted one ply shallower first, and searched as usual when
+    /// that scout does not fail low for the parent.
     fn search_child(
         &mut self,
         state: &mut GameState,
         child: Node,
         scout: bool,
+        reduce: bool,
         observer: &mut impl SearchObserver,
     ) -> Result<f64, Stopped> {
         if !scout
@@ -580,6 +699,16 @@ impl Searcher {
         }
 
         let narrow = Node { alpha: child.beta.next_down(), ..child };
+
+        if reduce {
+            let reduced = Node { depth: child.depth - 1, ..narrow };
+            let score = self.negamax(state, reduced, observer)?;
+
+            if score >= child.beta {
+                return Ok(score);
+            }
+        }
+
         let score = self.negamax(state, narrow, observer)?;
 
         if score > child.alpha && score < child.beta {
@@ -587,6 +716,69 @@ impl Searcher {
         } else {
             Ok(score)
         }
+    }
+
+    /// Try a null move at a node if [`Searcher::null_move_applies`]: pass, and search the
+    /// opponent's reply shallower with a minimal window at `beta`. Returns whether the
+    /// player still reaches `beta`, so the node can be cut off.
+    fn null_move_cuts_off(
+        &mut self,
+        state: &mut GameState,
+        node: Node,
+        player: Player,
+        observer: &mut impl SearchObserver,
+    ) -> Result<bool, Stopped> {
+        if !self.null_move_applies(state, node, player) {
+            return Ok(false);
+        }
+
+        let child = Node {
+            depth: node.depth - 1 - self.config.null_move_reduction,
+            ply: node.ply + 1,
+            alpha: -node.beta,
+            beta: (-node.beta).next_up(),
+            on_principal_variation: false,
+            allow_null: false,
+        };
+        state.apply_move(None);
+        let result = self.negamax(state, child, observer);
+        state.undo_move(None);
+        let score = -result?;
+        self.lines[node.ply as usize].clear();
+        let cuts_off = score >= node.beta;
+        self.cutoff |= cuts_off;
+        Ok(cuts_off)
+    }
+
+    /// Check whether a node tries a null move: the option is on, the node is an inner
+    /// scout node deep enough for the reduction, not right after another null move, the
+    /// player's queen is placed with at most three neighbours, and the static evaluation
+    /// already reaches `beta`.
+    fn null_move_applies(
+        &mut self,
+        state: &mut GameState,
+        node: Node,
+        player: Player,
+    ) -> bool {
+        let reduction = self.config.null_move_reduction;
+
+        if reduction == 0
+            || !self.config.alpha_beta
+            || node.ply == 0
+            || !node.allow_null
+            || !node.is_scout()
+            || node.depth < reduction + 2
+        {
+            return false;
+        }
+
+        let Some(queen) = state.queen_coord(player) else { return false };
+
+        if state.board().count_occupied_neighbors(queen.cell()) > 3 {
+            return false;
+        }
+
+        self.evaluator.evaluate(state, player) >= node.beta
     }
 
     /// Search a node with minimax: the score is from the perspective of `root_player`,
@@ -628,6 +820,7 @@ impl Searcher {
                 beta,
                 on_principal_variation: self
                     .follows_principal_variation(follows, node.ply, mv),
+                allow_null: true,
             };
             state.apply_move(mv);
             let result = self.minimax(state, child, root_player, observer);

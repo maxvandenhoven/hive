@@ -1,6 +1,7 @@
 """Command line interface for the `hive` package."""
 
 import cProfile
+import gzip
 import json
 import logging
 import os
@@ -421,7 +422,13 @@ def replay(
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     try:
-        result = GauntletReport.from_json(json.loads(report.read_text())).replay(match)
+        if report.suffix == ".gz":
+            with gzip.open(report, "rt") as stream:
+                data = json.load(stream)
+        else:
+            data = json.loads(report.read_text())
+
+        result = GauntletReport.from_json(data).replay(match)
     except (OSError, ValueError) as e:
         raise typer.BadParameter(str(e), param_hint="REPORT") from e
 

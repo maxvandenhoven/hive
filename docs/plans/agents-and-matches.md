@@ -417,3 +417,7 @@ not deterministic. See `performance.md` for measured defaults and tuning evidenc
 The `nm-smp` preset selects unbounded negamax with a 0.5 aspiration window, PVS and two
 threads, keeping the default evaluator. The WP 28 weight sweep did not confirm a stronger
 evaluator on its independent one-second test, so no tuned-weight preset is promoted.
+
+The new evaluation terms and the configuration-based champion ratchet are documented in
+[evaluation.md](evaluation.md). Paired trials use `GauntletConfig.openings`; `MatchRunner`
+validates each opening and `MatchResult.record` includes it before the timed decisions.

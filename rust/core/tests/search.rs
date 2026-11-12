@@ -49,6 +49,10 @@ fn decide(
         aspiration_window: 0.0,
         threads: 1,
         principal_variation_search: false,
+        table_deeper_hits: false,
+        late_move_reductions: 0,
+        null_move_reduction: 0,
+        queen_attack_ordering: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut recorder = Recorder::default();
@@ -144,6 +148,10 @@ fn a_forced_win_is_final_at_depth_one() {
         aspiration_window: 0.0,
         threads: 1,
         principal_variation_search: false,
+        table_deeper_hits: false,
+        late_move_reductions: 0,
+        null_move_reduction: 0,
+        queen_attack_ordering: false,
     };
     let mut recorder = Recorder::default();
     Searcher::new(rules, config).think(&mut state, &mut recorder);
@@ -221,6 +229,18 @@ fn aspiration_and_helpers_preserve_scores_and_state_with_a_warm_table() {
         let weights = EvaluationWeights {
             positioning: 0.5,
             material_on_board: 0.1,
+            queen_danger: 0.1,
+            queen_escape: 0.1,
+            pinned_material: 0.025,
+            free_ants: 0.25,
+            beetle_control: 0.5,
+            tempo: 0.05,
+            mobile_queen: 0.2,
+            mobile_beetle: 0.1,
+            mobile_grasshopper: 0.1,
+            mobile_spider: 0.1,
+            mobile_ant: 0.3,
+            placement_cells: 0.02,
             ..Default::default()
         };
         let (_, reference) = decide(
@@ -244,6 +264,10 @@ fn aspiration_and_helpers_preserve_scores_and_state_with_a_warm_table() {
                 aspiration_window: 0.01,
                 threads,
                 principal_variation_search: true,
+                table_deeper_hits: false,
+                late_move_reductions: 0,
+                null_move_reduction: 0,
+                queen_attack_ordering: false,
             };
             let mut searcher = Searcher::new(rules, config);
 
@@ -303,6 +327,10 @@ fn cancellation_joins_helpers_and_restores_the_position() {
         aspiration_window: 0.01,
         threads: 4,
         principal_variation_search: true,
+        table_deeper_hits: false,
+        late_move_reductions: 0,
+        null_move_reduction: 0,
+        queen_attack_ordering: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut observer = StopObserver { remaining: 200, reports: Vec::new() };
@@ -337,6 +365,53 @@ fn observer_panic_cancels_helpers_before_joining() {
         aspiration_window: 0.5,
         threads: 2,
         principal_variation_search: true,
+        table_deeper_hits: false,
+        late_move_reductions: 0,
+        null_move_reduction: 0,
+        queen_attack_ordering: false,
     };
     Searcher::new(rules, config).think(&mut state, &mut PanickingObserver);
+}
+
+#[test]
+fn search_refinements_restore_the_state_and_visit_fewer_nodes() {
+    for name in ["long_hive", "ant_moves", "tournament_opening"] {
+        let (rules, state) = suite_position(name);
+        let weights = EvaluationWeights {
+            queen_danger: 0.1,
+            mobile_ant: 0.3,
+            placement_cells: 0.02,
+            ..Default::default()
+        };
+        let plain = SearchConfig {
+            principal_variation_search: true,
+            ..SearchConfig::new(SearchAlgorithm::Negamax, Some(5), weights)
+        };
+        let refined = SearchConfig {
+            table_deeper_hits: true,
+            late_move_reductions: 3,
+            null_move_reduction: 2,
+            queen_attack_ordering: true,
+            ..plain
+        };
+        let mut nodes = Vec::new();
+
+        for (config, threads) in [(plain, 1), (refined, 1), (refined, 2)] {
+            let mut searcher = Searcher::new(rules, SearchConfig { threads, ..config });
+            let mut position = state.clone();
+            let mut recorder = Recorder::default();
+            searcher.think(&mut position, &mut recorder);
+            assert_eq!(position, state, "{name}");
+            let last = recorder.reports.last().expect("a completed depth");
+            let mut replay = state.clone();
+
+            for mv in &last.principal_variation {
+                replay.apply_coord_move(*mv).expect("legal variation");
+            }
+
+            nodes.push(searcher.nodes());
+        }
+
+        assert!(nodes[1] < nodes[0], "{name}: {nodes:?}");
+    }
 }
