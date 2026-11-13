@@ -282,3 +282,22 @@ generation 3, 50-24-26 with 23 turn caps, normal lower bound 0.563. Depth 7.69 v
 Every candidate is within noise of generation 4 and almost 40% of the games reach the
 60-turn cap: the weights sit near a local optimum. null_move_reduction 1 was mildly
 positive for the second screen in a row and goes to confirmation.
+
+### Generation 5 rejected, progress check and repetition draws
+
+`confirm-gen5` (1 s, 50 pairs, seeds 30400–30449): null_move_reduction 1 on generation 4
+scored 0.520, 29-46-25 with 37 turn caps, normal lower bound 0.459: not promoted. The
+parameter tuning has reached a plateau.
+
+`cumulative-gen4` (1 s, 50 pairs, seeds 31000–31049): generation 4 against generation 0
+scored **0.885**, 84-9-7 with 9 turn caps, normal lower bound 0.839. Depth 7.05 vs 6.43
+at 900 vs 2149 knodes/s: the evaluation terms cost more than half of the speed and are
+worth far more.
+
+The 37 capped games of `confirm-gen5` are mostly not balanced: the last scores average
+beyond ±1.5 in 24 of them, one side had found a forced win when the cap came, and in
+several games one move repeats 16 to 34 times. The side ahead freezes the opponent and
+then moves a piece away from the queen and back, as no line of the search improves the
+evaluation for good. `repetition_draws` scores a position that repeats an earlier one of
+the searched line as a draw, so the side ahead must find progress. The screen of it uses
+a 100-turn cap so that conversions count.

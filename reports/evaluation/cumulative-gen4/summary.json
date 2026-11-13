@@ -1,0 +1,97 @@
+{
+  "champion": {
+    "generation": 0,
+    "name": "baseline-b90be45",
+    "source_revision": "b90be45",
+    "spec": {
+      "kind": "negamax",
+      "label": "champion",
+      "params": {
+        "queen_safety": 1.0,
+        "mobility": 0.0,
+        "positioning": 0.0,
+        "material_on_board": 0.0,
+        "material_in_hand": 0.0,
+        "queen_danger": 0.0,
+        "queen_escape": 0.0,
+        "pinned_material": 0.0,
+        "free_ants": 0.0,
+        "beetle_control": 0.0,
+        "alpha_beta": true,
+        "table_megabytes": 32,
+        "aspiration_window": 0.5,
+        "principal_variation_search": true,
+        "threads": 2,
+        "depth": null
+      }
+    },
+    "evidence": null
+  },
+  "champion_sha256": "03503ef49cbc344dfba1add94ebff564bd8d42b343cd7762a4febcb9c7a066e4",
+  "revision": "a6c9e48998db6df71ce5f7762b1216e629118c8c",
+  "engine_sha256": "bd865ec85063cd0cc7492285bb16165f0c1a1130c00174eb1c3317538cb87b42",
+  "dirty": false,
+  "phase": "confirmation",
+  "seed": 31000,
+  "pairs": 50,
+  "budget_s": 1.0,
+  "alpha": 0.05,
+  "gate": "fast",
+  "max_turns": 60,
+  "results": {
+    "generation-4": {
+      "spec": {
+        "kind": "negamax",
+        "params": {
+          "queen_safety": 1.0,
+          "mobility": 0.0,
+          "positioning": 0.0,
+          "material_on_board": 0.0,
+          "material_in_hand": 0.0,
+          "queen_danger": 0.0,
+          "queen_escape": 0.0,
+          "pinned_material": 0.05,
+          "free_ants": 0.0,
+          "beetle_control": 0.5,
+          "alpha_beta": true,
+          "table_megabytes": 32,
+          "aspiration_window": 0.5,
+          "principal_variation_search": true,
+          "threads": 2,
+          "depth": null,
+          "table_deeper_hits": true,
+          "late_move_reductions": 6,
+          "null_move_reduction": 2,
+          "queen_attack_ordering": true,
+          "tempo": 0.3,
+          "mobile_ant": 0.3,
+          "mobile_beetle": 0.15,
+          "mobile_queen": 0.2,
+          "mobile_spider": 0.1,
+          "mobile_grasshopper": 0.1
+        },
+        "label": null
+      },
+      "assessment": {
+        "pairs": 50,
+        "score": 0.885,
+        "wins": 84,
+        "draws": 9,
+        "losses": 7,
+        "turn_caps": 9,
+        "lower_bound": 0.8391790775349233,
+        "hoeffding_lower_bound": 0.7119181617397715,
+        "normal_lower_bound": 0.8391790775349233,
+        "bound": "normal",
+        "alpha": 0.05,
+        "candidate_mean_depth": 7.047161572052402,
+        "champion_mean_depth": 6.428857715430862,
+        "candidate_nodes_per_s": 899906.7331877729,
+        "champion_nodes_per_s": 2149254.1718436875,
+        "healthy": true,
+        "eligible": true
+      },
+      "report": "candidate-0.json.gz"
+    }
+  }
+}
