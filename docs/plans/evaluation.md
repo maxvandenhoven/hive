@@ -356,7 +356,7 @@ evidence.
 | 4 | structure weights doubled (pinned 0.05, beetle 0.5) | 0.620 |
 | 5 | repetition_draws, queen_safety 0.75 | 0.575 (100 pairs) |
 
-Generation 4 scored 0.885 against generation 0. The weight tuning has reached a plateau:
+On the fixed speed positions (1 s, `reports/evaluation/speed/champion-gen5.json`) generation 5 reaches depth 10.88 (max 12) at 2407 knodes/s, against 8.25 (max 10) at 7764 knodes/s for generation 0. Generation 4 scored 0.885 against generation 0. The weight tuning has reached a plateau:
 the last two screens of single weights were all within noise. The remaining weakness is
 conversion: about a quarter of the games at 1 s reach the turn cap, mostly fortresses in
 which the side ahead keeps the opponent frozen (`tests/data/search/frozen_opponent.json`)
