@@ -236,3 +236,10 @@ Capped games (26 of 100 in confirm-gen2) end with every piece placed and queens 
 repeatedly reach five neighbours but escape. Many queen neighbours are the owner's own
 free pieces, which do not threaten; `queen_locked_neighbors` counts only the neighbours
 the owner cannot move away (opponent tops and own pinned, covered or stuck pieces).
+
+### Generation 3 (promoted)
+
+`confirm-gen3` (1 s, 50 pairs, seeds 30200–30249, fast gate, revision 2858b2c): mobile
+pieces by type (ant 0.3, beetle 0.15, queen 0.2, spider 0.1, grasshopper 0.1) instead of
+free_ants scored **0.605** against generation 2, 43-35-22 with 31 turn caps, normal lower
+bound 0.546. Depth 7.89 vs 7.97 at 855 vs 858 knodes/s.
