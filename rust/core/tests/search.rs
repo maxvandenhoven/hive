@@ -449,3 +449,59 @@ fn repetition_draws_change_the_search_and_restore_the_state() {
 
     assert_ne!(nodes[0], nodes[1], "repeated positions end the line early");
 }
+
+#[test]
+fn repetition_draws_remember_the_decisions_of_the_game() {
+    let (rules, start) = suite_position("long_hive");
+    let reverse = |mv: CoordMove| CoordMove {
+        source: Some(mv.target),
+        target: mv.source.expect("a movement"),
+        ..mv
+    };
+    let mut pair = None;
+    let mut state = start.clone();
+
+    'search: for first in rules.movement_coord_moves(&mut state.clone()) {
+        let mut after_first = state.clone();
+        after_first.apply_coord_move(Some(first)).expect("legal move");
+
+        for second in rules.movement_coord_moves(&mut after_first.clone()) {
+            let mut back = after_first.clone();
+            back.apply_coord_move(Some(second)).expect("legal move");
+            let mut returns = false;
+
+            if rules.movement_coord_moves(&mut back).contains(&reverse(first)) {
+                back.apply_coord_move(Some(reverse(first))).expect("legal move");
+                returns =
+                    rules.movement_coord_moves(&mut back).contains(&reverse(second));
+                back.apply_coord_move(Some(reverse(second))).expect("legal move");
+            }
+
+            if returns && back.hash() == start.hash() {
+                pair = Some((first, second));
+                break 'search;
+            }
+        }
+    }
+
+    let (first, second) = pair.expect("two reversible moves");
+    state.apply_coord_move(Some(first)).expect("legal move");
+    state.apply_coord_move(Some(second)).expect("legal move");
+    let config = SearchConfig {
+        repetition_draws: true,
+        alpha_beta: false,
+        table_megabytes: 0,
+        ..SearchConfig::new(
+            SearchAlgorithm::Negamax,
+            Some(3),
+            EvaluationWeights::default(),
+        )
+    };
+    let mut fresh = Searcher::new(rules, config);
+    fresh.think(&mut state.clone(), &mut Recorder::default());
+    let mut playing = Searcher::new(rules, config);
+    playing.think(&mut start.clone(), &mut Recorder::default());
+    playing.think(&mut state.clone(), &mut Recorder::default());
+
+    assert!(playing.nodes() < fresh.nodes(), "the start position recurs as a draw");
+}
