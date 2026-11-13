@@ -80,6 +80,9 @@ pub struct SearchConfig {
     /// Search a move one ply deeper when it brings a queen to five or more occupied
     /// neighbours, so threats to win are resolved, up to twice the iteration's depth.
     pub queen_threat_extension: bool,
+    /// Score a position that repeats an earlier one of the searched line as a draw, so
+    /// the side ahead looks for progress instead of moving back and forth.
+    pub repetition_draws: bool,
 }
 
 impl SearchConfig {
@@ -105,6 +108,7 @@ impl SearchConfig {
             null_move_reduction: 0,
             queen_attack_ordering: false,
             queen_threat_extension: false,
+            repetition_draws: false,
         }
     }
 }
@@ -214,6 +218,8 @@ pub struct Searcher {
     worker_index: usize,
     /// The depth of the iteration in progress, which limits extensions.
     root_depth: u32,
+    /// The position hash at each ply of the line being searched, for repetitions.
+    path: Vec<u64>,
 }
 
 impl Searcher {
@@ -234,6 +240,7 @@ impl Searcher {
             ordering: Vec::new(),
             worker_index: 0,
             root_depth: 0,
+            path: Vec::new(),
         }
     }
 
@@ -372,6 +379,7 @@ impl Searcher {
         while self.buffers.len() < plies {
             self.buffers.push(Vec::with_capacity(256));
             self.lines.push(Vec::with_capacity(plies));
+            self.path.push(0);
         }
 
         while self.killers.len() < plies {
@@ -557,7 +565,9 @@ impl Searcher {
         self.lines[index].clear();
         let player = state.current_player();
 
-        if let Some(score) = self.terminal_score(state, player, node.ply) {
+        let ended = self.terminal_score(state, player, node.ply);
+
+        if let Some(score) = ended.or_else(|| self.repetition_score(state, index)) {
             return Ok(score);
         }
 
@@ -669,6 +679,21 @@ impl Searcher {
         }
 
         Ok(best)
+    }
+
+    /// Get the draw score of a position at a ply that repeats an earlier position of the
+    /// line with the same player to move, when repetitions are draws, and record the
+    /// position for later plies.
+    fn repetition_score(&mut self, state: &GameState, index: usize) -> Option<f64> {
+        if !self.config.repetition_draws {
+            return None;
+        }
+
+        let hash = state.hash();
+        self.path[index] = hash;
+        let repeats = self.path[index % 2..index].iter().step_by(2).any(|&h| h == hash);
+
+        repeats.then_some(0.0)
     }
 
     /// Store the result of a searched node in the transposition table, with its bound

@@ -70,6 +70,7 @@ class SearchAgent(Agent):
             zero for none.
         queen_attack_ordering: Order moves next to the enemy queen after killers.
         queen_threat_extension: Search a ply deeper once a queen has five neighbours.
+        repetition_draws: Score a repeat of an earlier searched position as a draw.
         searcher: The search of the Rust core, configured with the params.
         nodes: The number of nodes the last decision visited.
     """
@@ -114,6 +115,7 @@ class SearchAgent(Agent):
         null_move_reduction: Annotated[int, Field(ge=0, le=8)] = 0,
         queen_attack_ordering: bool = False,
         queen_threat_extension: bool = False,
+        repetition_draws: bool = False,
     ) -> None:
         """Initialize the search agent.
 
@@ -160,7 +162,7 @@ class SearchAgent(Agent):
                 zero for none.
             queen_attack_ordering: Order moves next to the enemy queen after killers.
             queen_threat_extension: Search a ply deeper once a queen has five neighbours.
-        queen_threat_extension: Search a ply deeper once a queen has five neighbours.
+            repetition_draws: Score a repeat of an earlier searched position as a draw.
         """
         super().__init__(rules=rules, seed=seed)
         self.depth = depth
@@ -192,6 +194,7 @@ class SearchAgent(Agent):
         self.null_move_reduction = null_move_reduction
         self.queen_attack_ordering = queen_attack_ordering
         self.queen_threat_extension = queen_threat_extension
+        self.repetition_draws = repetition_draws
         self.searcher = Searcher(
             rules,
             algorithm=self.ALGORITHM,
@@ -225,6 +228,7 @@ class SearchAgent(Agent):
             null_move_reduction=null_move_reduction,
             queen_attack_ordering=queen_attack_ordering,
             queen_threat_extension=queen_threat_extension,
+            repetition_draws=repetition_draws,
         )
         self.nodes = 0
 
