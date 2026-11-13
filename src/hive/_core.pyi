@@ -755,6 +755,7 @@ class Searcher:
         null_move_reduction: int = 0,
         queen_attack_ordering: bool = False,
         queen_threat_extension: bool = False,
+        repetition_draws: bool = False,
     ) -> None:
         """Create a searcher.
 
@@ -800,6 +801,7 @@ class Searcher:
                 zero for none.
             queen_attack_ordering: Order moves next to the enemy queen after killers.
             queen_threat_extension: Search a ply deeper once a queen has five neighbours.
+            repetition_draws: Score a repeat of an earlier searched position as a draw.
 
         Raises:
             ValueError: If the algorithm, depth, window or thread count is invalid.

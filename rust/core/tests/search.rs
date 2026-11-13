@@ -54,6 +54,7 @@ fn decide(
         null_move_reduction: 0,
         queen_attack_ordering: false,
         queen_threat_extension: false,
+        repetition_draws: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut recorder = Recorder::default();
@@ -154,6 +155,7 @@ fn a_forced_win_is_final_at_depth_one() {
         null_move_reduction: 0,
         queen_attack_ordering: false,
         queen_threat_extension: false,
+        repetition_draws: false,
     };
     let mut recorder = Recorder::default();
     Searcher::new(rules, config).think(&mut state, &mut recorder);
@@ -271,6 +273,7 @@ fn aspiration_and_helpers_preserve_scores_and_state_with_a_warm_table() {
                 null_move_reduction: 0,
                 queen_attack_ordering: false,
                 queen_threat_extension: false,
+                repetition_draws: false,
             };
             let mut searcher = Searcher::new(rules, config);
 
@@ -335,6 +338,7 @@ fn cancellation_joins_helpers_and_restores_the_position() {
         null_move_reduction: 0,
         queen_attack_ordering: false,
         queen_threat_extension: false,
+        repetition_draws: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut observer = StopObserver { remaining: 200, reports: Vec::new() };
@@ -374,6 +378,7 @@ fn observer_panic_cancels_helpers_before_joining() {
         null_move_reduction: 0,
         queen_attack_ordering: false,
         queen_threat_extension: false,
+        repetition_draws: false,
     };
     Searcher::new(rules, config).think(&mut state, &mut PanickingObserver);
 }
@@ -398,6 +403,7 @@ fn search_refinements_restore_the_state_and_visit_fewer_nodes() {
             null_move_reduction: 2,
             queen_attack_ordering: true,
             queen_threat_extension: true,
+            repetition_draws: true,
             ..plain
         };
         let mut nodes = Vec::new();
@@ -420,4 +426,26 @@ fn search_refinements_restore_the_state_and_visit_fewer_nodes() {
 
         assert!(nodes[1] < nodes[0], "{name}: {nodes:?}");
     }
+}
+
+#[test]
+fn repetition_draws_change_the_search_and_restore_the_state() {
+    let (rules, state) = suite_position("long_hive");
+    let weights = EvaluationWeights { mobile_ant: 0.3, ..Default::default() };
+    let plain = SearchConfig {
+        principal_variation_search: true,
+        ..SearchConfig::new(SearchAlgorithm::Negamax, Some(6), weights)
+    };
+    let mut nodes = Vec::new();
+
+    for repetition_draws in [false, true] {
+        let config = SearchConfig { repetition_draws, ..plain };
+        let mut searcher = Searcher::new(rules, config);
+        let mut position = state.clone();
+        searcher.think(&mut position, &mut Recorder::default());
+        assert_eq!(position, state);
+        nodes.push(searcher.nodes());
+    }
+
+    assert_ne!(nodes[0], nodes[1], "repeated positions end the line early");
 }
