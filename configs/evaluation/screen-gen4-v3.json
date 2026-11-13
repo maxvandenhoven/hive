@@ -1,0 +1,5 @@
+{
+  "repetition": {"repetition_draws": true},
+  "repetition-queen-safety-0.75": {"repetition_draws": true, "queen_safety": 0.75},
+  "repetition-null1": {"repetition_draws": true, "null_move_reduction": 1}
+}

@@ -756,6 +756,7 @@ class Searcher:
         queen_attack_ordering: bool = False,
         queen_threat_extension: bool = False,
         repetition_draws: bool = False,
+        forced_move_extension: bool = False,
     ) -> None:
         """Create a searcher.
 
@@ -802,6 +803,7 @@ class Searcher:
             queen_attack_ordering: Order moves next to the enemy queen after killers.
             queen_threat_extension: Search a ply deeper once a queen has five neighbours.
             repetition_draws: Score a repeat of an earlier position as a draw.
+            forced_move_extension: Search a forced move without using up depth.
 
         Raises:
             ValueError: If the algorithm, depth, window or thread count is invalid.
