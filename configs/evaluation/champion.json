@@ -1,11 +1,11 @@
 {
-  "generation": 4,
-  "name": "structure-x2",
-  "source_revision": "a6c9e48998db6df71ce5f7762b1216e629118c8c",
+  "generation": 5,
+  "name": "repetition-queen-safety-0.75",
+  "source_revision": "bcf17fabba34d9fb275e9fba0b99e155b879eb78",
   "spec": {
     "kind": "negamax",
     "params": {
-      "queen_safety": 1.0,
+      "queen_safety": 0.75,
       "mobility": 0.0,
       "positioning": 0.0,
       "material_on_board": 0.0,
@@ -30,9 +30,10 @@
       "mobile_beetle": 0.15,
       "mobile_queen": 0.2,
       "mobile_spider": 0.1,
-      "mobile_grasshopper": 0.1
+      "mobile_grasshopper": 0.1,
+      "repetition_draws": true
     },
     "label": null
   },
-  "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen4/summary.json"
+  "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen5b-extension/summary.json"
 }
