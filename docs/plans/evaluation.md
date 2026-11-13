@@ -259,3 +259,10 @@ bound 0.546. Depth 7.89 vs 7.97 at 855 vs 858 knodes/s.
 `queen_locked_neighbors` on top of queen_safety hurts: it double counts the queen
 pressure. Doubling the structure weights (pinned_material 0.05, beetle_control 0.5) was
 positive for the second screen in a row and goes to confirmation.
+
+### Generation 4 (promoted)
+
+`confirm-gen4` (1 s, 50 pairs, seeds 30300–30349, fast gate, revision a6c9e48): doubled
+structure weights (pinned_material 0.05, beetle_control 0.5) scored **0.620** against
+generation 3, 50-24-26 with 23 turn caps, normal lower bound 0.563. Depth 7.69 vs 7.80 at
+914 vs 856 knodes/s.

@@ -1,7 +1,7 @@
 {
-  "generation": 3,
-  "name": "mobile",
-  "source_revision": "2858b2c9353b492738dcaf5e0fd9d680d6cccd5f",
+  "generation": 4,
+  "name": "structure-x2",
+  "source_revision": "a6c9e48998db6df71ce5f7762b1216e629118c8c",
   "spec": {
     "kind": "negamax",
     "params": {
@@ -12,9 +12,9 @@
       "material_in_hand": 0.0,
       "queen_danger": 0.0,
       "queen_escape": 0.0,
-      "pinned_material": 0.025,
+      "pinned_material": 0.05,
       "free_ants": 0.0,
-      "beetle_control": 0.25,
+      "beetle_control": 0.5,
       "alpha_beta": true,
       "table_megabytes": 32,
       "aspiration_window": 0.5,
@@ -34,5 +34,5 @@
     },
     "label": null
   },
-  "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen3/summary.json"
+  "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen4/summary.json"
 }
