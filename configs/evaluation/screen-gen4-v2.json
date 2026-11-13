@@ -1,0 +1,7 @@
+{
+  "repetition": {"repetition_draws": true},
+  "repetition-queen-safety-0.75": {"repetition_draws": true, "queen_safety": 0.75},
+  "repetition-queen-safety-1.5": {"repetition_draws": true, "queen_safety": 1.5},
+  "repetition-null1": {"repetition_draws": true, "null_move_reduction": 1},
+  "repetition-threat-extension": {"repetition_draws": true, "queen_threat_extension": true}
+}
