@@ -39,6 +39,7 @@ tuning to fix the score scale, since aspiration windows use that scale too.
 | tempo | Bonus for the side to move, against the odd-even effect of the depth |
 | mobile_queen … mobile_ant | Per type: top, unpinned pieces that can make a first step (sliders need a free slide), once their queen is placed |
 | placement_cells | Free cells next to own and not next to enemy tops, for players with a hand |
+| queen_locked_neighbors | Queen neighbours its owner cannot move away: opponent tops and own pinned, covered or stuck pieces |
 
 Structural terms count integers per player and multiply by the weights at the end, so the
 score does not depend on the board scan order, which depends on the move history (an
@@ -217,3 +218,21 @@ queen_attack_ordering (on the b90be45 search settings).
 and late_move_reductions 6 on generation 1 scored **0.590**, 42-34-24 with 26 turn caps,
 normal lower bound 0.536. Depth 7.78 vs 7.89 at 883 vs 822 knodes/s. A quarter of the
 games now reach the 60-turn cap: the stronger agents defend well but convert poorly.
+
+| Trial | Candidate | Score | W-D-L (caps) | Normal lower | Depth cand/champ | knodes/s cand/champ |
+|---|---|---|---|---|---|---|
+| screen-gen2-v1 (0.25 s, 24 pairs, seed 300, gen 2) | positioning 0.25 | 0.365 | 11-13-24 (10) | 0.269 | 6.60 / 6.43 | 835 / 880 |
+| | positioning 0.5 | 0.406 | 15-9-24 (7) | 0.333 | 6.39 / 6.17 | 816 / 899 |
+| | mobility 0.02 | 0.417 | 12-16-20 (16) | 0.348 | 5.40 / 6.79 | 323 / 845 |
+| | mobile pieces (free_ants 0) | 0.615 | 23-13-12 (8) | 0.522 | 6.59 / 6.50 | 925 / 959 |
+| | mobile_ant 0.3 (free_ants 0) | 0.562 | 21-12-15 (12) | 0.479 | 6.44 / 6.53 | 911 / 895 |
+| | structure weights doubled | 0.583 | 19-18-11 (14) | 0.499 | 6.64 / 6.88 | 952 / 888 |
+| | tempo 0.5 | 0.573 | 20-15-13 (13) | 0.493 | 6.53 / 6.63 | 943 / 912 |
+| | late_move_reductions 8 | 0.500 | 18-12-18 (8) | 0.426 | 6.40 / 6.42 | 908 / 924 |
+| | queen_safety 1.5 | 0.458 | 16-12-20 (8) | 0.390 | 6.40 / 6.29 | 921 / 984 |
+| | aspiration_window 0.25 | 0.427 | 15-11-22 (10) | 0.336 | 6.39 / 6.37 | 907 / 904 |
+
+Capped games (26 of 100 in confirm-gen2) end with every piece placed and queens that
+repeatedly reach five neighbours but escape. Many queen neighbours are the owner's own
+free pieces, which do not threaten; `queen_locked_neighbors` counts only the neighbours
+the owner cannot move away (opponent tops and own pinned, covered or stuck pieces).

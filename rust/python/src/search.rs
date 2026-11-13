@@ -139,6 +139,7 @@ impl PySearcher {
     ///     mobile_spider: Own minus opponent spiders that can take a first step.
     ///     mobile_ant: Own minus opponent ants that can take a first step.
     ///     placement_cells: Own minus opponent free cells to place a piece on.
+    ///     queen_locked_neighbors: Queen neighbours its owner cannot move away.
     ///     stop_check_interval: The number of nodes between two calls of
     ///         `turn.should_stop`.
     ///     alpha_beta: Whether to prune with alpha-beta, which finds the same scores in
@@ -181,6 +182,7 @@ impl PySearcher {
         mobile_spider = 0.0,
         mobile_ant = 0.0,
         placement_cells = 0.0,
+        queen_locked_neighbors = 0.0,
         stop_check_interval = 1024,
         alpha_beta = true,
         table_megabytes = 32,
@@ -219,6 +221,7 @@ impl PySearcher {
         mobile_spider: f64,
         mobile_ant: f64,
         placement_cells: f64,
+        queen_locked_neighbors: f64,
         stop_check_interval: u64,
         alpha_beta: bool,
         table_megabytes: usize,
@@ -271,6 +274,7 @@ impl PySearcher {
             mobile_spider,
             mobile_ant,
             placement_cells,
+            queen_locked_neighbors,
         ]
         .iter()
         .any(|weight| !weight.is_finite())
@@ -296,6 +300,7 @@ impl PySearcher {
             mobile_spider,
             mobile_ant,
             placement_cells,
+            queen_locked_neighbors,
         };
         let config = SearchConfig {
             algorithm,

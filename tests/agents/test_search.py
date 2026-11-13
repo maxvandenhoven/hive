@@ -261,6 +261,7 @@ def test_native_search_rejects_invalid_parallel_options(
         "mobile_grasshopper",
         "mobile_ant",
         "placement_cells",
+        "queen_locked_neighbors",
     ],
 )
 def test_structural_terms_are_antisymmetric_and_restore_state(
@@ -303,6 +304,10 @@ def test_structural_terms_are_antisymmetric_and_restore_state(
         assert white == -1
     elif term == "placement_cells":
         assert white == -8
+    elif term == "queen_locked_neighbors":
+        # White's queen: Black's queen and White's pinned ant are locked. Black's queen:
+        # White's ant is locked, Black's free beetle on the white queen is not.
+        assert white == 1 - 2
     else:
         black_state = rules.from_board(board=board, current_player=Player.BLACK)
         escapes = sum(

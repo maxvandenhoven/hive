@@ -57,6 +57,7 @@ class SearchAgent(Agent):
         mobile_spider: Own minus opponent spiders that can take a first step.
         mobile_ant: Own minus opponent ants that can take a first step.
         placement_cells: Own minus opponent free cells to place a piece on.
+        queen_locked_neighbors: Queen neighbours its owner cannot move away.
         alpha_beta: Whether the search prunes with alpha-beta.
         table_megabytes: The size of the transposition table in MB.
         aspiration_window: Initial score half-window, zero to disable aspiration.
@@ -102,6 +103,7 @@ class SearchAgent(Agent):
         mobile_spider: Annotated[float, Field(allow_inf_nan=False)] = 0.0,
         mobile_ant: Annotated[float, Field(allow_inf_nan=False)] = 0.0,
         placement_cells: Annotated[float, Field(allow_inf_nan=False)] = 0.0,
+        queen_locked_neighbors: Annotated[float, Field(allow_inf_nan=False)] = 0.0,
         alpha_beta: bool = True,
         table_megabytes: Annotated[int, Field(ge=0)] = 32,
         aspiration_window: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0,
@@ -141,6 +143,7 @@ class SearchAgent(Agent):
             mobile_spider: Own minus opponent spiders that can take a first step.
             mobile_ant: Own minus opponent ants that can take a first step.
             placement_cells: Own minus opponent free cells to place a piece on.
+            queen_locked_neighbors: Queen neighbours its owner cannot move away.
             alpha_beta: Whether to prune the search with alpha-beta, searching the best
                 line of the previous depth first. It finds the same scores in far fewer
                 nodes, but may choose another of several equally scored moves.
@@ -178,6 +181,7 @@ class SearchAgent(Agent):
         self.mobile_spider = mobile_spider
         self.mobile_ant = mobile_ant
         self.placement_cells = placement_cells
+        self.queen_locked_neighbors = queen_locked_neighbors
         self.alpha_beta = alpha_beta
         self.table_megabytes = table_megabytes
         self.aspiration_window = aspiration_window
@@ -209,6 +213,7 @@ class SearchAgent(Agent):
             mobile_spider=mobile_spider,
             mobile_ant=mobile_ant,
             placement_cells=placement_cells,
+            queen_locked_neighbors=queen_locked_neighbors,
             stop_check_interval=self.STOP_CHECK_INTERVAL,
             alpha_beta=alpha_beta,
             table_megabytes=table_megabytes,
