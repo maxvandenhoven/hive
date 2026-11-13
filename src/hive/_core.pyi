@@ -743,6 +743,7 @@ class Searcher:
         mobile_spider: float = 0.0,
         mobile_ant: float = 0.0,
         placement_cells: float = 0.0,
+        queen_locked_neighbors: float = 0.0,
         stop_check_interval: int = 1024,
         alpha_beta: bool = True,
         table_megabytes: int = 32,
@@ -782,6 +783,7 @@ class Searcher:
             mobile_spider: Own minus opponent spiders that can take a first step.
             mobile_ant: Own minus opponent ants that can take a first step.
             placement_cells: Own minus opponent free cells to place a piece on.
+            queen_locked_neighbors: Queen neighbours its owner cannot move away.
             stop_check_interval: The number of nodes between two calls of
                 `turn.should_stop`.
             alpha_beta: Whether to prune with alpha-beta, which finds the same scores in

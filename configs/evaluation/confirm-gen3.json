@@ -1,0 +1,10 @@
+{
+  "mobile": {
+    "free_ants": 0.0,
+    "mobile_ant": 0.3,
+    "mobile_beetle": 0.15,
+    "mobile_queen": 0.2,
+    "mobile_spider": 0.1,
+    "mobile_grasshopper": 0.1
+  }
+}

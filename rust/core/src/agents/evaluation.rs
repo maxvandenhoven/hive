@@ -52,6 +52,9 @@ pub struct EvaluationWeights {
     pub mobile_ant: f64,
     /// Own minus opponent free cells to place a piece on, for players with a hand.
     pub placement_cells: f64,
+    /// Occupied neighbours of the opponent's queen minus the player's own that the
+    /// queen's owner cannot move away: opponent pieces and own pinned or stuck ones.
+    pub queen_locked_neighbors: f64,
 }
 
 impl Default for EvaluationWeights {
@@ -74,6 +77,7 @@ impl Default for EvaluationWeights {
             mobile_spider: 0.0,
             mobile_ant: 0.0,
             placement_cells: 0.0,
+            queen_locked_neighbors: 0.0,
         }
     }
 }
@@ -100,6 +104,7 @@ impl EvaluationWeights {
         self.pinned_material != 0.0
             || self.free_ants != 0.0
             || self.beetle_control != 0.0
+            || self.queen_locked_neighbors != 0.0
             || self.mobile().iter().any(|&weight| weight != 0.0)
     }
 }
@@ -117,6 +122,8 @@ struct StructureFeatures {
     beetle_control: i32,
     /// The player's mobile pieces by piece type (see [`EvaluationWeights::mobile`]).
     mobile: [i32; PieceType::COUNT],
+    /// The occupied neighbours of the player's queen that the player cannot move away.
+    locked_queen_neighbors: i32,
 }
 
 impl StructureFeatures {
@@ -124,6 +131,7 @@ impl StructureFeatures {
     fn of_board(state: &GameState, articulation: u64) -> [Self; 2] {
         let board = state.board();
         let mut features = [StructureFeatures::default(); 2];
+        let mut movable = CellSet::new();
 
         for (slot, &cell) in board.occupied().iter().enumerate() {
             let stack = board.stack(cell);
@@ -155,8 +163,24 @@ impl StructureFeatures {
 
                 if queen_placed && piece_can_step(board, cell, piece_type, height) {
                     own.mobile[piece_type.index()] += 1;
+                    movable.insert(cell);
                 }
             }
+        }
+
+        for owner in Player::ALL {
+            let Some(queen) = state.queen_coord(owner) else { continue };
+            let cell = queen.cell();
+            let locked = (0..DIRECTION_COUNT)
+                .map(|direction| cell.neighbor(direction))
+                .filter(|&neighbor| {
+                    board.is_occupied(neighbor)
+                        && !(board.top(neighbor).owner() == owner
+                            && movable.contains(neighbor))
+                })
+                .count();
+            features[owner.index()].locked_queen_neighbors =
+                i32::try_from(locked).unwrap_or(i32::MAX);
         }
 
         features
@@ -319,6 +343,7 @@ impl Evaluator {
         let weights = self.weights;
         let needs_articulation = weights.pinned_material != 0.0
             || weights.free_ants != 0.0
+            || weights.queen_locked_neighbors != 0.0
             || weights.mobile().iter().any(|&weight| weight != 0.0);
         let articulation =
             if needs_articulation { state.board().articulation_slots() } else { 0 };
@@ -329,7 +354,9 @@ impl Evaluator {
             * f64::from(opponent.pinned_value - own.pinned_value)
             + weights.free_ants * f64::from(own.free_ants - opponent.free_ants)
             + weights.beetle_control
-                * f64::from(own.beetle_control - opponent.beetle_control);
+                * f64::from(own.beetle_control - opponent.beetle_control)
+            + weights.queen_locked_neighbors
+                * f64::from(opponent.locked_queen_neighbors - own.locked_queen_neighbors);
 
         for (weight, (own, opponent)) in
             weights.mobile().iter().zip(own.mobile.iter().zip(opponent.mobile.iter()))
