@@ -332,3 +332,35 @@ as many of its own moves.
 
 Repetition draws with queen_safety 0.75 scored 0.583 and 0.677 in two screens and goes to
 confirmation (`confirm-gen5b`, 1 s, 50 pairs, seeds 30500–30549, 100-turn cap).
+
+### Generation 5 (promoted)
+
+`confirm-gen5b` (1 s, 50 pairs, seeds 30500–30549, 100-turn cap, revision bcf17fa):
+repetition_draws with queen_safety 0.75 on generation 4 scored 0.555, 41-29-30 with 22
+turn caps, normal lower bound 0.496: just short of the fast gate. As both screens agreed
+(0.583 and 0.677), 50 more pairs ran on fresh seeds: `confirm-gen5b-extension` (seeds
+30600–30649) scored **0.595**, 45-29-26 with 28 turn caps, normal lower bound 0.534, and
+the 100 pairs pooled score 0.575 with normal lower bound 0.533. Depth 8.21 vs 8.38 at 910
+vs 891 knodes/s. The extension was decided after seeing the first result, which makes the
+95% bound somewhat optimistic; the extension passes the gate on its own fresh seeds. The
+promotion was written by hand in the format of `tune_champion.py`, with the extension as
+evidence.
+
+## Status after generation 5
+
+| Generation | Change | Score vs previous (1 s, 50 pairs) |
+|---|---|---|
+| 1 | structure terms, search refinements (LMR 3, null move 2, deeper hits, queen ordering) | 0.845 |
+| 2 | tempo 0.3, late_move_reductions 6 | 0.590 |
+| 3 | mobile pieces by type instead of free ants | 0.605 |
+| 4 | structure weights doubled (pinned 0.05, beetle 0.5) | 0.620 |
+| 5 | repetition_draws, queen_safety 0.75 | 0.575 (100 pairs) |
+
+Generation 4 scored 0.885 against generation 0. The weight tuning has reached a plateau:
+the last two screens of single weights were all within noise. The remaining weakness is
+conversion: about a quarter of the games at 1 s reach the turn cap, mostly fortresses in
+which the side ahead keeps the opponent frozen (`tests/data/search/frozen_opponent.json`)
+and does not risk releasing it to surround the queen. Promising next steps are evaluation
+changes for that: fade the pinned and mobility terms as the game goes on without progress,
+or score the reachable empty neighbours of the opponent's queen. Before matches against
+people, run the strict gate (10 s, 100 pairs) of the final champion against generation 0.
