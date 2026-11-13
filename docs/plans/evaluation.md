@@ -301,3 +301,24 @@ then moves a piece away from the queen and back, as no line of the search improv
 evaluation for good. `repetition_draws` scores a position that repeats an earlier one of
 the searched line as a draw, so the side ahead must find progress. The screen of it uses
 a 100-turn cap so that conversions count.
+
+| Trial | Candidate | Score | W-D-L (caps) | Normal lower | Depth cand/champ | knodes/s cand/champ |
+|---|---|---|---|---|---|---|
+| screen-gen4-v2 (0.25 s, 24 pairs, seed 600, 100 turns, line repeats only) | repetition_draws | 0.521 | 17-16-15 (14) | 0.419 | 6.89 / 7.07 | 872 / 882 |
+| | repetition, queen_safety 0.75 | 0.531 | 19-13-16 (11) | 0.417 | 7.22 / 7.33 | 946 / 931 |
+| | repetition, queen_safety 1.5 | 0.417 | 12-16-20 (15) | 0.310 | 6.89 / 6.67 | 828 / 943 |
+| | repetition, null_move_reduction 1 | 0.479 | 17-12-19 (10) | 0.366 | 6.75 / 6.77 | 920 / 932 |
+| | repetition, queen_threat_extension | 0.458 | 12-20-16 (16) | 0.370 | 6.10 / 7.04 | 883 / 911 |
+| screen-gen4-v3 (same, game repeats too) | repetition_draws | 0.417 | 12-16-20 (13) | 0.340 | 7.09 / 6.97 | 904 / 921 |
+| | repetition, queen_safety 0.75 | 0.583 | 23-10-15 (7) | 0.479 | 6.73 / 6.93 | 955 / 924 |
+| | repetition, null_move_reduction 1 | 0.531 | 16-19-13 (16) | 0.428 | 6.91 / 6.87 | 913 / 917 |
+
+Repeats of the searched line alone miss a shuffle across real moves, so the searcher now
+also records the root of each decision. Neither version helps: the capped games are
+fortresses, not shuffles. In `tests/data/search/frozen_opponent.json` (from
+screen-gen4-v3) Black is frozen and passes, and White leads by 7.25, mostly pinned
+material and mobility. Every way to fill the last two queen neighbours moves a White piece
+that pins Black, and a search of depth 10 still keeps the frozen position. With 123 legal
+moves White never has to repeat a position. `forced_move_extension` searches a forced move
+(such as a pass) without using up depth, so the attacker of a frozen opponent sees twice
+as many of its own moves.
