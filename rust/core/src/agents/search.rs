@@ -80,8 +80,9 @@ pub struct SearchConfig {
     /// Search a move one ply deeper when it brings a queen to five or more occupied
     /// neighbours, so threats to win are resolved, up to twice the iteration's depth.
     pub queen_threat_extension: bool,
-    /// Score a position that repeats an earlier one of the searched line as a draw, so
-    /// the side ahead looks for progress instead of moving back and forth.
+    /// Score a position that repeats an earlier one of the searched line, or a position
+    /// the searcher decided from earlier in the game, as a draw, so the side ahead looks
+    /// for progress instead of moving back and forth.
     pub repetition_draws: bool,
 }
 
@@ -220,6 +221,10 @@ pub struct Searcher {
     root_depth: u32,
     /// The position hash at each ply of the line being searched, for repetitions.
     path: Vec<u64>,
+    /// The ply and position hash of each earlier decision of the game, for repetitions.
+    game_path: Vec<(i64, u64)>,
+    /// One bit per position of `game_path`, chosen by its hash, to skip most lookups.
+    game_filter: u64,
 }
 
 impl Searcher {
@@ -241,6 +246,8 @@ impl Searcher {
             worker_index: 0,
             root_depth: 0,
             path: Vec::new(),
+            game_path: Vec::new(),
+            game_filter: 0,
         }
     }
 
@@ -252,6 +259,8 @@ impl Searcher {
     /// Forget everything learned in earlier decisions: the transposition table, the
     /// killer moves and the history, for example before a new game.
     pub fn clear(&mut self) {
+        self.game_path.clear();
+        self.game_filter = 0;
         self.table.clear();
         self.killers.clear();
         self.history.fill(0);
@@ -272,6 +281,10 @@ impl Searcher {
     /// The state is searched in place and restored before returning, also when the
     /// observer stops the search.
     pub fn think(&mut self, state: &mut GameState, observer: &mut impl SearchObserver) {
+        if self.config.repetition_draws {
+            self.record_decision(state);
+        }
+
         if self.config.threads <= 1 || self.config.algorithm != SearchAlgorithm::Negamax {
             self.think_serial(state, observer);
             return;
@@ -293,6 +306,16 @@ impl Searcher {
 
             self.think_serial(state, observer);
         });
+    }
+
+    /// Record the position of a decision for repetitions, after forgetting the decisions
+    /// at the same or a later ply, which belong to another game or to undone moves.
+    fn record_decision(&mut self, state: &GameState) {
+        let ply = state.current_ply();
+        self.game_path.retain(|&(earlier, _)| earlier < ply);
+        self.game_path.push((ply, state.hash()));
+        self.game_filter =
+            self.game_path.iter().fold(0, |filter, &(_, hash)| filter | 1 << (hash & 63));
     }
 
     /// Run iterative deepening on one thread; only the main thread calls the client.
@@ -682,8 +705,8 @@ impl Searcher {
     }
 
     /// Get the draw score of a position at a ply that repeats an earlier position of the
-    /// line with the same player to move, when repetitions are draws, and record the
-    /// position for later plies.
+    /// line with the same player to move or an earlier decision of the game, when
+    /// repetitions are draws, and record the position for later plies.
     fn repetition_score(&mut self, state: &GameState, index: usize) -> Option<f64> {
         if !self.config.repetition_draws {
             return None;
@@ -691,7 +714,10 @@ impl Searcher {
 
         let hash = state.hash();
         self.path[index] = hash;
-        let repeats = self.path[index % 2..index].iter().step_by(2).any(|&h| h == hash);
+        let repeats = self.path[index % 2..index].iter().step_by(2).any(|&h| h == hash)
+            || index > 0
+                && self.game_filter & 1 << (hash & 63) != 0
+                && self.game_path.iter().any(|&(_, earlier)| earlier == hash);
 
         repeats.then_some(0.0)
     }
