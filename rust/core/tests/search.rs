@@ -3,12 +3,14 @@
 
 mod common;
 
-use common::suite_position;
+use common::{parse_move, suite_position};
 use hive_core::agents::{
     DepthReport, EvaluationWeights, SEARCH_WIN_SCORE, SearchAlgorithm, SearchConfig,
     SearchObserver, Searcher,
 };
-use hive_core::engine::{Coord, CoordMove, Piece, PieceType, Player, Rules};
+use hive_core::engine::{
+    Coord, CoordMove, GameState, Piece, PieceType, Player, Rules, RulesConfig,
+};
 
 /// An observer that never stops and keeps every report.
 #[derive(Default)]
@@ -55,6 +57,7 @@ fn decide(
         queen_attack_ordering: false,
         queen_threat_extension: false,
         repetition_draws: false,
+        forced_move_extension: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut recorder = Recorder::default();
@@ -156,6 +159,7 @@ fn a_forced_win_is_final_at_depth_one() {
         queen_attack_ordering: false,
         queen_threat_extension: false,
         repetition_draws: false,
+        forced_move_extension: false,
     };
     let mut recorder = Recorder::default();
     Searcher::new(rules, config).think(&mut state, &mut recorder);
@@ -274,6 +278,7 @@ fn aspiration_and_helpers_preserve_scores_and_state_with_a_warm_table() {
                 queen_attack_ordering: false,
                 queen_threat_extension: false,
                 repetition_draws: false,
+                forced_move_extension: false,
             };
             let mut searcher = Searcher::new(rules, config);
 
@@ -339,6 +344,7 @@ fn cancellation_joins_helpers_and_restores_the_position() {
         queen_attack_ordering: false,
         queen_threat_extension: false,
         repetition_draws: false,
+        forced_move_extension: false,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut observer = StopObserver { remaining: 200, reports: Vec::new() };
@@ -379,6 +385,7 @@ fn observer_panic_cancels_helpers_before_joining() {
         queen_attack_ordering: false,
         queen_threat_extension: false,
         repetition_draws: false,
+        forced_move_extension: false,
     };
     Searcher::new(rules, config).think(&mut state, &mut PanickingObserver);
 }
@@ -504,4 +511,46 @@ fn repetition_draws_remember_the_decisions_of_the_game() {
     playing.think(&mut state.clone(), &mut Recorder::default());
 
     assert!(playing.nodes() < fresh.nodes(), "the start position recurs as a draw");
+}
+
+/// Get the last position of a capped game in which Black is frozen and only passes.
+fn frozen_opponent() -> (Rules, GameState) {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/data/search/frozen_opponent.json");
+    let game: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the game exists"))
+            .expect("JSON");
+    let rules = Rules::new(RulesConfig::default()).expect("the default rules are valid");
+    let mut state = rules.create_initial_state();
+
+    for mv in game["moves"].as_array().expect("moves") {
+        rules.apply_checked_move(&mut state, parse_move(mv)).expect("a legal move");
+    }
+
+    (rules, state)
+}
+
+#[test]
+fn forced_move_extension_searches_the_moves_against_a_frozen_opponent_deeper() {
+    let (rules, state) = frozen_opponent();
+    let config = SearchConfig {
+        principal_variation_search: true,
+        ..SearchConfig::new(
+            SearchAlgorithm::Negamax,
+            Some(4),
+            EvaluationWeights::default(),
+        )
+    };
+    let mut nodes = Vec::new();
+
+    for forced_move_extension in [false, true] {
+        let mut searcher =
+            Searcher::new(rules, SearchConfig { forced_move_extension, ..config });
+        let mut position = state.clone();
+        searcher.think(&mut position, &mut Recorder::default());
+        assert_eq!(position, state);
+        nodes.push(searcher.nodes());
+    }
+
+    assert!(nodes[1] > nodes[0], "{nodes:?}");
 }

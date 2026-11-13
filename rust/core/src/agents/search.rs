@@ -84,6 +84,10 @@ pub struct SearchConfig {
     /// the searcher decided from earlier in the game, as a draw, so the side ahead looks
     /// for progress instead of moving back and forth.
     pub repetition_draws: bool,
+    /// Search the move of a node with a single legal move, a forced pass included,
+    /// without using up depth, up to twice the iteration's depth, so the attacker of a
+    /// frozen opponent sees as many of its own moves as with a free opponent.
+    pub forced_move_extension: bool,
 }
 
 impl SearchConfig {
@@ -110,6 +114,7 @@ impl SearchConfig {
             queen_attack_ordering: false,
             queen_threat_extension: false,
             repetition_draws: false,
+            forced_move_extension: false,
         }
     }
 }
@@ -396,7 +401,9 @@ impl Searcher {
 
     /// Make sure there is a move buffer and a line for every ply of a depth.
     fn reserve(&mut self, depth: u32) {
-        let extended = if self.config.queen_threat_extension { 2 * depth } else { depth };
+        let extends =
+            self.config.queen_threat_extension || self.config.forced_move_extension;
+        let extended = if extends { 2 * depth } else { depth };
         let plies = extended as usize + 2;
 
         while self.buffers.len() < plies {
@@ -646,7 +653,7 @@ impl Searcher {
         for position in 0..moves.len().max(1) {
             let mv = moves.get(position).copied();
             state.apply_move(mv);
-            let extend = self.extends(state, node, crowding);
+            let extend = self.extends(state, node, crowding, moves.len() <= 1);
             let mut child = Node {
                 depth: node.depth - 1 + u32::from(extend),
                 ply: node.ply + 1,
@@ -782,13 +789,26 @@ impl Searcher {
         }
     }
 
-    /// Check whether the move just applied at a node is extended: the option is on, the
-    /// extended line stays within twice the iteration's depth, and a queen's occupied
-    /// neighbours grew to five or more from `before`, its count at the node.
-    fn extends(&self, state: &GameState, node: Node, before: [usize; 2]) -> bool {
-        if !self.config.queen_threat_extension
-            || node.ply + node.depth >= 2 * self.root_depth
-        {
+    /// Check whether the move just applied at a node is extended: the extended line stays
+    /// within twice the iteration's depth, and either the move was `forced`, the only one
+    /// of the node, or a queen's occupied neighbours grew to five or more from `before`,
+    /// its count at the node, with the matching option on.
+    fn extends(
+        &self,
+        state: &GameState,
+        node: Node,
+        before: [usize; 2],
+        forced: bool,
+    ) -> bool {
+        if node.ply + node.depth >= 2 * self.root_depth {
+            return false;
+        }
+
+        if forced && self.config.forced_move_extension {
+            return true;
+        }
+
+        if !self.config.queen_threat_extension {
             return false;
         }
 

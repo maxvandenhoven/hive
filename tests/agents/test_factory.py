@@ -138,7 +138,7 @@ class TestAgentSpecFromYaml:
             "aspiration_window, threads, "
             "principal_variation_search, table_deeper_hits, late_move_reductions, "
             "null_move_reduction, queen_attack_ordering, queen_threat_extension, "
-            "repetition_draws.",
+            "repetition_draws, forced_move_extension.",
         ]
 
 
@@ -366,6 +366,7 @@ class TestListAgents:
             "queen_attack_ordering",
             "queen_threat_extension",
             "repetition_draws",
+            "forced_move_extension",
         ]
         assert properties["depth"] == {
             "anyOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}],

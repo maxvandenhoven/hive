@@ -157,6 +157,7 @@ impl PySearcher {
     ///     queen_attack_ordering: Order moves next to the enemy queen after killers.
     ///     queen_threat_extension: Search a ply deeper once a queen has five neighbours.
     ///     repetition_draws: Score a repeat of an earlier position as a draw.
+    ///     forced_move_extension: Search a forced move without using up depth.
     ///
     /// Raises:
     ///     ValueError: If the algorithm, depth, window or thread count is invalid.
@@ -195,7 +196,8 @@ impl PySearcher {
         null_move_reduction = 0,
         queen_attack_ordering = false,
         queen_threat_extension = false,
-        repetition_draws = false
+        repetition_draws = false,
+        forced_move_extension = false
     ))]
     #[expect(
         clippy::too_many_arguments,
@@ -236,6 +238,7 @@ impl PySearcher {
         queen_attack_ordering: bool,
         queen_threat_extension: bool,
         repetition_draws: bool,
+        forced_move_extension: bool,
     ) -> PyResult<Self> {
         let algorithm = match algorithm {
             "minimax" => SearchAlgorithm::Minimax,
@@ -321,6 +324,7 @@ impl PySearcher {
             queen_attack_ordering,
             queen_threat_extension,
             repetition_draws,
+            forced_move_extension,
         };
         Ok(PySearcher { inner: Searcher::new(rules.inner, config) })
     }
