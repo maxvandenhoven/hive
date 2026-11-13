@@ -243,3 +243,19 @@ the owner cannot move away (opponent tops and own pinned, covered or stuck piece
 pieces by type (ant 0.3, beetle 0.15, queen 0.2, spider 0.1, grasshopper 0.1) instead of
 free_ants scored **0.605** against generation 2, 43-35-22 with 31 turn caps, normal lower
 bound 0.546. Depth 7.89 vs 7.97 at 855 vs 858 knodes/s.
+
+| Trial | Candidate | Score | W-D-L (caps) | Normal lower | Depth cand/champ | knodes/s cand/champ |
+|---|---|---|---|---|---|---|
+| screen-gen3-v1 (0.25 s, 24 pairs, seed 400, gen 3) | queen_locked_neighbors 0.5 | 0.427 | 13-15-20 (14) | 0.340 | 6.42 / 6.35 | 822 / 883 |
+| | queen_locked_neighbors 1 | 0.375 | 14-8-26 (6) | 0.282 | 6.21 / 6.13 | 905 / 995 |
+| | queen_safety 0.5, locked 0.5 | 0.552 | 20-13-15 (12) | 0.463 | 6.35 / 6.39 | 954 / 948 |
+| | structure weights doubled | 0.719 | 31-7-10 (7) | 0.625 | 6.25 / 6.50 | 959 / 896 |
+| | tempo 0.5 | 0.448 | 17-9-22 (6) | 0.370 | 6.23 / 6.10 | 937 / 916 |
+| | mobile weights doubled | 0.490 | 17-13-18 (10) | 0.392 | 6.27 / 6.54 | 952 / 894 |
+| | mobile_queen 0.5 | 0.510 | 19-11-18 (10) | 0.423 | 6.45 / 6.41 | 948 / 959 |
+| | null_move_reduction 1 | 0.583 | 22-12-14 (11) | 0.510 | 6.47 / 6.51 | 943 / 922 |
+| | late_move_reductions 4 | 0.521 | 18-14-16 (11) | 0.443 | 6.55 / 6.61 | 925 / 914 |
+
+`queen_locked_neighbors` on top of queen_safety hurts: it double counts the queen
+pressure. Doubling the structure weights (pinned_material 0.05, beetle_control 0.5) was
+positive for the second screen in a row and goes to confirmation.
