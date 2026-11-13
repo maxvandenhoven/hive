@@ -266,3 +266,19 @@ positive for the second screen in a row and goes to confirmation.
 structure weights (pinned_material 0.05, beetle_control 0.5) scored **0.620** against
 generation 3, 50-24-26 with 23 turn caps, normal lower bound 0.563. Depth 7.69 vs 7.80 at
 914 vs 856 knodes/s.
+
+| Trial | Candidate | Score | W-D-L (caps) | Normal lower | Depth cand/champ | knodes/s cand/champ |
+|---|---|---|---|---|---|---|
+| screen-gen4-v1 (0.25 s, 24 pairs, seed 500, gen 4) | pinned_material 0.1 | 0.490 | 12-23-13 (21) | 0.418 | 6.47 / 6.89 | 945 / 889 |
+| | beetle_control 1 | 0.479 | 11-24-13 (22) | 0.394 | 6.79 / 6.63 | 906 / 939 |
+| | structure weights doubled again | 0.479 | 15-16-17 (16) | 0.380 | 6.66 / 6.81 | 956 / 908 |
+| | queen_safety 0.75 | 0.552 | 16-21-11 (19) | 0.466 | 6.83 / 6.94 | 965 / 907 |
+| | tempo 0.2 | 0.448 | 15-13-20 (11) | 0.366 | 6.78 / 6.82 | 955 / 948 |
+| | queen_safety 0.5, locked 0.5 | 0.458 | 10-24-14 (19) | 0.385 | 6.95 / 6.75 | 923 / 942 |
+| | null_move_reduction 1 | 0.562 | 16-22-10 (18) | 0.479 | 6.65 / 6.75 | 944 / 923 |
+| | late_move_reductions 4 | 0.469 | 12-21-15 (19) | 0.393 | 7.10 / 6.83 | 910 / 932 |
+| | mobile_queen 0.3 | 0.490 | 16-15-17 (13) | 0.389 | 6.87 / 6.79 | 926 / 923 |
+
+Every candidate is within noise of generation 4 and almost 40% of the games reach the
+60-turn cap: the weights sit near a local optimum. null_move_reduction 1 was mildly
+positive for the second screen in a row and goes to confirmation.
