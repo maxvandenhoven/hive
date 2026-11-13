@@ -322,3 +322,13 @@ that pins Black, and a search of depth 10 still keeps the frozen position. With 
 moves White never has to repeat a position. `forced_move_extension` searches a forced move
 (such as a pass) without using up depth, so the attacker of a frozen opponent sees twice
 as many of its own moves.
+
+| Trial | Candidate | Score | W-D-L (caps) | Normal lower | Depth cand/champ | knodes/s cand/champ |
+|---|---|---|---|---|---|---|
+| screen-gen4-v4 (0.25 s, 24 pairs, seed 800, 100 turns) | forced_move_extension | 0.406 | 14-11-23 (8) | 0.318 | 7.01 / 6.95 | 861 / 890 |
+| | forced, repetition | 0.510 | 18-13-17 (10) | 0.438 | 7.24 / 7.12 | 978 / 1006 |
+| | queen_safety 0.75 | 0.573 | 21-13-14 (10) | 0.485 | 6.46 / 6.83 | 980 / 919 |
+| | repetition, queen_safety 0.75 | 0.677 | 26-13-9 (10) | 0.590 | 6.89 / 7.08 | 970 / 917 |
+
+Repetition draws with queen_safety 0.75 scored 0.583 and 0.677 in two screens and goes to
+confirmation (`confirm-gen5b`, 1 s, 50 pairs, seeds 30500–30549, 100-turn cap).
