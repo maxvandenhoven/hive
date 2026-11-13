@@ -1,7 +1,7 @@
 {
-  "generation": 1,
-  "name": "structure-search-all",
-  "source_revision": "420429021d313ae849c10156f6bbae50280727d4",
+  "generation": 2,
+  "name": "tempo-lmr6",
+  "source_revision": "2858b2c9353b492738dcaf5e0fd9d680d6cccd5f",
   "spec": {
     "kind": "negamax",
     "params": {
@@ -22,11 +22,12 @@
       "threads": 2,
       "depth": null,
       "table_deeper_hits": true,
-      "late_move_reductions": 3,
+      "late_move_reductions": 6,
       "null_move_reduction": 2,
-      "queen_attack_ordering": true
+      "queen_attack_ordering": true,
+      "tempo": 0.3
     },
     "label": null
   },
-  "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen1/summary.json"
+  "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen2/summary.json"
 }

@@ -197,3 +197,23 @@ structure + all four search refinements scored **0.845** against generation 0,
 899 vs 2211 knodes/s. Generation 1 = pinned_material 0.025, free_ants 0.25,
 beetle_control 0.25, table_deeper_hits, late_move_reductions 3, null_move_reduction 2,
 queen_attack_ordering (on the b90be45 search settings).
+
+| Trial | Candidate | Score | W-D-L (caps) | Normal lower | Depth cand/champ | knodes/s cand/champ |
+|---|---|---|---|---|---|---|
+| screen-gen1-v1 (0.25 s, 24 pairs, seed 200, gen 1) | late_move_reductions 0 | 0.417 | 14-12-22 (9) | 0.299 | 5.32 / 6.28 | 924 / 810 |
+| | late_move_reductions 6 | 0.625 | 25-10-13 (9) | 0.523 | 6.06 / 6.38 | 887 / 855 |
+| | queen_threat_extension | 0.479 | 17-12-19 (11) | 0.387 | 5.82 / 6.56 | 904 / 872 |
+| | null_move_reduction 3 | 0.427 | 15-11-22 (9) | 0.312 | 6.34 / 6.26 | 876 / 872 |
+| | mobile pieces (free_ants 0) | 0.542 | 18-16-14 (14) | 0.461 | 6.71 / 6.82 | 922 / 890 |
+| | placement_cells 0.05 | 0.396 | 13-12-23 (11) | 0.314 | 6.30 / 6.62 | 734 / 844 |
+| | queen_danger 0.1 | 0.417 | 13-14-21 (11) | 0.325 | 6.32 / 6.27 | 833 / 909 |
+| | tempo 0.3 | 0.635 | 22-17-9 (15) | 0.533 | 6.65 / 6.52 | 921 / 832 |
+| | beetle_control 0.5 | 0.521 | 17-16-15 (14) | 0.432 | 6.57 / 6.68 | 887 / 875 |
+| | pinned_material 0.05 | 0.490 | 16-15-17 (14) | 0.399 | 6.46 / 6.53 | 902 / 834 |
+
+### Generation 2 (promoted)
+
+`confirm-gen2` (1 s, 50 pairs, seeds 30100–30149, fast gate, revision 2858b2c): tempo 0.3
+and late_move_reductions 6 on generation 1 scored **0.590**, 42-34-24 with 26 turn caps,
+normal lower bound 0.536. Depth 7.78 vs 7.89 at 883 vs 822 knodes/s. A quarter of the
+games now reach the 60-turn cap: the stronger agents defend well but convert poorly.

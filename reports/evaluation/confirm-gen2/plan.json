@@ -1,0 +1,52 @@
+{
+  "champion": {
+    "generation": 1,
+    "name": "structure-search-all",
+    "source_revision": "420429021d313ae849c10156f6bbae50280727d4",
+    "spec": {
+      "kind": "negamax",
+      "params": {
+        "queen_safety": 1.0,
+        "mobility": 0.0,
+        "positioning": 0.0,
+        "material_on_board": 0.0,
+        "material_in_hand": 0.0,
+        "queen_danger": 0.0,
+        "queen_escape": 0.0,
+        "pinned_material": 0.025,
+        "free_ants": 0.25,
+        "beetle_control": 0.25,
+        "alpha_beta": true,
+        "table_megabytes": 32,
+        "aspiration_window": 0.5,
+        "principal_variation_search": true,
+        "threads": 2,
+        "depth": null,
+        "table_deeper_hits": true,
+        "late_move_reductions": 3,
+        "null_move_reduction": 2,
+        "queen_attack_ordering": true
+      },
+      "label": null
+    },
+    "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen1/summary.json"
+  },
+  "champion_sha256": "775e865ac2b3480c69a901d86f5d55086ebb84cb2669c029f9fea6d45ebe4e96",
+  "revision": "2858b2c9353b492738dcaf5e0fd9d680d6cccd5f",
+  "engine_sha256": "03d8b84fdddcd556709f6be999ea09403290b6f99db0b750094e11b6801dff9c",
+  "dirty": false,
+  "phase": "confirmation",
+  "seed": 30100,
+  "pairs": 50,
+  "budget_s": 1.0,
+  "alpha": 0.05,
+  "gate": "fast",
+  "max_turns": 60,
+  "results": {},
+  "candidates": {
+    "tempo-lmr6": {
+      "tempo": 0.3,
+      "late_move_reductions": 6
+    }
+  }
+}
