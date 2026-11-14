@@ -732,6 +732,7 @@ class Searcher:
         material_on_board: float = 0.0,
         material_in_hand: float = 0.0,
         stop_check_interval: int = 1024,
+        alpha_beta: bool = True,
     ) -> None:
         """Create a searcher.
 
@@ -750,6 +751,8 @@ class Searcher:
                 minus the opponent's.
             stop_check_interval: The number of nodes between two calls of
                 `turn.should_stop`.
+            alpha_beta: Whether to prune with alpha-beta, which finds the same scores in
+                far fewer nodes but may choose another of several equally scored moves.
 
         Raises:
             ValueError: If `algorithm` is unknown or `depth` is less than one.

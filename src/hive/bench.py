@@ -420,13 +420,15 @@ ENGINE_BENCH_CASES: list[EngineBenchCase] = [
     SearchBenchCase(
         name="negamax-long-3",
         position="long_hive",
-        agent=AgentSpec(kind="negamax", params={"depth": 3}),
+        agent=AgentSpec(kind="negamax", params={"depth": 3, "alpha_beta": False}),
         nodes=153_360,
     ),
     SearchBenchCase(
         name="mobility-ant-2",
         position="ant_moves",
-        agent=AgentSpec(kind="negamax", params={"depth": 2, "mobility": 1.0}),
+        agent=AgentSpec(
+            kind="negamax", params={"depth": 2, "mobility": 1.0, "alpha_beta": False}
+        ),
         nodes=946,
     ),
     NativePerftBenchCase(
@@ -441,14 +443,28 @@ ENGINE_BENCH_CASES: list[EngineBenchCase] = [
     SearchBenchCase(
         name="negamax-long-4",
         position="long_hive",
-        agent=AgentSpec(kind="negamax", params={"depth": 4}),
+        agent=AgentSpec(kind="negamax", params={"depth": 4, "alpha_beta": False}),
         nodes=12_102_433,
     ),
     SearchBenchCase(
         name="mobility-ant-3",
         position="ant_moves",
-        agent=AgentSpec(kind="negamax", params={"depth": 3, "mobility": 1.0}),
+        agent=AgentSpec(
+            kind="negamax", params={"depth": 3, "mobility": 1.0, "alpha_beta": False}
+        ),
         nodes=39_464,
+    ),
+    SearchBenchCase(
+        name="alphabeta-long-6",
+        position="long_hive",
+        agent=AgentSpec(kind="negamax", params={"depth": 6}),
+        nodes=1_241_120,
+    ),
+    SearchBenchCase(
+        name="alphabeta-mobility-ant-5",
+        position="ant_moves",
+        agent=AgentSpec(kind="negamax", params={"depth": 5, "mobility": 1.0}),
+        nodes=481_529,
     ),
 ]
 """The fixed cases of `hive bench engine`.
@@ -460,7 +476,8 @@ The search cases add a negamax decision with the default evaluation and one with
 mobility term, which generates the moves of both players at every leaf. Since the Rust
 core (WP 44 and 45), the perft cases measure the engine through the Python bindings and
 the search cases run in Rust. The native perft cases walk deeper entirely in Rust, and the
-deeper search cases take long enough to time the Rust search reliably.
+deeper search cases take long enough to time the Rust search reliably. The search cases
+before the alpha-beta cases turn pruning off, so their node counts stay comparable.
 """
 
 

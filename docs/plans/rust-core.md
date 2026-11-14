@@ -252,7 +252,7 @@ the engine through the bindings. Targets on the Ryzen 7 5800H, recorded per work
 | 43 | Native perft at least as fast as the spike (62M nodes/s for `start` depth 5, 15M in the midgame cases), parity at all reference depths | 55.8M at `start` depth 6, 28.4M and 32.7M in the midgame; parity up to `start` depth 7 |
 | 44 | The current benchmark cases at least 5 times faster through the bindings (geometric mean), the Python suite green without changes to code outside the engine | 10.2x before the search moved (29x after); green |
 | 45 | `negamax-long-3` and `mobility-ant-2` at least 50 times faster than WP 27, with the same node counts | 104x and 154x, same node counts |
-| 28 | A mean search depth of at least 6 at a 1 s budget (2.8 after WP 27) | 4.1 after WP 45; open (M7) |
+| 28 | A mean search depth of at least 6 at a 1 s budget (2.8 after WP 27) | 4.1 after WP 45, 5.4 with alpha-beta; open (M7) |
 
 The targets are lower bounds taken from the spike, not estimates of the final speed. The
 results are from `performance.md` §Result (WP 42 to 45).

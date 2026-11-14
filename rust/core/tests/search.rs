@@ -37,9 +37,15 @@ fn decide(
     algorithm: SearchAlgorithm,
     depth: u32,
     weights: EvaluationWeights,
+    alpha_beta: bool,
 ) -> (Searcher, Recorder) {
-    let config =
-        SearchConfig { algorithm, depth: Some(depth), weights, stop_check_interval: 32 };
+    let config = SearchConfig {
+        algorithm,
+        depth: Some(depth),
+        weights,
+        stop_check_interval: 32,
+        alpha_beta,
+    };
     let mut searcher = Searcher::new(rules, config);
     let mut recorder = Recorder::default();
     let before = state.clone();
@@ -57,6 +63,7 @@ fn negamax_visits_the_nodes_of_the_python_agent() {
         SearchAlgorithm::Negamax,
         3,
         EvaluationWeights::default(),
+        false,
     );
 
     assert_eq!(searcher.nodes(), 153_360);
@@ -76,9 +83,9 @@ fn minimax_agrees_with_negamax() {
         ..Default::default()
     };
     let (_, negamax) =
-        decide(rules, &mut state.clone(), SearchAlgorithm::Negamax, 3, weights);
+        decide(rules, &mut state.clone(), SearchAlgorithm::Negamax, 3, weights, false);
     let (_, minimax) =
-        decide(rules, &mut state.clone(), SearchAlgorithm::Minimax, 3, weights);
+        decide(rules, &mut state.clone(), SearchAlgorithm::Minimax, 3, weights, false);
 
     assert_eq!(
         negamax.reports,
@@ -98,7 +105,8 @@ fn minimax_agrees_with_negamax() {
 fn mobility_visits_the_nodes_of_the_python_agent() {
     let (rules, mut state) = suite_position("ant_moves");
     let weights = EvaluationWeights { mobility: 1.0, ..Default::default() };
-    let (searcher, _) = decide(rules, &mut state, SearchAlgorithm::Negamax, 2, weights);
+    let (searcher, _) =
+        decide(rules, &mut state, SearchAlgorithm::Negamax, 2, weights, false);
     assert_eq!(searcher.nodes(), 946);
 }
 
@@ -127,6 +135,7 @@ fn a_forced_win_is_final_at_depth_one() {
         depth: None,
         weights: EvaluationWeights::default(),
         stop_check_interval: 32,
+        alpha_beta: true,
     };
     let mut recorder = Recorder::default();
     Searcher::new(rules, config).think(&mut state, &mut recorder);
@@ -140,4 +149,61 @@ fn a_forced_win_is_final_at_depth_one() {
     assert_eq!((report.depth, report.score), (1, SEARCH_WIN_SCORE - 1.0));
     assert_eq!(report.principal_variation, [Some(winning_move)]);
     assert!(report.is_final);
+}
+
+#[test]
+fn alpha_beta_finds_the_scores_of_the_full_search_with_fewer_nodes() {
+    let weights = EvaluationWeights {
+        positioning: 0.5,
+        material_on_board: 0.1,
+        ..Default::default()
+    };
+
+    for (name, depth) in
+        [("long_hive", 3), ("ant_moves", 3), ("tournament_opening", 4), ("long_hive", 4)]
+    {
+        let (rules, state) = suite_position(name);
+
+        for algorithm in [SearchAlgorithm::Negamax, SearchAlgorithm::Minimax] {
+            let (full, full_reports) =
+                decide(rules, &mut state.clone(), algorithm, depth, weights, false);
+            let (pruned, pruned_reports) =
+                decide(rules, &mut state.clone(), algorithm, depth, weights, true);
+            let scores = |reports: &Recorder| {
+                reports.reports.iter().map(|report| report.score).collect::<Vec<_>>()
+            };
+
+            assert_eq!(
+                scores(&pruned_reports),
+                scores(&full_reports),
+                "{name} depth {depth}"
+            );
+            assert!(
+                pruned.nodes() < full.nodes(),
+                "{name}: {} < {}",
+                pruned.nodes(),
+                full.nodes()
+            );
+        }
+    }
+}
+
+#[test]
+fn minimax_and_negamax_prune_alike() {
+    let (rules, state) = suite_position("long_hive");
+    let weights = EvaluationWeights::default();
+    let (negamax, negamax_reports) =
+        decide(rules, &mut state.clone(), SearchAlgorithm::Negamax, 4, weights, true);
+    let (minimax, minimax_reports) =
+        decide(rules, &mut state.clone(), SearchAlgorithm::Minimax, 4, weights, true);
+
+    assert_eq!(negamax.nodes(), minimax.nodes());
+    let lines = |reports: &Recorder| {
+        reports
+            .reports
+            .iter()
+            .map(|report| (report.score, report.principal_variation.clone()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(lines(&negamax_reports), lines(&minimax_reports));
 }
