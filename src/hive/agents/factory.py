@@ -1,37 +1,26 @@
 """Agent specifications, the registry of agent kinds and the agent factory.
 
-Agent classes register a kind name with `register_agent`. The parameters of a kind are
-the keyword-only parameters of its constructor after `seed`: their annotations (with
-`Annotated` constraints such as `Field(ge=1)`) and defaults define a pydantic model that
-validates specs, and the `Args:` section of the constructor docstring describes them.
+Agent classes register a kind name with `register_agent`. The params of a kind are the
+fields of the params model its class names in `Agent.Params` (`hive.agents.params`),
+which validates specs and gives the params schema with its constraints, defaults and
+descriptions.
 """
 
 import inspect
-import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from importlib.resources import files
 from pathlib import Path
-from typing import Annotated, Any, get_type_hints
+from typing import Annotated, Any
 
 import yaml
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    JsonValue,
-    ValidationError,
-    computed_field,
-    create_model,
-)
+from pydantic import Field, JsonValue, ValidationError, computed_field
 from pydantic.json_schema import SkipJsonSchema
 
 from hive.agents.base import Agent
+from hive.agents.params import AgentParams
 from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
-
-INJECTED_AGENT_PARAMS = ("rules", "seed")
-"""The constructor parameters the factory passes itself, which are not agent params."""
 
 AGENT_PRESET_PACKAGE = "hive.agents.presets"
 """The package holding the preset spec files, one `<name>.yaml` per preset."""
@@ -41,9 +30,6 @@ ERROR_TYPE_ALIASES = {
     "missing_argument": "missing",
 }
 """The pydantic error types of dataclasses, by the matching error type of models."""
-
-DOCSTRING_ARG_PATTERN = re.compile(r"^    (\w+)(?: \(.*\))?: (.*)$")
-"""A line starting an argument description in a cleaned Google-style docstring."""
 
 
 class InvalidAgentSpecError(ValueError):
@@ -60,75 +46,16 @@ class AgentRegistration:
     Attributes:
         kind: The kind name used in `AgentSpec.kind`.
         agent_class: The agent class, called with the rules, a keyword `seed` and the
-            validated params as keywords.
-        params_model: The model that validates the params, derived from the signature of
-            the agent constructor.
+            validated params as the keyword `params`.
     """
 
     kind: str
     agent_class: Annotated[SkipJsonSchema[type[Agent]], Field(exclude=True)]
-    params_model: Annotated[SkipJsonSchema[type[BaseModel]], Field(exclude=True)]
 
-    @classmethod
-    def from_class(cls, kind: str, agent_class: type[Agent]) -> "AgentRegistration":
-        """Register an agent class, deriving its params model from the constructor.
-
-        The keyword-only parameters after `seed` become the fields of the model: their
-        annotations (including `Annotated` constraints) and defaults define validation,
-        and the `Args:` section of the constructor docstring gives the descriptions.
-
-        Args:
-            kind: The kind name used in `AgentSpec.kind`.
-            agent_class: The agent class to inspect.
-
-        Returns:
-            The registration, with a frozen params model that rejects unknown params.
-
-        Raises:
-            TypeError: If the constructor does not start with `rules` and `seed`, or an
-                agent param is not keyword-only or has no annotation.
-        """
-        init = agent_class.__init__
-        parameters = list(inspect.signature(init).parameters.values())[1:]
-
-        if [p.name for p in parameters[:2]] != list(INJECTED_AGENT_PARAMS):
-            msg = f"`{agent_class.__name__}.__init__` must start with `rules` and `seed`."
-            raise TypeError(msg)
-
-        hints = get_type_hints(init, include_extras=True)
-        descriptions = parse_arg_descriptions(inspect.getdoc(init))
-        fields: dict[str, Any] = {}
-
-        for parameter in parameters[2:]:
-            if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
-                msg = (
-                    f"Agent param `{parameter.name}` of `{agent_class.__name__}` must be "
-                    "keyword-only."
-                )
-                raise TypeError(msg)
-
-            if parameter.name not in hints:
-                msg = (
-                    f"Agent param `{parameter.name}` of `{agent_class.__name__}` has no "
-                    "annotation."
-                )
-                raise TypeError(msg)
-
-            default = (
-                ... if parameter.default is inspect.Parameter.empty else parameter.default
-            )
-            fields[parameter.name] = (
-                hints[parameter.name],
-                Field(default, description=descriptions.get(parameter.name)),
-            )
-
-        params_model = create_model(
-            f"{agent_class.__name__}Params",
-            __config__=ConfigDict(frozen=True, extra="forbid"),
-            **fields,
-        )
-
-        return cls(kind=kind, agent_class=agent_class, params_model=params_model)
+    @property
+    def params_model(self) -> type[AgentParams]:
+        """The model that validates the params, which the agent class declares."""
+        return self.agent_class.Params
 
     @computed_field
     @property
@@ -140,7 +67,12 @@ class AgentRegistration:
     @property
     def params_schema(self) -> dict[str, JsonValue]:
         """The JSON schema of the params, for rendering parameter forms."""
-        return self.params_model.model_json_schema()
+        schema = self.params_model.model_json_schema()
+        # Kinds that share a params model keep a title of their own, and the docstring of
+        # the model stays out of the forms.
+        schema.pop("description", None)
+
+        return {**schema, "title": f"{self.agent_class.__name__}Params"}
 
 
 AGENT_REGISTRY: dict[str, AgentRegistration] = {}
@@ -294,7 +226,7 @@ class AgentSpec(JsonCodec):
         """The label of the agent, or its kind if it has no label."""
         return self.label or self.kind
 
-    def validate_params(self, *, source: str | None = None) -> BaseModel:
+    def validate_params(self, *, source: str | None = None) -> AgentParams:
         """Check that the kind is registered and the params are valid for it.
 
         Args:
@@ -395,8 +327,8 @@ class AgentPreset(JsonCodec):
 def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:
     """Register an agent class under a kind name, making it available to specs.
 
-    The constructor must take `rules` as its first parameter and everything else as
-    keyword-only parameters with annotations: `seed`, then the agent params.
+    The params of the kind are the fields of the params model of the class
+    (`Agent.Params`).
 
     Args:
         kind: The kind name used in `AgentSpec.kind`.
@@ -406,7 +338,6 @@ def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:
 
     Raises:
         ValueError: If `kind` is already registered.
-        TypeError: If the constructor does not have the expected parameters.
     """
 
     def register(agent_class: type[A]) -> type[A]:
@@ -414,9 +345,7 @@ def register_agent[A: Agent](kind: str) -> Callable[[type[A]], type[A]]:
             msg = f"Agent kind `{kind}` is already registered."
             raise ValueError(msg)
 
-        AGENT_REGISTRY[kind] = AgentRegistration.from_class(
-            kind=kind, agent_class=agent_class
-        )
+        AGENT_REGISTRY[kind] = AgentRegistration(kind=kind, agent_class=agent_class)
 
         return agent_class
 
@@ -440,7 +369,7 @@ def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent:
     params = spec.validate_params()
     agent_class = AGENT_REGISTRY[spec.kind].agent_class
 
-    return agent_class(rules=rules, seed=seed, **dict(params))
+    return agent_class(rules=rules, seed=seed, params=params)
 
 
 def list_agents() -> list[AgentRegistration]:
@@ -463,33 +392,6 @@ def list_presets() -> list[str]:
         for resource in files(AGENT_PRESET_PACKAGE).iterdir()
         if resource.name.endswith(".yaml")
     )
-
-
-def parse_arg_descriptions(docstring: str | None) -> dict[str, str]:
-    """Read the argument descriptions from the `Args:` section of a Google docstring.
-
-    Args:
-        docstring: The cleaned docstring, as returned by `inspect.getdoc`.
-
-    Returns:
-        The description of each argument, with continuation lines joined by spaces.
-    """
-    descriptions: dict[str, str] = {}
-    in_args = False
-    name: str | None = None
-
-    for line in (docstring or "").splitlines():
-        if line == "Args:":
-            in_args = True
-        elif in_args and line and not line.startswith(" "):
-            break
-        elif in_args and (match := DOCSTRING_ARG_PATTERN.match(line)):
-            name = match[1]
-            descriptions[name] = match[2]
-        elif in_args and name is not None and line.strip():
-            descriptions[name] += " " + line.strip()
-
-    return descriptions
 
 
 def format_spec_errors(

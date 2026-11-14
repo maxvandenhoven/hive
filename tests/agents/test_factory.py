@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, override
+from typing import override
 
 import pytest
 from pydantic import Field
@@ -19,6 +19,7 @@ from hive.agents.factory import (
 )
 from hive.agents.minimax import MinimaxAgent
 from hive.agents.negamax import NegamaxAgent
+from hive.agents.params import AgentParams, SearchParams
 from hive.agents.random import RandomAgent
 from hive.engine.codec import json_adapter
 from hive.engine.rules import Rules
@@ -31,41 +32,20 @@ class Network:
     blocks: int = 2
 
 
-class NeuralAgent(Agent):
+class NeuralParams(AgentParams):
+    """Params with a required field and a nested config, like a future neural agent."""
+
+    weights: str = Field(description="The path to the model weights.")
+    network: Network = Field(
+        default_factory=Network, description="The shape of the network."
+    )
+    temperature: float = Field(default=1.0, gt=0, description="The sampling temperature.")
+
+
+class NeuralAgent(Agent[NeuralParams]):
     """Agent with a required param and a nested config, like a future neural agent."""
 
-    def __init__(
-        self,
-        rules: Rules,
-        *,
-        seed: int,
-        weights: str,
-        network: Network = Network(),  # noqa: B008
-        temperature: Annotated[float, Field(gt=0)] = 1.0,
-    ) -> None:
-        """Initialize the agent.
-
-        Args:
-            rules: The rules governing the game.
-            seed: The seed for the random number generator of the agent.
-            weights: The path to the model
-                weights.
-            network: The shape of the network.
-            temperature: The sampling temperature.
-
-        Raises:
-            ValueError: If `weights` is empty, which this description must not extend
-                into the description of `temperature`.
-        """
-        super().__init__(rules=rules, seed=seed)
-
-        if not weights:
-            msg = "Missing weights."
-            raise ValueError(msg)
-
-        self.weights = weights
-        self.network = network
-        self.temperature = temperature
+    Params = NeuralParams
 
     @override
     def think(self, state: GameState, turn: TurnContext) -> None:
@@ -191,7 +171,7 @@ class TestAgentSpecFile:
 
         assert isinstance(data, dict)
         assert sorted(data) == ["description", "kind", "params_schema"]
-        assert data["params_schema"] == registration.params_model.model_json_schema()
+        assert data["params_schema"] == registration.params_schema
         assert sorted(schema["properties"]) == ["description", "kind", "params_schema"]
 
     def test_display_label(self) -> None:
@@ -284,7 +264,7 @@ class TestBuildAgent:
         agent = build_agent(spec=spec, rules=Rules(), seed=0)
 
         assert isinstance(agent, NegamaxAgent)
-        assert (agent.depth, agent.mobility, agent.queen_safety) == (3, 0.5, 0.0)
+        assert agent.params == SearchParams(depth=3, mobility=0.5, queen_safety=0.0)
 
     def test_coerces_strings(self) -> None:
         agent = build_agent(
@@ -292,7 +272,7 @@ class TestBuildAgent:
         )
 
         assert isinstance(agent, NegamaxAgent)
-        assert agent.depth == 2
+        assert agent.params.depth == 2
 
     def test_passes_rules(self) -> None:
         rules = Rules(max_turns=10)
@@ -330,7 +310,7 @@ class TestListAgents:
         )
         assert agents["random"].params_schema["properties"] == {}
 
-    def test_derives_schema_from_signature(self) -> None:
+    def test_derives_schema_from_params_model(self) -> None:
         agents = {agent.kind: agent for agent in list_agents()}
         properties = agents["negamax"].params_schema["properties"]
         assert isinstance(properties, dict)
@@ -395,9 +375,9 @@ class TestRegisterAgent:
         agent = build_agent(spec=spec, rules=Rules(), seed=0)
 
         assert isinstance(agent, NeuralAgent)
-        assert agent.weights == "s3://a.onnx"
-        assert agent.network == Network(hidden=64, blocks=2)
-        assert agent.temperature == 1.0
+        assert agent.params == NeuralParams(
+            weights="s3://a.onnx", network=Network(hidden=64, blocks=2), temperature=1.0
+        )
         properties = list_agents()[-1].params_schema["properties"]
         assert isinstance(properties, dict)
         assert properties["temperature"] == {
@@ -435,30 +415,19 @@ class TestRegisterAgent:
         with pytest.raises(ValueError, match="`random` is already registered"):
             register_agent("random")(NeuralAgent)
 
-    def test_rejects_missing_seed(self) -> None:
-        class NoSeedAgent(NeuralAgent):
-            def __init__(self, rules: Rules) -> None:
-                super().__init__(rules=rules, seed=0, weights="w")
+    def test_reads_declared_params_model(self) -> None:
+        register_agent("neural")(NeuralAgent)
+        registrations = {agent.kind: agent for agent in list_agents()}
 
-        with pytest.raises(TypeError, match="must start with `rules` and `seed`"):
-            register_agent("no-seed")(NoSeedAgent)
+        assert registrations["neural"].params_model is NeuralParams
+        assert registrations["random"].params_model is AgentParams
+        assert registrations["negamax"].params_model is SearchParams
 
-    def test_rejects_positional_param(self) -> None:
-        class PositionalAgent(NeuralAgent):
-            def __init__(self, rules: Rules, seed: int, depth: int) -> None:
-                super().__init__(rules=rules, seed=seed, weights="w")
+    def test_titles_schema_after_agent_class(self) -> None:
+        register_agent("neural")(NeuralAgent)
+        registrations = {agent.kind: agent for agent in list_agents()}
 
-        with pytest.raises(
-            TypeError, match="`depth` of `PositionalAgent` must be keyword-only"
-        ):
-            register_agent("positional")(PositionalAgent)
-
-    def test_rejects_missing_annotation(self) -> None:
-        class UnannotatedAgent(NeuralAgent):
-            def __init__(self, rules: Rules, *, seed: int, depth=1) -> None:  # noqa: ANN001
-                super().__init__(rules=rules, seed=seed, weights="w")
-
-        with pytest.raises(
-            TypeError, match="`depth` of `UnannotatedAgent` has no annotation"
-        ):
-            register_agent("unannotated")(UnannotatedAgent)
+        assert registrations["neural"].params_schema["title"] == "NeuralAgentParams"
+        assert registrations["minimax"].params_schema["title"] == "MinimaxAgentParams"
+        assert registrations["negamax"].params_schema["title"] == "NegamaxAgentParams"
+        assert "description" not in registrations["neural"].params_schema

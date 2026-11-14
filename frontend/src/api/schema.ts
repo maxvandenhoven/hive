@@ -350,9 +350,7 @@ export interface components {
          *     Attributes:
          *         kind: The kind name used in `AgentSpec.kind`.
          *         agent_class: The agent class, called with the rules, a keyword `seed` and the
-         *             validated params as keywords.
-         *         params_model: The model that validates the params, derived from the signature of
-         *             the agent constructor.
+         *             validated params as the keyword `params`.
          */
         AgentRegistration: {
             /** Kind */

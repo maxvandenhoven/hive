@@ -5,6 +5,7 @@ import pytest
 from hive.agents.factory import AgentSpec, build_agent
 from hive.agents.minimax import MinimaxAgent
 from hive.agents.negamax import NegamaxAgent
+from hive.agents.params import SearchParams
 from hive.agents.search import SEARCH_WIN_SCORE, SearchAgent
 from hive.agents.testing import LocalTurnContext
 from hive.engine.rules import Rules
@@ -58,7 +59,9 @@ def test_stops_at_depth_limit(
 ) -> None:
     """Test that every depth up to the limit is reported and the last move is final."""
     turn = LocalTurnContext()
-    agent_class(rules=rules, seed=0, depth=2).think(state=position.copy(), turn=turn)
+    agent_class(rules=rules, seed=0, params=SearchParams(depth=2)).think(
+        state=position.copy(), turn=turn
+    )
 
     assert [info["depth"] for info in turn.infos] == [1, 2]
     assert [s.final for s in turn.submissions] == [False, False, True]
@@ -80,7 +83,8 @@ def test_minimax_and_negamax_agree(depth: int, rules: Rules, position: GameState
 
     for agent_class in SEARCH_AGENTS:
         turn = LocalTurnContext()
-        agent_class(rules=rules, seed=0, depth=depth, table_megabytes=0, **weights).think(
+        params = SearchParams(depth=depth, table_megabytes=0, **weights)
+        agent_class(rules=rules, seed=0, params=params).think(
             state=position.copy(), turn=turn
         )
         infos.append({key: turn.infos[-1][key] for key in ("score", "pv", "nodes")})
@@ -94,7 +98,10 @@ def test_forced_win_is_final(
 ) -> None:
     """Test that an unbounded search closes the turn as soon as it finds a win."""
     turn = LocalTurnContext()
-    turn.run(agent=agent_class(rules=rules, seed=0), state=winning_position)
+    turn.run(
+        agent=agent_class(rules=rules, seed=0, params=SearchParams()),
+        state=winning_position,
+    )
 
     assert turn.closed
     assert turn.infos[-1]["depth"] == 1
@@ -109,7 +116,10 @@ def test_exhausted_tree_is_final(agent_class: type[SearchAgent]) -> None:
     """Test that an unbounded search ends once every line reaches the turn limit draw."""
     rules = Rules(max_turns=1)
     turn = LocalTurnContext()
-    turn.run(agent=agent_class(rules=rules, seed=0), state=rules.create_initial_state())
+    turn.run(
+        agent=agent_class(rules=rules, seed=0, params=SearchParams()),
+        state=rules.create_initial_state(),
+    )
 
     assert turn.closed
     assert [info["depth"] for info in turn.infos] == [1, 2, 3]
@@ -133,7 +143,7 @@ def test_single_legal_move_is_final(agent_class: type[SearchAgent], rules: Rules
     assert rules.legal_moves(state) == [None]
 
     turn = LocalTurnContext()
-    turn.run(agent=agent_class(rules=rules, seed=0), state=state)
+    turn.run(agent=agent_class(rules=rules, seed=0, params=SearchParams()), state=state)
 
     assert [(s.move, s.final) for s in turn.submissions] == [(None, True)]
     assert not turn.infos
@@ -156,29 +166,27 @@ def test_evaluation_terms_are_zero_sum(
 
 
 def test_evaluation_skips_zero_weights(rules: Rules, position: GameState) -> None:
-    agent = NegamaxAgent(
-        rules,
-        seed=0,
+    params = SearchParams(
         queen_safety=0.0,
         mobility=0.0,
         positioning=0.0,
         material_on_board=0.0,
         material_in_hand=0.0,
     )
+    agent = NegamaxAgent(rules, seed=0, params=params)
 
     assert agent.evaluate(state=position, player=Player.WHITE) == 0.0
 
 
 def test_evaluation_weighs_terms(rules: Rules, winning_position: GameState) -> None:
     """Test the weighted sum of hand-counted term values in the winning position."""
-    agent = NegamaxAgent(
-        rules,
-        seed=0,
+    params = SearchParams(
         queen_safety=1.0,
         positioning=10.0,
         material_on_board=100.0,
         material_in_hand=1000.0,
     )
+    agent = NegamaxAgent(rules, seed=0, params=params)
 
     # Queen safety: the black queen has 5 occupied neighbours, the white queen 3.
     # Positioning: white tops 3 stacks next to the black queen, black tops 1 (its queen)
@@ -206,7 +214,9 @@ def test_passing_player_has_no_mobility(rules: Rules) -> None:
     black_move_count = len(rules.legal_moves(state))
     state.current_player = Player.WHITE
 
-    agent = NegamaxAgent(rules=rules, seed=0, queen_safety=0.0, mobility=1.0)
+    agent = NegamaxAgent(
+        rules=rules, seed=0, params=SearchParams(queen_safety=0.0, mobility=1.0)
+    )
 
     assert rules.legal_moves(state) == [None]
     assert agent.evaluate(state=state, player=Player.WHITE) == -black_move_count
@@ -219,11 +229,12 @@ def test_threaded_aspiration_search(
 ) -> None:
     """Searches report exact scores through the bindings and retain a legal best move."""
     baseline = LocalTurnContext()
-    NegamaxAgent(rules=rules, seed=0, depth=3).think(state=position.copy(), turn=baseline)
-    turn = LocalTurnContext()
-    agent = NegamaxAgent(
-        rules=rules, seed=0, depth=3, threads=threads, aspiration_window=0.01
+    NegamaxAgent(rules=rules, seed=0, params=SearchParams(depth=3)).think(
+        state=position.copy(), turn=baseline
     )
+    turn = LocalTurnContext()
+    params = SearchParams(depth=3, threads=threads, aspiration_window=0.01)
+    agent = NegamaxAgent(rules=rules, seed=0, params=params)
     before = position.copy()
     agent.think(state=position, turn=turn)
     assert position == before

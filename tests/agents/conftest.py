@@ -1,5 +1,6 @@
 import pytest
 
+from hive.agents.params import AgentParams
 from hive.agents.random import RandomAgent
 from hive.agents.testing import LocalTurnContext
 from hive.engine.rules import Rules
@@ -8,7 +9,7 @@ from hive.engine.state import GameState
 
 def random_position(rules: Rules, seed: int, plies: int) -> GameState:
     """Play a seeded random game for a number of plies, or until it finishes."""
-    agent = RandomAgent(rules=rules, seed=seed)
+    agent = RandomAgent(rules=rules, seed=seed, params=AgentParams())
     state = rules.create_initial_state()
 
     for _ in range(plies):
