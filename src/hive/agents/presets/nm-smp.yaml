@@ -1,0 +1,6 @@
+description: Unbounded negamax with aspiration, principal-variation search and two threads.
+kind: negamax
+params:
+  aspiration_window: 0.5
+  principal_variation_search: true
+  threads: 2

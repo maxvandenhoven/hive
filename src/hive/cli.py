@@ -1,6 +1,7 @@
 """Command line interface for the `hive` package."""
 
 import cProfile
+import gzip
 import json
 import logging
 import os
@@ -245,7 +246,8 @@ def gauntlet(
         typer.Option(
             min=1,
             help="The number of matches played at the same time. Defaults to the "
-            "number of CPUs, the most allowed without `--allow-oversubscribe`.",
+            "number of CPUs divided by search threads per match, the most allowed "
+            "without `--allow-oversubscribe`.",
             show_default=False,
         ),
     ] = None,
@@ -306,20 +308,27 @@ def gauntlet(
         msg = "A gauntlet needs at least two agents."
         raise typer.BadParameter(msg, param_hint="--agent")
 
-    max_jobs = default_gauntlet_jobs()
+    participants = tuple(
+        parse_agent_spec(value=value, option="--agent") for value in agents
+    )
+    threads = max(
+        value if isinstance(value := spec.params.get("threads", 1), int) else 1
+        for spec in participants
+    )
+    max_jobs = default_gauntlet_jobs(threads=threads)
 
-    if jobs is not None and jobs > max_jobs and not allow_oversubscribe:
+    if not allow_oversubscribe and (
+        (jobs is not None and jobs > max_jobs) or threads > default_gauntlet_jobs()
+    ):
         msg = (
-            f"At most {max_jobs} matches fit the CPUs, which keeps timed decisions "
-            "fair. Pass `--allow-oversubscribe` to run more."
+            f"At most {max_jobs} matches with {threads} search threads fit the CPUs; "
+            "pass `--allow-oversubscribe` to run more."
         )
         raise typer.BadParameter(msg, param_hint="--jobs")
 
     try:
         config = GauntletConfig(
-            participants=tuple(
-                parse_agent_spec(value=value, option="--agent") for value in agents
-            ),
+            participants=participants,
             games_per_pair=games_per_pair,
             budget_s=budget,
             max_turns=max_turns,
@@ -413,7 +422,13 @@ def replay(
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     try:
-        result = GauntletReport.from_json(json.loads(report.read_text())).replay(match)
+        if report.suffix == ".gz":
+            with gzip.open(report, "rt") as stream:
+                data = json.load(stream)
+        else:
+            data = json.loads(report.read_text())
+
+        result = GauntletReport.from_json(data).replay(match)
     except (OSError, ValueError) as e:
         raise typer.BadParameter(str(e), param_hint="REPORT") from e
 

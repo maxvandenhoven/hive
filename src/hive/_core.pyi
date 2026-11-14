@@ -731,9 +731,32 @@ class Searcher:
         positioning: float = 0.0,
         material_on_board: float = 0.0,
         material_in_hand: float = 0.0,
+        queen_danger: float = 0.0,
+        queen_escape: float = 0.0,
+        pinned_material: float = 0.0,
+        free_ants: float = 0.0,
+        beetle_control: float = 0.0,
+        tempo: float = 0.0,
+        mobile_queen: float = 0.0,
+        mobile_beetle: float = 0.0,
+        mobile_grasshopper: float = 0.0,
+        mobile_spider: float = 0.0,
+        mobile_ant: float = 0.0,
+        placement_cells: float = 0.0,
+        queen_locked_neighbors: float = 0.0,
         stop_check_interval: int = 1024,
         alpha_beta: bool = True,
         table_megabytes: int = 32,
+        aspiration_window: float = 0.0,
+        threads: int = 1,
+        principal_variation_search: bool = False,
+        table_deeper_hits: bool = False,
+        late_move_reductions: int = 0,
+        null_move_reduction: int = 0,
+        queen_attack_ordering: bool = False,
+        queen_threat_extension: bool = False,
+        repetition_draws: bool = False,
+        forced_move_extension: bool = False,
     ) -> None:
         """Create a searcher.
 
@@ -750,15 +773,40 @@ class Searcher:
                 board minus the opponent's.
             material_in_hand: The weight of the value of the player's pieces in hand
                 minus the opponent's.
+            queen_danger: Nonlinear queen crowding: squared occupied-neighbour counts.
+            queen_escape: Legal queen escapes, excluding covered or pinned queens.
+            pinned_material: Opponent minus own covered or articulation-pinned material.
+            free_ants: Own minus opponent uncovered, unpinned ants after queen placement.
+            beetle_control: Elevated beetle balance, doubled over an enemy queen.
+            tempo: A bonus for the player to move.
+            mobile_queen: Own minus opponent queens that can take a first step.
+            mobile_beetle: Own minus opponent beetles that can move.
+            mobile_grasshopper: Own minus opponent grasshoppers that can move.
+            mobile_spider: Own minus opponent spiders that can take a first step.
+            mobile_ant: Own minus opponent ants that can take a first step.
+            placement_cells: Own minus opponent free cells to place a piece on.
+            queen_locked_neighbors: Queen neighbours its owner cannot move away.
             stop_check_interval: The number of nodes between two calls of
                 `turn.should_stop`.
             alpha_beta: Whether to prune with alpha-beta, which finds the same scores in
                 far fewer nodes but may choose another of several equally scored moves.
             table_megabytes: The size of the transposition table in MB, zero for none.
                 Negamax with alpha-beta uses it and orders moves by killers and history.
+            aspiration_window: Initial score half-window, zero to disable aspiration.
+            threads: Total negamax search threads sharing one table, at least one.
+            principal_variation_search: Scout later moves before a full-window search.
+            table_deeper_hits: Reuse table entries searched deeper than needed.
+            late_move_reductions: Moves searched at full depth before later ones are
+                scouted a ply shallower, zero for none. Needs principal variation search.
+            null_move_reduction: Extra depth reduction of a null move at scout nodes,
+                zero for none.
+            queen_attack_ordering: Order moves next to the enemy queen after killers.
+            queen_threat_extension: Search a ply deeper once a queen has five neighbours.
+            repetition_draws: Score a repeat of an earlier position as a draw.
+            forced_move_extension: Search a forced move without using up depth.
 
         Raises:
-            ValueError: If `algorithm` is unknown or `depth` is less than one.
+            ValueError: If the algorithm, depth, window or thread count is invalid.
         """
 
     def clear(self) -> None:

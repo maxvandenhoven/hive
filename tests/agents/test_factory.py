@@ -131,8 +131,14 @@ class TestAgentSpecFromYaml:
             "  params.mobility: Input should be a valid number, unable to parse string "
             "as a number (got 'high').",
             "  params.depht: Unknown param, expected one of: depth, queen_safety, "
-            "mobility, positioning, material_on_board, material_in_hand, alpha_beta, "
-            "table_megabytes.",
+            "mobility, positioning, material_on_board, material_in_hand, queen_danger, "
+            "queen_escape, pinned_material, free_ants, beetle_control, tempo, "
+            "mobile_queen, mobile_beetle, mobile_grasshopper, mobile_spider, mobile_ant, "
+            "placement_cells, queen_locked_neighbors, alpha_beta, table_megabytes, "
+            "aspiration_window, threads, "
+            "principal_variation_search, table_deeper_hits, late_move_reductions, "
+            "null_move_reduction, queen_attack_ordering, queen_threat_extension, "
+            "repetition_draws, forced_move_extension.",
         ]
 
 
@@ -336,8 +342,31 @@ class TestListAgents:
             "positioning",
             "material_on_board",
             "material_in_hand",
+            "queen_danger",
+            "queen_escape",
+            "pinned_material",
+            "free_ants",
+            "beetle_control",
+            "tempo",
+            "mobile_queen",
+            "mobile_beetle",
+            "mobile_grasshopper",
+            "mobile_spider",
+            "mobile_ant",
+            "placement_cells",
+            "queen_locked_neighbors",
             "alpha_beta",
             "table_megabytes",
+            "aspiration_window",
+            "threads",
+            "principal_variation_search",
+            "table_deeper_hits",
+            "late_move_reductions",
+            "null_move_reduction",
+            "queen_attack_ordering",
+            "queen_threat_extension",
+            "repetition_draws",
+            "forced_move_extension",
         ]
         assert properties["depth"] == {
             "anyOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}],

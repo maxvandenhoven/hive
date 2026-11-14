@@ -1,0 +1,124 @@
+{
+  "machine": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+  "params": {},
+  "default_rules": true,
+  "budget_s": 10.0,
+  "repeat": 1,
+  "mean_depth": 11,
+  "max_depth": 11,
+  "observations": [
+    {
+      "repeat": 0,
+      "position": "start",
+      "depth": 11,
+      "nodes": 44375365,
+      "score": 1.0,
+      "pv": [
+        {
+          "piece": "queen",
+          "from": null,
+          "to": [
+            0,
+            0
+          ]
+        },
+        {
+          "piece": "beetle",
+          "from": null,
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": [
+            0,
+            0
+          ],
+          "to": [
+            1,
+            -1
+          ]
+        },
+        {
+          "piece": "beetle",
+          "from": null,
+          "to": [
+            2,
+            0
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": null,
+          "to": [
+            2,
+            -2
+          ]
+        },
+        {
+          "piece": "grasshopper",
+          "from": null,
+          "to": [
+            1,
+            1
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            2,
+            -2
+          ],
+          "to": [
+            0,
+            2
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": null,
+          "to": [
+            2,
+            1
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": [
+            1,
+            -1
+          ],
+          "to": [
+            0,
+            0
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": [
+            2,
+            1
+          ],
+          "to": [
+            3,
+            0
+          ]
+        },
+        {
+          "piece": "ant",
+          "from": [
+            0,
+            2
+          ],
+          "to": [
+            3,
+            -1
+          ]
+        }
+      ],
+      "nps": 5650995
+    }
+  ]
+}

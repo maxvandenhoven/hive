@@ -96,6 +96,7 @@ class MatchResult(JsonCodec):
         black_spec: The agent playing black.
         seed: The match seed, from which the seed of each seat is derived.
         budget_s: The time budget of every decision in seconds.
+        opening: Opening moves before the timed decisions.
         decisions: The decision behind every move of the game, in order.
         outcome: How the match ended.
         winner: The winning player, or `None` unless the outcome is a win.
@@ -107,6 +108,7 @@ class MatchResult(JsonCodec):
     black_spec: Annotated[AgentSpec, Field(alias="black")]
     seed: int
     budget_s: float
+    opening: tuple[Move | None, ...] = ()
     decisions: list[DecisionRecord] = field(default_factory=list)
     outcome: MatchOutcome = MatchOutcome.TURN_CAP
     winner: Player | None = None
@@ -127,10 +129,10 @@ class MatchResult(JsonCodec):
     def record(self) -> GameRecord:
         """The game, built from the rules and the move of every decision.
 
-        Matches start from the initial state, so the record has no setup.
+        Opening moves precede the timed decisions.
         """
         return GameRecord(
-            rules=self.rules, moves=[decision.move for decision in self.decisions]
+            rules=self.rules, moves=[*self.opening, *(d.move for d in self.decisions)]
         )
 
     def thinking_s(self, player: Player) -> float:

@@ -1,0 +1,60 @@
+{
+  "machine": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+  "params": {
+    "aspiration_window": 0.5,
+    "principal_variation_search": true,
+    "threads": 2
+  },
+  "default_rules": true,
+  "budget_s": 10.0,
+  "repeat": 1,
+  "mean_depth": 11,
+  "max_depth": 11,
+  "observations": [
+    {
+      "repeat": 0,
+      "position": "start",
+      "depth": 11,
+      "nodes": 26119220,
+      "score": 1.0,
+      "pv": [
+        {
+          "piece": "queen",
+          "from": null,
+          "to": [
+            0,
+            0
+          ]
+        },
+        {
+          "piece": "beetle",
+          "from": null,
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "piece": "queen",
+          "from": [
+            0,
+            0
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "piece": "beetle",
+          "from": null,
+          "to": [
+            2,
+            0
+          ]
+        }
+      ],
+      "nps": 4761823
+    }
+  ]
+}

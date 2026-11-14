@@ -7,14 +7,16 @@
 //! nodes are visited, scores are equal, and the root keeps the first best move in the
 //! documented order of legal moves.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use crate::agents::evaluation::{EvaluationWeights, Evaluator};
 use crate::agents::table::{
     TableBound, TableEntry, TranspositionTable, from_table_score, to_table_score,
 };
+use crate::engine::grid::DIRECTION_COUNT;
 use crate::engine::zobrist::ply_key;
-use crate::engine::{CoordMove, GameState, Move, PieceType, Player, Rules};
+use crate::engine::{Cell, Coord, CoordMove, GameState, Move, PieceType, Player, Rules};
 
 /// The number of cells, the stride of the history table per piece type.
 const HISTORY_CELLS: usize = 1024;
@@ -35,6 +37,10 @@ pub enum SearchAlgorithm {
 
 /// The configuration of a search, from the agent params.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent on/off agent params, set by keyword"
+)]
 pub struct SearchConfig {
     /// The tree search.
     pub algorithm: SearchAlgorithm,
@@ -51,6 +57,66 @@ pub struct SearchConfig {
     /// The size of the transposition table in MB, zero for none. Negamax with alpha-beta
     /// uses it, and orders moves by killer moves and a history table too.
     pub table_megabytes: usize,
+    /// Initial half-width around the previous score, zero for full windows.
+    pub aspiration_window: f64,
+    /// Total search threads, including the reporting thread. Negamax only.
+    pub threads: usize,
+    /// Scout later moves with a minimal window, re-searching improvements exactly.
+    pub principal_variation_search: bool,
+    /// Reuse transposition table entries searched deeper than needed, not only those of
+    /// the same remaining depth.
+    pub table_deeper_hits: bool,
+    /// The number of moves searched at full depth before later moves of an inner node
+    /// at least three plies deep are scouted one ply shallower, zero for none. A reduced
+    /// move that improves the score is searched again at full depth. Needs principal
+    /// variation search.
+    pub late_move_reductions: u32,
+    /// The extra depth reduction of a null move (a pass) at scout nodes, zero for none.
+    /// When the side to move still scores at least `beta` after passing, the node is cut
+    /// off without searching its moves.
+    pub null_move_reduction: u32,
+    /// Order the moves onto or next to the opponent's queen right after the killer moves.
+    pub queen_attack_ordering: bool,
+    /// Search a move one ply deeper when it brings a queen to five or more occupied
+    /// neighbours, so threats to win are resolved, up to twice the iteration's depth.
+    pub queen_threat_extension: bool,
+    /// Score a position that repeats an earlier one of the searched line, or a position
+    /// the searcher decided from earlier in the game, as a draw, so the side ahead looks
+    /// for progress instead of moving back and forth.
+    pub repetition_draws: bool,
+    /// Search the move of a node with a single legal move, a forced pass included,
+    /// without using up depth, up to twice the iteration's depth, so the attacker of a
+    /// frozen opponent sees as many of its own moves as with a free opponent.
+    pub forced_move_extension: bool,
+}
+
+impl SearchConfig {
+    /// Create a configuration with the given algorithm, depth and weights, and every
+    /// refinement of the search off: alpha-beta and a 32 MB table, one thread.
+    pub fn new(
+        algorithm: SearchAlgorithm,
+        depth: Option<u32>,
+        weights: EvaluationWeights,
+    ) -> Self {
+        SearchConfig {
+            algorithm,
+            depth,
+            weights,
+            stop_check_interval: 1024,
+            alpha_beta: true,
+            table_megabytes: 32,
+            aspiration_window: 0.0,
+            threads: 1,
+            principal_variation_search: false,
+            table_deeper_hits: false,
+            late_move_reductions: 0,
+            null_move_reduction: 0,
+            queen_attack_ordering: false,
+            queen_threat_extension: false,
+            repetition_draws: false,
+            forced_move_extension: false,
+        }
+    }
 }
 
 /// The place of a node in the search: its remaining depth, its ply from the root, its
@@ -69,6 +135,8 @@ struct Node {
     /// Whether every move from the root to the node follows the previous principal
     /// variation, so its next move is searched first.
     on_principal_variation: bool,
+    /// Whether the node may try a null move: not right after another one.
+    allow_null: bool,
 }
 
 impl Node {
@@ -80,7 +148,14 @@ impl Node {
             alpha: f64::NEG_INFINITY,
             beta: f64::INFINITY,
             on_principal_variation: true,
+            allow_null: true,
         }
+    }
+
+    /// Check whether the node has a minimal window, as scouted by principal variation
+    /// search, so its exact score is never needed.
+    fn is_scout(self) -> bool {
+        self.beta.is_finite() && self.alpha >= self.beta.next_down()
     }
 }
 
@@ -145,6 +220,16 @@ pub struct Searcher {
     history: Vec<u32>,
     /// Scratch space for ordering moves: the sort key and the move.
     ordering: Vec<(u64, Move)>,
+    /// Root move rotation that diversifies helper searches.
+    worker_index: usize,
+    /// The depth of the iteration in progress, which limits extensions.
+    root_depth: u32,
+    /// The position hash at each ply of the line being searched, for repetitions.
+    path: Vec<u64>,
+    /// The ply and position hash of each earlier decision of the game, for repetitions.
+    game_path: Vec<(i64, u64)>,
+    /// One bit per position of `game_path`, chosen by its hash, to skip most lookups.
+    game_filter: u64,
 }
 
 impl Searcher {
@@ -163,6 +248,11 @@ impl Searcher {
             killers: Vec::new(),
             history: vec![0; PieceType::COUNT * HISTORY_CELLS],
             ordering: Vec::new(),
+            worker_index: 0,
+            root_depth: 0,
+            path: Vec::new(),
+            game_path: Vec::new(),
+            game_filter: 0,
         }
     }
 
@@ -174,6 +264,8 @@ impl Searcher {
     /// Forget everything learned in earlier decisions: the transposition table, the
     /// killer moves and the history, for example before a new game.
     pub fn clear(&mut self) {
+        self.game_path.clear();
+        self.game_filter = 0;
         self.table.clear();
         self.killers.clear();
         self.history.fill(0);
@@ -194,24 +286,97 @@ impl Searcher {
     /// The state is searched in place and restored before returning, also when the
     /// observer stops the search.
     pub fn think(&mut self, state: &mut GameState, observer: &mut impl SearchObserver) {
+        if self.config.repetition_draws {
+            self.record_decision(state);
+        }
+
+        if self.config.threads <= 1 || self.config.algorithm != SearchAlgorithm::Negamax {
+            self.think_serial(state, observer);
+            return;
+        }
+
+        self.table.share();
+        let stop = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            let _cancel_helpers = SearchCancellation { stop: &stop };
+            for index in 1..self.config.threads {
+                let mut helper = self.clone();
+                helper.worker_index = index;
+                let mut position = state.clone();
+                let stop = &stop;
+                scope.spawn(move || {
+                    helper.think_serial(&mut position, &mut HelperObserver { stop });
+                });
+            }
+
+            self.think_serial(state, observer);
+        });
+    }
+
+    /// Record the position of a decision for repetitions, after forgetting the decisions
+    /// at the same or a later ply, which belong to another game or to undone moves.
+    fn record_decision(&mut self, state: &GameState) {
+        let ply = state.current_ply();
+        self.game_path.retain(|&(earlier, _)| earlier < ply);
+        self.game_path.push((ply, state.hash()));
+        self.game_filter =
+            self.game_path.iter().fold(0, |filter, &(_, hash)| filter | 1 << (hash & 63));
+    }
+
+    /// Run iterative deepening on one thread; only the main thread calls the client.
+    fn think_serial(
+        &mut self,
+        state: &mut GameState,
+        observer: &mut impl SearchObserver,
+    ) {
         self.nodes = 0;
         self.previous_line.clear();
         let start = Instant::now();
         let mut depth = 1;
+        let mut previous_score = 0.0;
 
         while !observer.should_stop() {
             self.cutoff = false;
             self.reserve(depth);
             let root_player = state.current_player();
 
-            let root = Node::root(depth);
-            let result = match self.config.algorithm {
-                SearchAlgorithm::Negamax => self.negamax(state, root, observer),
-                SearchAlgorithm::Minimax => {
-                    self.minimax(state, root, root_player, observer)
+            self.root_depth = depth;
+            let mut root = Node::root(depth);
+            let mut width = self.config.aspiration_window;
+
+            if depth > 1 && self.config.alpha_beta && width > 0.0 {
+                root.alpha = previous_score - width;
+                root.beta = previous_score + width;
+            }
+
+            let score = loop {
+                self.cutoff = false;
+                let result = match self.config.algorithm {
+                    SearchAlgorithm::Negamax => self.negamax(state, root, observer),
+                    SearchAlgorithm::Minimax => {
+                        self.minimax(state, root, root_player, observer)
+                    }
+                };
+                let Ok(score) = result else { return };
+
+                if score > root.alpha && score < root.beta {
+                    break score;
+                }
+
+                // A failed window is only a bound. Widen before publishing a result.
+                if observer.should_stop() {
+                    return;
+                }
+
+                width *= 4.0;
+                if width >= SEARCH_WIN_SCORE || !width.is_finite() {
+                    root = Node::root(depth);
+                } else {
+                    root.alpha = score - width;
+                    root.beta = score + width;
                 }
             };
-            let Ok(score) = result else { return };
+            previous_score = score;
 
             let report = DepthReport {
                 depth,
@@ -236,11 +401,15 @@ impl Searcher {
 
     /// Make sure there is a move buffer and a line for every ply of a depth.
     fn reserve(&mut self, depth: u32) {
-        let plies = depth as usize + 2;
+        let extends =
+            self.config.queen_threat_extension || self.config.forced_move_extension;
+        let extended = if extends { 2 * depth } else { depth };
+        let plies = extended as usize + 2;
 
         while self.buffers.len() < plies {
             self.buffers.push(Vec::with_capacity(256));
             self.lines.push(Vec::with_capacity(plies));
+            self.path.push(0);
         }
 
         while self.killers.len() < plies {
@@ -281,6 +450,11 @@ impl Searcher {
             decoded.sort_unstable_by_key(|&(coord_move, _)| coord_move);
             moves.clear();
             moves.extend(decoded.into_iter().map(|(_, mv)| mv));
+
+            if !moves.is_empty() {
+                let rotation = self.worker_index % moves.len();
+                moves.rotate_left(rotation);
+            }
         }
     }
 
@@ -327,15 +501,32 @@ impl Searcher {
 
     /// Order the moves of an inner node: the moves in `first` in their order (the move of
     /// the previous principal variation, the table move and the killer moves), then the
-    /// rest by their history, keeping the generation order between equals.
-    fn order_moves(&mut self, first: [Option<Move>; 4], moves: &mut [Move]) {
+    /// moves onto or next to `enemy_queen` if given, then the rest by their history,
+    /// keeping the generation order between equals.
+    fn order_moves(
+        &mut self,
+        first: [Option<Move>; 4],
+        enemy_queen: Option<Cell>,
+        moves: &mut [Move],
+    ) {
         let ordering = &mut self.ordering;
         ordering.clear();
 
         for (position, &mv) in moves.iter().enumerate() {
+            let attacks = enemy_queen.is_some_and(|queen| {
+                let target = mv.target();
+                target == queen
+                    || (0..DIRECTION_COUNT).any(|side| queen.neighbor(side) == target)
+            });
             let rank =
                 first.iter().position(|&candidate| candidate == Some(mv)).map_or_else(
-                    || u64::from(self.history[history_index(mv)]),
+                    || {
+                        if attacks {
+                            u64::from(u32::MAX) - 8
+                        } else {
+                            u64::from(self.history[history_index(mv)])
+                        }
+                    },
                     |priority| u64::from(u32::MAX) - priority as u64,
                 );
             let key = (rank << 16) | (0xffff - (position as u64).min(0xffff));
@@ -347,6 +538,31 @@ impl Searcher {
         for (slot, &(_, mv)) in moves.iter_mut().zip(ordering.iter()) {
             *slot = mv;
         }
+    }
+
+    /// Order the moves of an inner node at a ply with [`Searcher::order_moves`]: first
+    /// the previous principal variation's move if the node follows it, the table move and
+    /// the killers of the ply.
+    fn order_inner_moves(
+        &mut self,
+        state: &GameState,
+        index: usize,
+        follows: bool,
+        table_move: Option<Move>,
+        moves: &mut [Move],
+    ) {
+        let expected = if follows { self.previous_line[index] } else { None };
+        let killers = self.killers[index];
+        let enemy_queen = if self.config.queen_attack_ordering {
+            state.queen_coord(state.current_player().opponent()).map(Coord::cell)
+        } else {
+            None
+        };
+        self.order_moves(
+            [expected, table_move, killers[0], killers[1]],
+            enemy_queen,
+            moves,
+        );
     }
 
     /// Remember a move that caused a cutoff at a ply, as a killer and in the history.
@@ -366,7 +582,7 @@ impl Searcher {
     /// move, and child scores are negated. With alpha-beta, the search of a node stops as
     /// soon as a move scores at least `beta`, which the opponent will not allow. Results
     /// are stored in the transposition table and reused when a position recurs at the
-    /// same remaining depth or deeper; moves are ordered by the table, killers and
+    /// same remaining depth; moves are ordered by the table, killers and
     /// history.
     fn negamax(
         &mut self,
@@ -379,7 +595,9 @@ impl Searcher {
         self.lines[index].clear();
         let player = state.current_player();
 
-        if let Some(score) = self.terminal_score(state, player, node.ply) {
+        let ended = self.terminal_score(state, player, node.ply);
+
+        if let Some(score) = ended.or_else(|| self.repetition_score(state, index)) {
             return Ok(score);
         }
 
@@ -395,8 +613,13 @@ impl Searcher {
         if use_table && let Some(entry) = self.table.probe(key) {
             table_move = entry.best_move();
             let score = from_table_score(entry.score, node.ply);
+            let depth_matches = if self.config.table_deeper_hits {
+                u32::from(entry.depth) >= node.depth
+            } else {
+                u32::from(entry.depth) == node.depth
+            };
             let usable = index > 0
-                && u32::from(entry.depth) >= node.depth
+                && depth_matches
                 && match entry.bound {
                     TableBound::Exact => true,
                     TableBound::Lower => score >= node.beta,
@@ -410,32 +633,45 @@ impl Searcher {
             }
         }
 
+        if self.null_move_cuts_off(state, node, player, observer)? {
+            return Ok(node.beta);
+        }
+
         let mut moves = std::mem::take(&mut self.buffers[index]);
         self.generate(state, node.ply, &mut moves);
         let follows = self.order_principal_variation(node, &mut moves);
 
         if use_table && index > 0 && moves.len() > 1 {
-            let expected = if follows { self.previous_line[index] } else { None };
-            let killers = self.killers[index];
-            self.order_moves([expected, table_move, killers[0], killers[1]], &mut moves);
+            self.order_inner_moves(state, index, follows, table_move, &mut moves);
         }
 
         let outer_cutoff = std::mem::replace(&mut self.cutoff, false);
         let mut alpha = node.alpha;
         let mut best = f64::NEG_INFINITY;
+        let crowding = queen_crowding(state);
 
         for position in 0..moves.len().max(1) {
             let mv = moves.get(position).copied();
-            let child = Node {
-                depth: node.depth - 1,
+            state.apply_move(mv);
+            let extend = self.extends(state, node, crowding, moves.len() <= 1);
+            let mut child = Node {
+                depth: node.depth - 1 + u32::from(extend),
                 ply: node.ply + 1,
                 alpha: -node.beta,
                 beta: -alpha,
                 on_principal_variation: self
                     .follows_principal_variation(follows, node.ply, mv),
+                allow_null: true,
             };
-            state.apply_move(mv);
-            let result = self.negamax(state, child, observer);
+            let late = self.config.late_move_reductions;
+            let reduce = late > 0
+                && index > 0
+                && node.depth >= 3
+                && mv.is_some()
+                && !extend
+                && position >= late as usize;
+            child.allow_null = !extend;
+            let result = self.search_child(state, child, position > 0, reduce, observer);
             state.undo_move(mv);
 
             let Ok(child_score) = result else {
@@ -469,25 +705,178 @@ impl Searcher {
         self.cutoff |= outer_cutoff;
 
         if use_table {
-            let bound = if best <= node.alpha {
-                TableBound::Upper
-            } else if best >= node.beta {
-                TableBound::Lower
-            } else {
-                TableBound::Exact
-            };
-            let best_move = self.lines[index].first().copied().flatten();
-            self.table.store(TableEntry {
-                key,
-                score: to_table_score(best, node.ply),
-                best: best_move.map_or(0, Move::bits),
-                depth: u8::try_from(node.depth).unwrap_or(u8::MAX),
-                bound,
-                cutoff: subtree_cutoff,
-            });
+            self.store_node(key, node, best, subtree_cutoff);
         }
 
         Ok(best)
+    }
+
+    /// Get the draw score of a position at a ply that repeats an earlier position of the
+    /// line with the same player to move or an earlier decision of the game, when
+    /// repetitions are draws, and record the position for later plies.
+    fn repetition_score(&mut self, state: &GameState, index: usize) -> Option<f64> {
+        if !self.config.repetition_draws {
+            return None;
+        }
+
+        let hash = state.hash();
+        self.path[index] = hash;
+        let repeats = self.path[index % 2..index].iter().step_by(2).any(|&h| h == hash)
+            || index > 0
+                && self.game_filter & 1 << (hash & 63) != 0
+                && self.game_path.iter().any(|&(_, earlier)| earlier == hash);
+
+        repeats.then_some(0.0)
+    }
+
+    /// Store the result of a searched node in the transposition table, with its bound
+    /// relative to the node's window and the first move of its line.
+    fn store_node(&mut self, key: u64, node: Node, best: f64, subtree_cutoff: bool) {
+        let bound = if best <= node.alpha {
+            TableBound::Upper
+        } else if best >= node.beta {
+            TableBound::Lower
+        } else {
+            TableBound::Exact
+        };
+        let best_move = self.lines[node.ply as usize].first().copied().flatten();
+        self.table.store(TableEntry {
+            key,
+            score: to_table_score(best, node.ply),
+            best: best_move.map_or(0, Move::bits),
+            depth: u8::try_from(node.depth).unwrap_or(u8::MAX),
+            bound,
+            cutoff: subtree_cutoff,
+        });
+    }
+
+    /// Scout a later child, then search its full window if it improves the best score.
+    /// A reduced child is scouted one ply shallower first, and searched as usual when
+    /// that scout does not fail low for the parent.
+    fn search_child(
+        &mut self,
+        state: &mut GameState,
+        child: Node,
+        scout: bool,
+        reduce: bool,
+        observer: &mut impl SearchObserver,
+    ) -> Result<f64, Stopped> {
+        if !scout
+            || !self.config.alpha_beta
+            || !self.config.principal_variation_search
+            || !child.beta.is_finite()
+        {
+            return self.negamax(state, child, observer);
+        }
+
+        let narrow = Node { alpha: child.beta.next_down(), ..child };
+
+        if reduce {
+            let reduced = Node { depth: child.depth - 1, ..narrow };
+            let score = self.negamax(state, reduced, observer)?;
+
+            if score >= child.beta {
+                return Ok(score);
+            }
+        }
+
+        let score = self.negamax(state, narrow, observer)?;
+
+        if score > child.alpha && score < child.beta {
+            self.negamax(state, child, observer)
+        } else {
+            Ok(score)
+        }
+    }
+
+    /// Check whether the move just applied at a node is extended: the extended line stays
+    /// within twice the iteration's depth, and either the move was `forced`, the only one
+    /// of the node, or a queen's occupied neighbours grew to five or more from `before`,
+    /// its count at the node, with the matching option on.
+    fn extends(
+        &self,
+        state: &GameState,
+        node: Node,
+        before: [usize; 2],
+        forced: bool,
+    ) -> bool {
+        if node.ply + node.depth >= 2 * self.root_depth {
+            return false;
+        }
+
+        if forced && self.config.forced_move_extension {
+            return true;
+        }
+
+        if !self.config.queen_threat_extension {
+            return false;
+        }
+
+        let after = queen_crowding(state);
+        (0..2).any(|index| after[index] >= 5 && after[index] > before[index])
+    }
+
+    /// Try a null move at a node if [`Searcher::null_move_applies`]: pass, and search the
+    /// opponent's reply shallower with a minimal window at `beta`. Returns whether the
+    /// player still reaches `beta`, so the node can be cut off.
+    fn null_move_cuts_off(
+        &mut self,
+        state: &mut GameState,
+        node: Node,
+        player: Player,
+        observer: &mut impl SearchObserver,
+    ) -> Result<bool, Stopped> {
+        if !self.null_move_applies(state, node, player) {
+            return Ok(false);
+        }
+
+        let child = Node {
+            depth: node.depth - 1 - self.config.null_move_reduction,
+            ply: node.ply + 1,
+            alpha: -node.beta,
+            beta: (-node.beta).next_up(),
+            on_principal_variation: false,
+            allow_null: false,
+        };
+        state.apply_move(None);
+        let result = self.negamax(state, child, observer);
+        state.undo_move(None);
+        let score = -result?;
+        self.lines[node.ply as usize].clear();
+        let cuts_off = score >= node.beta;
+        self.cutoff |= cuts_off;
+        Ok(cuts_off)
+    }
+
+    /// Check whether a node tries a null move: the option is on, the node is an inner
+    /// scout node deep enough for the reduction, not right after another null move, the
+    /// player's queen is placed with at most three neighbours, and the static evaluation
+    /// already reaches `beta`.
+    fn null_move_applies(
+        &mut self,
+        state: &mut GameState,
+        node: Node,
+        player: Player,
+    ) -> bool {
+        let reduction = self.config.null_move_reduction;
+
+        if reduction == 0
+            || !self.config.alpha_beta
+            || node.ply == 0
+            || !node.allow_null
+            || !node.is_scout()
+            || node.depth < reduction + 2
+        {
+            return false;
+        }
+
+        let Some(queen) = state.queen_coord(player) else { return false };
+
+        if state.board().count_occupied_neighbors(queen.cell()) > 3 {
+            return false;
+        }
+
+        self.evaluator.evaluate(state, player) >= node.beta
     }
 
     /// Search a node with minimax: the score is from the perspective of `root_player`,
@@ -529,6 +918,7 @@ impl Searcher {
                 beta,
                 on_principal_variation: self
                     .follows_principal_variation(follows, node.ply, mv),
+                allow_null: true,
             };
             state.apply_move(mv);
             let result = self.minimax(state, child, root_player, observer);
@@ -562,6 +952,15 @@ impl Searcher {
     }
 }
 
+/// Count the occupied neighbours of both queens, by player index, zero if unplaced.
+fn queen_crowding(state: &GameState) -> [usize; 2] {
+    Player::ALL.map(|player| {
+        state
+            .queen_coord(player)
+            .map_or(0, |queen| state.board().count_occupied_neighbors(queen.cell()))
+    })
+}
+
 /// Get the slot of a move in the history table: its piece type and target cell.
 fn history_index(mv: Move) -> usize {
     mv.piece_type().index() * HISTORY_CELLS + mv.target().index()
@@ -578,4 +977,31 @@ fn decode_line(state: &GameState, line: &[Option<Move>]) -> Vec<Option<CoordMove
     }
 
     decoded
+}
+
+/// A helper only polls the shared cancellation flag; its table entries help the main
+/// search, but incomplete or speculative helper results are never submitted.
+struct HelperObserver<'a> {
+    /// Set when the reporting thread finishes or is stopped by its observer.
+    stop: &'a AtomicBool,
+}
+
+impl SearchObserver for HelperObserver<'_> {
+    fn should_stop(&mut self) -> bool {
+        self.stop.load(Ordering::Relaxed)
+    }
+
+    fn report(&mut self, _report: &DepthReport) {}
+}
+
+/// Cancels helpers on normal return and when a client observer unwinds with a panic.
+struct SearchCancellation<'a> {
+    /// The flag polled by every helper.
+    stop: &'a AtomicBool,
+}
+
+impl Drop for SearchCancellation<'_> {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
 }

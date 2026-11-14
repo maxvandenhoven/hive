@@ -1,0 +1,58 @@
+{
+  "champion": {
+    "generation": 4,
+    "name": "structure-x2",
+    "source_revision": "a6c9e48998db6df71ce5f7762b1216e629118c8c",
+    "spec": {
+      "kind": "negamax",
+      "params": {
+        "queen_safety": 1.0,
+        "mobility": 0.0,
+        "positioning": 0.0,
+        "material_on_board": 0.0,
+        "material_in_hand": 0.0,
+        "queen_danger": 0.0,
+        "queen_escape": 0.0,
+        "pinned_material": 0.05,
+        "free_ants": 0.0,
+        "beetle_control": 0.5,
+        "alpha_beta": true,
+        "table_megabytes": 32,
+        "aspiration_window": 0.5,
+        "principal_variation_search": true,
+        "threads": 2,
+        "depth": null,
+        "table_deeper_hits": true,
+        "late_move_reductions": 6,
+        "null_move_reduction": 2,
+        "queen_attack_ordering": true,
+        "tempo": 0.3,
+        "mobile_ant": 0.3,
+        "mobile_beetle": 0.15,
+        "mobile_queen": 0.2,
+        "mobile_spider": 0.1,
+        "mobile_grasshopper": 0.1
+      },
+      "label": null
+    },
+    "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen4/summary.json"
+  },
+  "champion_sha256": "d2d564b797ee529e8cf40b511d3012a7cc2104db6964820f99b19aec98469b4d",
+  "revision": "bcf17fabba34d9fb275e9fba0b99e155b879eb78",
+  "engine_sha256": "26d0ce09fb23f118c5b2717912905addd0f859fdadbe83f59c05d23b81358983",
+  "dirty": false,
+  "phase": "confirmation",
+  "seed": 30600,
+  "pairs": 50,
+  "budget_s": 1.0,
+  "alpha": 0.05,
+  "gate": "fast",
+  "max_turns": 100,
+  "results": {},
+  "candidates": {
+    "repetition-queen-safety-0.75": {
+      "repetition_draws": true,
+      "queen_safety": 0.75
+    }
+  }
+}

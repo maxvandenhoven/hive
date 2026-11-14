@@ -1,0 +1,12 @@
+{
+  "positioning-0.25": {"positioning": 0.25},
+  "positioning-0.5": {"positioning": 0.5},
+  "mobility-0.02": {"mobility": 0.02},
+  "mobile": {"free_ants": 0.0, "mobile_ant": 0.3, "mobile_beetle": 0.15, "mobile_queen": 0.2, "mobile_spider": 0.1, "mobile_grasshopper": 0.1},
+  "mobile-ant": {"free_ants": 0.0, "mobile_ant": 0.3},
+  "structure-x2": {"pinned_material": 0.05, "free_ants": 0.5, "beetle_control": 0.5},
+  "tempo-0.5": {"tempo": 0.5},
+  "lmr8": {"late_move_reductions": 8},
+  "queen-safety-1.5": {"queen_safety": 1.5},
+  "aspiration-0.25": {"aspiration_window": 0.25}
+}

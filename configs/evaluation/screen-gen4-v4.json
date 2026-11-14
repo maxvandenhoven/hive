@@ -1,0 +1,6 @@
+{
+  "forced": {"forced_move_extension": true},
+  "forced-repetition": {"forced_move_extension": true, "repetition_draws": true},
+  "queen-safety-0.75": {"queen_safety": 0.75},
+  "repetition-queen-safety-0.75": {"repetition_draws": true, "queen_safety": 0.75}
+}

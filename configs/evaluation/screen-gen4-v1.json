@@ -1,0 +1,11 @@
+{
+  "pinned-0.1": {"pinned_material": 0.1},
+  "beetle-1": {"beetle_control": 1.0},
+  "structure-x2": {"pinned_material": 0.1, "beetle_control": 1.0},
+  "queen-safety-0.75": {"queen_safety": 0.75},
+  "tempo-0.2": {"tempo": 0.2},
+  "locked-shift": {"queen_safety": 0.5, "queen_locked_neighbors": 0.5},
+  "null1": {"null_move_reduction": 1},
+  "lmr4": {"late_move_reductions": 4},
+  "mobile-queen-0.3": {"mobile_queen": 0.3}
+}

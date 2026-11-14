@@ -21,7 +21,7 @@ from pydantic import ConfigDict, computed_field
 from hive.agents.factory import AgentSpec
 from hive.engine.codec import JsonCodec
 from hive.engine.rules import Rules
-from hive.engine.state import Player
+from hive.engine.state import Move, Player
 from hive.match.records import DecisionRecord, MatchOutcome, MatchResult, TurnCloseReason
 from hive.match.runner import MatchRunner, derive_seed
 from hive.match.worker import DEFAULT_GRACE_S
@@ -40,16 +40,19 @@ GAUNTLET_ELO_PRIOR_GAMES = 1.0
 """Virtual drawn games added to every pairing, which keeps Elo finite for perfect play."""
 
 
-def default_gauntlet_jobs() -> int:
+def default_gauntlet_jobs(threads: int = 1) -> int:
     """Get the default and largest fair number of concurrent matches.
 
     A match has two worker processes, but only the seat to move thinks, so every match
-    keeps about one CPU busy.
+    keeps `threads` CPUs busy at most.
+
+    Args:
+        threads: The largest search thread count of any participant.
 
     Returns:
-        The number of CPUs, and at least one.
+        The number of matches that fit the CPUs, and at least one.
     """
-    return os.cpu_count() or 1
+    return max(1, (os.cpu_count() or 1) // threads)
 
 
 def wilson_interval(proportion: float, count: int, z: float) -> tuple[float, float]:
@@ -183,6 +186,7 @@ class GauntletConfig(JsonCodec):
         grace_s: The number of seconds an agent may take to return after it was stopped
             before its worker is restarted.
         rules: The rules of every match.
+        openings: Opening sequences, shared by both colours of each pair.
         replays: Whether the report keeps the full result of every match.
     """
 
@@ -195,6 +199,7 @@ class GauntletConfig(JsonCodec):
     grace_s: float = DEFAULT_GRACE_S
     rules: Rules = field(default_factory=Rules)
     replays: bool = False
+    openings: tuple[tuple[Move | None, ...], ...] = ()
 
     def __post_init__(self) -> None:
         """Check the participants and settings.
@@ -279,6 +284,18 @@ class GauntletConfig(JsonCodec):
             max_turns=self.max_turns,
             seed=match.seed,
             grace_s=self.grace_s,
+            opening=(
+                self.openings[
+                    (
+                        match.index
+                        // (len(self.participants) * (len(self.participants) - 1) // 2)
+                        // 2
+                    )
+                    % len(self.openings)
+                ]
+                if self.openings
+                else ()
+            ),
         )
 
     def run(
@@ -581,7 +598,7 @@ class MatchSummary(JsonCodec):
             seed=result.seed,
             outcome=result.outcome,
             winner=result.winner,
-            plies=len(result.decisions),
+            plies=len(result.opening) + len(result.decisions),
             duration_s=result.duration_s,
         )
 

@@ -1,0 +1,38 @@
+{
+  "structure": {
+    "queen_safety": 1.0,
+    "mobility": 0.0,
+    "positioning": 0.0,
+    "material_on_board": 0.0,
+    "material_in_hand": 0.0,
+    "queen_danger": 0.0,
+    "queen_escape": 0.0,
+    "pinned_material": 0.025,
+    "free_ants": 0.25,
+    "beetle_control": 0.25,
+    "alpha_beta": true,
+    "table_megabytes": 32,
+    "aspiration_window": 0.5,
+    "principal_variation_search": true,
+    "threads": 2,
+    "depth": null
+  },
+  "ants-pins-strong": {
+    "queen_safety": 1.0,
+    "mobility": 0.0,
+    "positioning": 0.0,
+    "material_on_board": 0.0,
+    "material_in_hand": 0.0,
+    "queen_danger": 0.0,
+    "queen_escape": 0.0,
+    "pinned_material": 0.05,
+    "free_ants": 0.25,
+    "beetle_control": 0.0,
+    "alpha_beta": true,
+    "table_megabytes": 32,
+    "aspiration_window": 0.5,
+    "principal_variation_search": true,
+    "threads": 2,
+    "depth": null
+  }
+}

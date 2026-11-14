@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import pytest
 
@@ -211,3 +211,109 @@ def test_passing_player_has_no_mobility(rules: Rules) -> None:
     assert rules.legal_moves(state) == [None]
     assert agent.evaluate(state=state, player=Player.WHITE) == -black_move_count
     assert state.current_player is Player.WHITE
+
+
+@pytest.mark.parametrize("threads", [1, 2, 4])
+def test_threaded_aspiration_search(
+    rules: Rules, position: GameState, threads: int
+) -> None:
+    """Searches report exact scores through the bindings and retain a legal best move."""
+    baseline = LocalTurnContext()
+    NegamaxAgent(rules=rules, seed=0, depth=3).think(state=position.copy(), turn=baseline)
+    turn = LocalTurnContext()
+    agent = NegamaxAgent(
+        rules=rules, seed=0, depth=3, threads=threads, aspiration_window=0.01
+    )
+    before = position.copy()
+    agent.think(state=position, turn=turn)
+    assert position == before
+    assert [info["score"] for info in turn.infos] == [
+        info["score"] for info in baseline.infos
+    ]
+    assert turn.move in rules.legal_moves(position)
+    agent.reset()
+
+
+@pytest.mark.parametrize(
+    "params", [{"threads": 0}, {"threads": 257}, {"aspiration_window": float("nan")}]
+)
+def test_native_search_rejects_invalid_parallel_options(
+    rules: Rules, params: dict[str, Any]
+) -> None:
+    """Direct binding calls validate options even without the agent factory."""
+    from hive._core import Searcher
+
+    with pytest.raises(ValueError):
+        Searcher(rules, algorithm="negamax", **params)
+
+
+@pytest.mark.parametrize(
+    "term",
+    [
+        "queen_danger",
+        "queen_escape",
+        "pinned_material",
+        "free_ants",
+        "beetle_control",
+        "tempo",
+        "mobile_queen",
+        "mobile_beetle",
+        "mobile_grasshopper",
+        "mobile_ant",
+        "placement_cells",
+        "queen_locked_neighbors",
+    ],
+)
+def test_structural_terms_are_antisymmetric_and_restore_state(
+    term: str, rules: Rules
+) -> None:
+    """A covered queen and a hive with a gate exercise the structural terms."""
+    board = {
+        (0, 0): [
+            Piece(type=PieceType.QUEEN, owner=Player.WHITE),
+            Piece(type=PieceType.BEETLE, owner=Player.BLACK),
+        ],
+        (1, 0): [Piece(type=PieceType.QUEEN, owner=Player.BLACK)],
+        (0, 1): [Piece(type=PieceType.ANT, owner=Player.WHITE)],
+        (0, 2): [Piece(type=PieceType.ANT, owner=Player.BLACK)],
+    }
+    state = rules.from_board(board=board, current_player=Player.WHITE)
+    before = state.copy()
+    agent = build_agent(
+        spec=AgentSpec(kind="negamax", params={"queen_safety": 0, term: 1}),
+        rules=rules,
+        seed=0,
+    )
+    assert isinstance(agent, SearchAgent)
+    white = agent.evaluate(state=state, player=Player.WHITE)
+    black = agent.evaluate(state=state, player=Player.BLACK)
+    assert white == -black
+    assert state == before
+
+    if term == "beetle_control":
+        assert white == -2
+    elif term == "free_ants":
+        assert white == -1
+    elif term == "pinned_material":
+        assert white == -17
+    elif term == "queen_danger" or term == "mobile_grasshopper":
+        assert white == 0
+    elif term == "tempo":
+        assert white == 1
+    elif term.startswith("mobile_"):
+        assert white == -1
+    elif term == "placement_cells":
+        assert white == -8
+    elif term == "queen_locked_neighbors":
+        # White's queen: Black's queen and White's pinned ant are locked. Black's queen:
+        # White's ant is locked, Black's free beetle on the white queen is not.
+        assert white == 1 - 2
+    else:
+        black_state = rules.from_board(board=board, current_player=Player.BLACK)
+        escapes = sum(
+            m is not None
+            and m.piece_type == PieceType.QUEEN
+            and m.source_coord is not None
+            for m in rules.legal_moves(black_state)
+        )
+        assert white == -escapes

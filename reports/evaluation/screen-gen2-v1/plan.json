@@ -1,0 +1,87 @@
+{
+  "champion": {
+    "generation": 2,
+    "name": "tempo-lmr6",
+    "source_revision": "2858b2c9353b492738dcaf5e0fd9d680d6cccd5f",
+    "spec": {
+      "kind": "negamax",
+      "params": {
+        "queen_safety": 1.0,
+        "mobility": 0.0,
+        "positioning": 0.0,
+        "material_on_board": 0.0,
+        "material_in_hand": 0.0,
+        "queen_danger": 0.0,
+        "queen_escape": 0.0,
+        "pinned_material": 0.025,
+        "free_ants": 0.25,
+        "beetle_control": 0.25,
+        "alpha_beta": true,
+        "table_megabytes": 32,
+        "aspiration_window": 0.5,
+        "principal_variation_search": true,
+        "threads": 2,
+        "depth": null,
+        "table_deeper_hits": true,
+        "late_move_reductions": 6,
+        "null_move_reduction": 2,
+        "queen_attack_ordering": true,
+        "tempo": 0.3
+      },
+      "label": null
+    },
+    "evidence": "/home/maxhov/Documents/repos/hive/reports/evaluation/confirm-gen2/summary.json"
+  },
+  "champion_sha256": "a9467439408fb38288604b8ded4fb64092b55fc03f877464c7c82a4a67bbd9a3",
+  "revision": "2858b2c9353b492738dcaf5e0fd9d680d6cccd5f",
+  "engine_sha256": "03d8b84fdddcd556709f6be999ea09403290b6f99db0b750094e11b6801dff9c",
+  "dirty": false,
+  "phase": "screening",
+  "seed": 300,
+  "pairs": 24,
+  "budget_s": 0.25,
+  "alpha": 0.05,
+  "gate": "strict",
+  "max_turns": 60,
+  "results": {},
+  "candidates": {
+    "positioning-0.25": {
+      "positioning": 0.25
+    },
+    "positioning-0.5": {
+      "positioning": 0.5
+    },
+    "mobility-0.02": {
+      "mobility": 0.02
+    },
+    "mobile": {
+      "free_ants": 0.0,
+      "mobile_ant": 0.3,
+      "mobile_beetle": 0.15,
+      "mobile_queen": 0.2,
+      "mobile_spider": 0.1,
+      "mobile_grasshopper": 0.1
+    },
+    "mobile-ant": {
+      "free_ants": 0.0,
+      "mobile_ant": 0.3
+    },
+    "structure-x2": {
+      "pinned_material": 0.05,
+      "free_ants": 0.5,
+      "beetle_control": 0.5
+    },
+    "tempo-0.5": {
+      "tempo": 0.5
+    },
+    "lmr8": {
+      "late_move_reductions": 8
+    },
+    "queen-safety-1.5": {
+      "queen_safety": 1.5
+    },
+    "aspiration-0.25": {
+      "aspiration_window": 0.25
+    }
+  }
+}

@@ -99,6 +99,10 @@ agent parameter next to `depth`:
 | `material_on_board` | 0.0 | Value of own pieces on the board minus the opponent's (`SEARCH_PIECE_VALUES`) |
 | `material_in_hand` | 0.0 | Value of own pieces in hand minus the opponent's |
 | `alpha_beta` | `true` | Not a term: whether the search prunes with alpha-beta (WP 28), searching the best line of the previous depth first. Same scores, far fewer nodes; among equally scored moves another may be chosen |
+| `table_megabytes` | `32` | Negamax transposition table size; zero disables table, killers and history |
+| `aspiration_window` | `0` | Initial half-window around the previous score; zero uses a full window. Failed windows widen before a result is reported |
+| `principal_variation_search` | `false` | Negamax scouts later moves with a minimal window and re-searches improvements |
+| `threads` | `1` | Total negamax threads sharing one table; helpers diversify root order. The main thread reports completed depths and its own node count |
 
 Terms with weight 0 are skipped, so an unused expensive term costs nothing. Flat weights
 keep the params of a spec plain numbers next to `depth`, which keeps the API parameter
@@ -403,3 +407,17 @@ In the app (implemented in WP 12, see `api-and-data.md`):
   `hive_decision_close_total{reason}`, `hive_worker_restarts_total`,
   `hive_worker_pool_size` / `_busy`, and `hive_illegal_submissions_total`.
 - Search info is streamed to the UI live (SSE), so a person sees depth and score evolve.
+
+Search experiments can be reproduced with `scripts/bench_search.py` (identical positions,
+completed depth at fixed time) and `scripts/tune_search.py` (colour-paired seeded openings,
+fixed opponents and budget). The CLI divides available CPUs by the largest participant
+thread count when selecting or validating gauntlet jobs. Timing and threaded searches are
+not deterministic. See `performance.md` for measured defaults and tuning evidence.
+
+The `nm-smp` preset selects unbounded negamax with a 0.5 aspiration window, PVS and two
+threads, keeping the default evaluator. The WP 28 weight sweep did not confirm a stronger
+evaluator on its independent one-second test, so no tuned-weight preset is promoted.
+
+The new evaluation terms and the configuration-based champion ratchet are documented in
+[evaluation.md](evaluation.md). Paired trials use `GauntletConfig.openings`; `MatchRunner`
+validates each opening and `MatchResult.record` includes it before the timed decisions.
