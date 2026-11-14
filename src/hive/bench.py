@@ -457,14 +457,28 @@ ENGINE_BENCH_CASES: list[EngineBenchCase] = [
     SearchBenchCase(
         name="alphabeta-long-6",
         position="long_hive",
-        agent=AgentSpec(kind="negamax", params={"depth": 6}),
+        agent=AgentSpec(kind="negamax", params={"depth": 6, "table_megabytes": 0}),
         nodes=1_241_120,
     ),
     SearchBenchCase(
         name="alphabeta-mobility-ant-5",
         position="ant_moves",
-        agent=AgentSpec(kind="negamax", params={"depth": 5, "mobility": 1.0}),
+        agent=AgentSpec(
+            kind="negamax", params={"depth": 5, "mobility": 1.0, "table_megabytes": 0}
+        ),
         nodes=481_529,
+    ),
+    SearchBenchCase(
+        name="search-long-7",
+        position="long_hive",
+        agent=AgentSpec(kind="negamax", params={"depth": 7}),
+        nodes=5_155_252,
+    ),
+    SearchBenchCase(
+        name="search-mobility-ant-5",
+        position="ant_moves",
+        agent=AgentSpec(kind="negamax", params={"depth": 5, "mobility": 1.0}),
+        nodes=46_978,
     ),
 ]
 """The fixed cases of `hive bench engine`.

@@ -46,6 +46,7 @@ class SearchAgent(Agent):
         material_on_board: The weight of the on-board material term.
         material_in_hand: The weight of the in-hand material term.
         alpha_beta: Whether the search prunes with alpha-beta.
+        table_megabytes: The size of the transposition table in MB.
         searcher: The search of the Rust core, configured with the params.
         nodes: The number of nodes the last decision visited.
     """
@@ -68,6 +69,7 @@ class SearchAgent(Agent):
         material_on_board: float = 0.0,
         material_in_hand: float = 0.0,
         alpha_beta: bool = True,
+        table_megabytes: Annotated[int, Field(ge=0)] = 32,
     ) -> None:
         """Initialize the search agent.
 
@@ -88,6 +90,9 @@ class SearchAgent(Agent):
             alpha_beta: Whether to prune the search with alpha-beta, searching the best
                 line of the previous depth first. It finds the same scores in far fewer
                 nodes, but may choose another of several equally scored moves.
+            table_megabytes: The size of the transposition table in MB, zero for none.
+                `negamax` with alpha-beta uses it, and orders moves by killer moves and a
+                history table too; it is kept between decisions of a match.
         """
         super().__init__(rules=rules, seed=seed)
         self.depth = depth
@@ -97,6 +102,7 @@ class SearchAgent(Agent):
         self.material_on_board = material_on_board
         self.material_in_hand = material_in_hand
         self.alpha_beta = alpha_beta
+        self.table_megabytes = table_megabytes
         self.searcher = Searcher(
             rules,
             algorithm=self.ALGORITHM,
@@ -108,6 +114,7 @@ class SearchAgent(Agent):
             material_in_hand=material_in_hand,
             stop_check_interval=self.STOP_CHECK_INTERVAL,
             alpha_beta=alpha_beta,
+            table_megabytes=table_megabytes,
         )
         self.nodes = 0
 
@@ -130,6 +137,11 @@ class SearchAgent(Agent):
 
         turn.submit(legal_moves[self.rng.randrange(len(legal_moves))])
         self.nodes = self.searcher.think(state=state, turn=turn)
+
+    @override
+    def reset(self) -> None:
+        """Forget the transposition table, killer moves and history of the last match."""
+        self.searcher.clear()
 
     def evaluate(self, state: GameState, player: Player) -> float:
         """Evaluate a position as the weighted sum of the evaluation terms.

@@ -166,6 +166,23 @@ search, and both games ended in a win instead of a draw at the turn cap. Move or
 beyond the principal variation, the transposition table and threads (the rest of WP 28)
 come next.
 
+### Search speed log (WP 28)
+
+Every step keeps the root scores of the full search (Rust tests compare them at fixed
+depths). Time to reach a depth with `negamax`, median of 3 runs on the Ryzen 7 5800H:
+
+| Step | `long_hive` depth 4 | `long_hive` depth 6 | `long_hive` depth 7 | `ant_moves` mobility depth 5 |
+|---|---|---|---|---|
+| Python search (WP 27) | about 60 s (12.1M nodes) | – | – | – |
+| Rust search, no pruning (WP 45) | 572 ms, 12,102,433 nodes | – | – | – |
+| Alpha-beta, previous best line first | 6.0 ms, 51,847 nodes | 342 ms, 1,241,120 | 2,776 ms, 46,021,711 | 758 ms, 481,529 |
+| Transposition table (key includes the ply), killer moves, history ordering | 3.2 ms, 13,614 nodes | 103 ms, 455,206 | 477 ms, 5,155,252 | 74 ms, 46,978 |
+
+The table, killers and history apply to `negamax` (param `table_megabytes`, default 32,
+zero turns them off); `minimax` keeps plain alpha-beta. The table is kept between the
+decisions of a match and cleared by `reset`. Not done yet: lazy SMP threads, aspiration
+windows and evaluator tuning.
+
 ## Baseline numbers
 
 Measured with `hive bench perft` (WP 05) on an otherwise idle machine, single process,

@@ -5,6 +5,7 @@
 
 pub mod evaluation;
 pub mod search;
+pub mod table;
 
 pub use evaluation::{EvaluationWeights, Evaluator, PIECE_VALUES};
 pub use search::{

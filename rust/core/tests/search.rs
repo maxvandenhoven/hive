@@ -45,6 +45,7 @@ fn decide(
         weights,
         stop_check_interval: 32,
         alpha_beta,
+        table_megabytes: 16,
     };
     let mut searcher = Searcher::new(rules, config);
     let mut recorder = Recorder::default();
@@ -136,6 +137,7 @@ fn a_forced_win_is_final_at_depth_one() {
         weights: EvaluationWeights::default(),
         stop_check_interval: 32,
         alpha_beta: true,
+        table_megabytes: 16,
     };
     let mut recorder = Recorder::default();
     Searcher::new(rules, config).think(&mut state, &mut recorder);
@@ -189,21 +191,19 @@ fn alpha_beta_finds_the_scores_of_the_full_search_with_fewer_nodes() {
 }
 
 #[test]
-fn minimax_and_negamax_prune_alike() {
+fn negamax_orders_its_moves_better_than_minimax() {
+    // Both prune with alpha-beta to the same scores; negamax also uses the transposition
+    // table, killer moves and the history, so it visits fewer nodes.
     let (rules, state) = suite_position("long_hive");
     let weights = EvaluationWeights::default();
     let (negamax, negamax_reports) =
         decide(rules, &mut state.clone(), SearchAlgorithm::Negamax, 4, weights, true);
     let (minimax, minimax_reports) =
         decide(rules, &mut state.clone(), SearchAlgorithm::Minimax, 4, weights, true);
-
-    assert_eq!(negamax.nodes(), minimax.nodes());
-    let lines = |reports: &Recorder| {
-        reports
-            .reports
-            .iter()
-            .map(|report| (report.score, report.principal_variation.clone()))
-            .collect::<Vec<_>>()
+    let scores = |recorder: &Recorder| {
+        recorder.reports.iter().map(|report| report.score).collect::<Vec<_>>()
     };
-    assert_eq!(lines(&negamax_reports), lines(&minimax_reports));
+
+    assert_eq!(scores(&negamax_reports), scores(&minimax_reports));
+    assert!(negamax.nodes() < minimax.nodes());
 }
