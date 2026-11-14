@@ -18,6 +18,7 @@ the order in which work happens. Topic files go deeper on each area:
 | [`evaluation.md`](evaluation.md) | Configurable evaluation, paired champion trials, tuning and promotion gates |
 | [`performance.md`](performance.md) | Engine speed (M6: profiling, Rust core, autoresearch) and agent strength (M7: repetition, alpha-beta, tuning), with all measurements |
 | [`rust-core.md`](rust-core.md) | Rust core of the engine and the search: crates, Python API contract, representation, search kernel, correctness gates |
+| [`cleanup.md`](cleanup.md) | Cleanup round (WP 46 to 60): simpler abstractions, merged objects and the documentation restructure |
 
 Work is split into **work packages** (WPs), each tracked as a GitHub issue that contains a
 self-contained session prompt. The entry point for a session is: *"Implement issue #N"*.
