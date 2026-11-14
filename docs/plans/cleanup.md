@@ -513,4 +513,47 @@ step, and every guide command was executed.
 
 ## Baseline
 
-WP 46 fills this section with the benchmark numbers of `main` before the cleanup.
+The numbers of `main` at d58e7de before the cleanup, measured on 2026-11-14 on the Ryzen
+7 5800H (8 cores, 16 threads) with no other load, one command after the other. Later
+packages compare with these on the same machine.
+
+| Measurement | Command | Result |
+|---|---|---|
+| Perft, `start` depth 6, through the bindings | `make perft` | 12,219,480 nodes in 2.298 s, 5.32M nodes/s |
+| Engine benchmark, geometric mean of 14 cases | `uv run hive bench engine` (5 runs) | 5.20M nodes/s |
+| Champion search, four fixed positions, 1 s | `scripts/bench_search.py --budget 1 --repeat 2 --params <champion>` | Mean depth 10.75, max 12, 2.46M nodes/s |
+
+`<champion>` is the `params` mapping of `configs/evaluation/champion.json` (generation 5,
+two threads), and the search uses the rules of the perft suite. The cases of the engine
+benchmark, median of five runs:
+
+| Case | Nodes | Median s | Nodes/s |
+|---|---|---|---|
+| `perft-start-5` | 516,240 | 0.097 | 5,338,728 |
+| `perft-ant-3` | 37,589 | 0.009 | 4,252,167 |
+| `perft-long-3` | 149,512 | 0.032 | 4,710,848 |
+| `negamax-long-3` | 153,360 | 0.008 | 18,791,752 |
+| `mobility-ant-2` | 946 | 0.002 | 593,210 |
+| `perft-start-6-native` | 12,219,480 | 0.221 | 55,344,831 |
+| `perft-ant-4-native` | 2,729,747 | 0.098 | 27,860,783 |
+| `perft-long-4-native` | 11,797,660 | 0.364 | 32,393,410 |
+| `negamax-long-4` | 12,102,433 | 0.637 | 18,999,671 |
+| `mobility-ant-3` | 39,464 | 0.064 | 614,269 |
+| `alphabeta-long-6` | 1,241,120 | 0.349 | 3,551,508 |
+| `alphabeta-mobility-ant-5` | 481,529 | 0.740 | 650,985 |
+| `search-long-7` | 5,155,252 | 0.503 | 10,239,926 |
+| `search-mobility-ant-5` | 46,978 | 0.073 | 639,342 |
+
+Depth and nodes per second of the champion search per position (two repeats):
+
+| Position | Depth | Nodes/s |
+|---|---|---|
+| `start` | 10, 10 | 3,134,552, 3,201,432 |
+| `long_hive` | 12, 12 | 2,719,239, 2,711,442 |
+| `ant_moves` | 9, 10 | 1,926,873, 1,825,729 |
+| `beetle_gate` | 12, 11 | 2,050,457, 2,080,534 |
+
+The pinned formats and the pinned seeded match are in `tests/data/golden/`, checked by
+`tests/test_golden.py`. A package that changes one on purpose (WP 52 and 53 for the report
+and the match result, WP 60 for descriptions in the OpenAPI schema) regenerates the file
+in the same pull request, as `tests/data/golden/README.md` describes.
