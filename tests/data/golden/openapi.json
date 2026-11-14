@@ -1,0 +1,2531 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Hive",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Read Liveness",
+        "description": "Report that the process is serving requests.",
+        "operationId": "read_liveness",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Read Readiness",
+        "description": "Report whether the database and the object store are reachable. Responds with 503 and the failing checks if either is not.",
+        "operationId": "read_readiness",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReport"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A check failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Read Metrics",
+        "description": "Expose the metrics of the service in the Prometheus text format.",
+        "operationId": "read_metrics",
+        "responses": {
+          "200": {
+            "description": "The metrics.",
+            "content": {
+              "text/plain; version=1.0.0; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agent Kinds",
+        "description": "List the agent kinds with their descriptions and param schemas.",
+        "operationId": "list_agent_kinds",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentRegistration"
+                  },
+                  "type": "array",
+                  "title": "Response List Agent Kinds"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/presets": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agent Presets",
+        "description": "List the shipped agent presets, such as `nm2` and `nm3`, with their spec and a short description, to offer as named strengths.",
+        "operationId": "list_agent_presets",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentPreset"
+                  },
+                  "type": "array",
+                  "title": "Response List Agent Presets"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games": {
+      "post": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Create Game",
+        "description": "Create a game: human vs agent on the screen or at the table, human vs human with a hint agent on at least one side at the table, or agent vs agent on the screen.",
+        "operationId": "create_game",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "List Games",
+        "description": "List games, newest first.",
+        "operationId": "list_games",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/GameStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only games with this status.",
+              "title": "Status"
+            },
+            "description": "Only games with this status."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Read Game",
+        "description": "Get a game with its rules, setup and moves.",
+        "operationId": "read_game",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Update Game",
+        "description": "Rename a game, change its status or move it between the screen and the table. Moving it to the screen confirms a pending move.",
+        "operationId": "update_game",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The players and the board location are not a supported setup. Or the request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Delete Game",
+        "description": "Delete a game with its moves, its photos and their stored images.",
+        "operationId": "delete_game",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}/export": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Export Game",
+        "description": "Download the game as a serialized `GameRecord` with its rules, setup and moves.",
+        "operationId": "export_game",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameRecord"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}/state": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Read Game State",
+        "description": "Get the position of a game at a ply, with what the side to move may play. Without `ply`, the latest position.",
+        "operationId": "read_game_state",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "ply",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The number of moves to replay; the latest by default.",
+              "title": "Ply"
+            },
+            "description": "The number of moves to replay; the latest by default."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePosition"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The ply is past the last move. Or the request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}/targets": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Read Piece Targets",
+        "description": "Get the legal targets of the piece on top of the stack at `(q, r)` in the latest position.",
+        "operationId": "read_piece_targets",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "The column of the piece.",
+              "title": "Q"
+            },
+            "description": "The column of the piece."
+          },
+          {
+            "name": "r",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "The row of the piece.",
+              "title": "R"
+            },
+            "description": "The row of the piece."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceTargets"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found. There is no piece at the coordinate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The piece cannot move. Or the request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}/moves": {
+      "post": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Play Move",
+        "description": "Play a move entered by hand or read from a photo, at the expected ply. Moves for a side that an agent plays need `allow_agent_side`.",
+        "operationId": "play_move",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePosition"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The game is not at the expected ply. The game is finished or abandoned. The last move waits to be confirmed on the board. An agent plays the side to move.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The photo is not a photo of the game. The move is not legal. Or the request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}/moves/last": {
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Undo Move",
+        "description": "Undo the last move, reopening the game if the move finished it.",
+        "operationId": "undo_move",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "expected_ply",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ply the client expects the game at; the move is only undone if it is.",
+              "title": "Expected Ply"
+            },
+            "description": "The ply the client expects the game at; the move is only undone if it is."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePosition"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The game is not at the expected ply. The game has no moves to undo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}/moves/last/confirm": {
+      "post": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Confirm Move",
+        "description": "Confirm that the pending agent move, the last move of a game at the table, was made on the physical board, so the game can go on.",
+        "operationId": "confirm_move",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveConfirm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePosition"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The game is not at the expected ply. The last move does not wait to be confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}/think": {
+      "post": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Think",
+        "description": "Let an agent think about the latest position within a time budget, streaming `info` and `candidate` events and ending with the `decision`. Without `agent`, the agent or hint agent of the side to move thinks. With `commit`, the agent playing the side to move plays its decision in the game, pending at the table until it is confirmed. Failures after the stream started end it with an `error` event. Closing the stream stops the agent.",
+        "operationId": "think",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "contentMediaType": "application/json",
+                      "contentSchema": {
+                        "$ref": "#/components/schemas/ThinkEvent"
+                      }
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game not found.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The game is finished or abandoned. Only the agent of the side to move may commit its decision. The last move waits to be confirmed on the board.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A person plays the side to move and no agent was given. Or the request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Every agent worker is busy. The agent failed to start.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentBudget": {
+        "type": "number",
+        "exclusiveMinimum": 0.0
+      },
+      "AgentPlayer": {
+        "properties": {
+          "spec": {
+            "$ref": "#/components/schemas/AgentSpec"
+          },
+          "budget_s": {
+            "$ref": "#/components/schemas/AgentBudget",
+            "default": 5.0
+          },
+          "type": {
+            "type": "string",
+            "const": "agent",
+            "title": "Type",
+            "default": "agent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "title": "AgentPlayer",
+        "description": "A side played by an agent, whose moves are applied or made on the board.\n\nAttributes:\n    spec: The agent. Its params are checked when a game is created, not when a stored\n        game is read.\n    budget_s: The time budget of every decision in seconds.\n    type: Always `agent`, which tells the player kinds apart in JSON."
+      },
+      "AgentPreset": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/AgentSpec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "spec"
+        ],
+        "title": "AgentPreset",
+        "description": "A tuned agent shipped in `hive.agents.presets`, offered by name.\n\nA preset file is a spec in YAML with a `description` next to `kind`, `label` and\n`params`.\n\nAttributes:\n    name: The name of the preset, which is its file name without `.yaml`.\n    description: What the agent is like, in one short sentence.\n    spec: The agent, labelled with the preset name unless the file sets a label."
+      },
+      "AgentRegistration": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "The summary line of the agent class docstring.",
+            "readOnly": true
+          },
+          "params_schema": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Params Schema",
+            "description": "The JSON schema of the params, for rendering parameter forms.",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "description",
+          "params_schema"
+        ],
+        "title": "AgentRegistration",
+        "description": "A registered agent kind: the agent class and the model that validates its params.\n\nIts JSON form, which the API lists for the agent picker, has the `kind`, the\n`description` and the `params_schema`; the class and the model are left out.\n\nAttributes:\n    kind: The kind name used in `AgentSpec.kind`.\n    agent_class: The agent class, called with the rules, a keyword `seed` and the\n        validated params as keywords.\n    params_model: The model that validates the params, derived from the signature of\n        the agent constructor."
+      },
+      "AgentSpec": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "params": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Params"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "AgentSpec",
+        "description": "A named, configured agent, as chosen in the app, a config file or the CLI.\n\nThe JSON form is a mapping with `kind`, an optional `label` and optional `params`,\nfor example in YAML:\n\n```yaml\nkind: negamax\nlabel: nm3\nparams:\n  depth: 3\n  mobility: 0.5\n```\n\nAttributes:\n    kind: The registered kind of the agent, for example `negamax`.\n    params: The JSON parameters, validated against the kind when loading or building.\n    label: The display name in reports and the UI, or `None` for none."
+      },
+      "ApiErrorCode": {
+        "type": "string",
+        "enum": [
+          "game_not_found",
+          "game_not_active",
+          "ply_out_of_range",
+          "ply_conflict",
+          "move_not_legal",
+          "agent_turn",
+          "photo_not_found",
+          "coordinate_empty",
+          "piece_not_movable",
+          "no_move_to_undo",
+          "agent_required",
+          "commit_not_allowed",
+          "pool_busy",
+          "agent_unavailable",
+          "move_pending",
+          "no_pending_move",
+          "setup_not_supported"
+        ],
+        "title": "ApiErrorCode",
+        "description": "The machine-readable code of an error response."
+      },
+      "BoardCell": {
+        "properties": {
+          "coord": {
+            "$ref": "#/components/schemas/Coordinate"
+          },
+          "stack": {
+            "items": {
+              "$ref": "#/components/schemas/Piece"
+            },
+            "type": "array",
+            "title": "Stack"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "coord",
+          "stack"
+        ],
+        "title": "BoardCell",
+        "description": "One occupied cell of a board in the JSON form of `GameBoard`.\n\nAttributes:\n    coord: The coordinate of the cell.\n    stack: The pieces on the cell, ordered bottom to top."
+      },
+      "BoardLocation": {
+        "type": "string",
+        "enum": [
+          "screen",
+          "table"
+        ],
+        "title": "BoardLocation",
+        "description": "Where a game is played.\n\nOn the `screen` the app is the board, so agent moves apply at once. At the `table` a\nphysical board is played on, so a person makes every agent move on it and confirms it."
+      },
+      "BoardSetup": {
+        "properties": {
+          "board": {
+            "$ref": "#/components/schemas/GameBoard"
+          },
+          "current_player": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Current Player"
+          },
+          "current_ply": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Ply"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "board",
+          "current_player"
+        ],
+        "title": "BoardSetup",
+        "description": "A starting position made in the board editor.\n\nAttributes:\n    board: The pieces on each occupied coordinate, ordered bottom to top.\n    current_player: The player to move.\n    current_ply: The number of plies played so far, or `None` to derive the lowest\n        consistent ply (see `Rules.from_board`)."
+      },
+      "Coordinate": {
+        "prefixItems": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "integer"
+          }
+        ],
+        "type": "array",
+        "maxItems": 2,
+        "minItems": 2
+      },
+      "DecisionRecord": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "player": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Player"
+          },
+          "agent_label": {
+            "type": "string",
+            "title": "Agent Label"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "budget_s": {
+            "type": "number",
+            "title": "Budget S"
+          },
+          "elapsed_s": {
+            "type": "number",
+            "title": "Elapsed S"
+          },
+          "overrun_s": {
+            "type": "number",
+            "title": "Overrun S"
+          },
+          "close_reason": {
+            "$ref": "#/components/schemas/TurnCloseReason"
+          },
+          "candidates": {
+            "type": "integer",
+            "title": "Candidates"
+          },
+          "illegal_submissions": {
+            "type": "integer",
+            "title": "Illegal Submissions"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Move"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_info": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/SearchInfoValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Info"
+          },
+          "worker_restarted": {
+            "type": "boolean",
+            "title": "Worker Restarted",
+            "default": false
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ply",
+          "player",
+          "agent_label",
+          "seed",
+          "budget_s",
+          "elapsed_s",
+          "overrun_s",
+          "close_reason",
+          "candidates",
+          "illegal_submissions",
+          "move"
+        ],
+        "title": "DecisionRecord",
+        "description": "Everything that happened in one timed decision of an agent.\n\nAttributes:\n    ply: The ply the decision was made at.\n    player: The player to move.\n    agent_label: The label of the agent, or its kind if it has no label.\n    seed: The seed the agent was built with.\n    budget_s: The time budget of the turn in seconds.\n    elapsed_s: The seconds from sending the state to closing the turn.\n    overrun_s: The seconds past the deadline until the worker returned or was killed.\n    close_reason: Why the turn closed.\n    candidates: The number of legal submissions.\n    illegal_submissions: The number of rejected submissions.\n    move: The applied move, or `None` for a pass.\n    last_info: The last progress report of the agent, or `None` if there was none.\n    worker_restarted: Whether the worker was killed and restarted after the turn.\n    failure: A truncated description of what went wrong, or `None` if nothing did."
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ApiErrorCode"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "detail"
+        ],
+        "title": "ErrorResponse",
+        "description": "The body of an error response.\n\nAttributes:\n    code: What went wrong, for clients to branch on.\n    detail: A human-readable description."
+      },
+      "GameBoard": {
+        "items": {
+          "$ref": "#/components/schemas/BoardCell"
+        },
+        "type": "array"
+      },
+      "GameCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "white": {
+            "$ref": "#/components/schemas/PlayerConfig"
+          },
+          "black": {
+            "$ref": "#/components/schemas/PlayerConfig"
+          },
+          "board_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rules": {
+            "$ref": "#/components/schemas/Rules"
+          },
+          "setup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardSetup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "white",
+          "black"
+        ],
+        "title": "GameCreate",
+        "description": "The request body that creates a game.\n\nAttributes:\n    name: The display name.\n    white: The white side.\n    black: The black side.\n    board_location: Where the game is played, or `None` for the default of the\n        players: `screen` for agent vs agent, otherwise `table`. Human vs agent\n        games may be played at either; human vs human games, which need a hint agent\n        on at least one side, only at the `table`; agent vs agent games only on the\n        `screen`.\n    rules: The rules; missing fields take their default.\n    setup: A starting position from the board editor, or `None` for the initial\n        state."
+      },
+      "GameDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GameStatus"
+          },
+          "white": {
+            "$ref": "#/components/schemas/PlayerConfig"
+          },
+          "black": {
+            "$ref": "#/components/schemas/PlayerConfig"
+          },
+          "board_location": {
+            "$ref": "#/components/schemas/BoardLocation"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ply_count": {
+            "type": "integer",
+            "title": "Ply Count"
+          },
+          "current_player": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Current Player"
+          },
+          "current_player_type": {
+            "$ref": "#/components/schemas/PlayerType"
+          },
+          "pending_move": {
+            "type": "boolean",
+            "title": "Pending Move"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/Rules"
+          },
+          "setup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardSetup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/MoveRead"
+            },
+            "type": "array",
+            "title": "Moves"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status",
+          "white",
+          "black",
+          "board_location",
+          "result",
+          "ply_count",
+          "current_player",
+          "current_player_type",
+          "pending_move",
+          "created_at",
+          "updated_at",
+          "rules",
+          "setup",
+          "moves"
+        ],
+        "title": "GameDetail",
+        "description": "A game with its rules, setup and moves.\n\nAttributes:\n    rules: The rules.\n    setup: The starting position from the board editor, or `None` for the initial\n        state.\n    moves: The moves, ordered by ply."
+      },
+      "GamePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GameSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "GamePage",
+        "description": "One page of the game list, newest first.\n\nAttributes:\n    items: The games on the page.\n    total: The number of games matching the filter, on all pages.\n    limit: The most games a page holds.\n    offset: The number of games before this page."
+      },
+      "GamePosition": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "ply_count": {
+            "type": "integer",
+            "title": "Ply Count"
+          },
+          "board": {
+            "items": {
+              "$ref": "#/components/schemas/BoardCell"
+            },
+            "type": "array",
+            "title": "Board"
+          },
+          "hands": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "propertyNames": {
+                "enum": [
+                  "queen",
+                  "beetle",
+                  "grasshopper",
+                  "spider",
+                  "ant"
+                ]
+              },
+              "type": "object"
+            },
+            "propertyNames": {
+              "enum": [
+                "white",
+                "black"
+              ]
+            },
+            "type": "object",
+            "title": "Hands"
+          },
+          "current_player": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Current Player"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_move": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoveRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "movable_pieces": {
+            "items": {
+              "$ref": "#/components/schemas/MovablePiece"
+            },
+            "type": "array",
+            "title": "Movable Pieces"
+          },
+          "placeable_coords": {
+            "items": {
+              "$ref": "#/components/schemas/Coordinate"
+            },
+            "type": "array",
+            "title": "Placeable Coords"
+          },
+          "placeable_piece_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "queen",
+                "beetle",
+                "grasshopper",
+                "spider",
+                "ant"
+              ]
+            },
+            "type": "array",
+            "title": "Placeable Piece Types"
+          },
+          "must_pass": {
+            "type": "boolean",
+            "title": "Must Pass"
+          },
+          "pending_move": {
+            "type": "boolean",
+            "title": "Pending Move"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "ply_count",
+          "board",
+          "hands",
+          "current_player",
+          "result",
+          "last_move",
+          "movable_pieces",
+          "placeable_coords",
+          "placeable_piece_types",
+          "must_pass",
+          "pending_move"
+        ],
+        "title": "GamePosition",
+        "description": "The position of a game at one ply, with what the side to move may play.\n\nAttributes:\n    ply: The number of moves played from the starting position, which is the setup\n        for games from the board editor.\n    ply_count: The number of moves of the game, so `ply == ply_count` is the latest\n        position.\n    board: The stacks on the board, ordered by coordinate.\n    hands: The pieces each side has left to place, by piece type.\n    current_player: The side to move.\n    result: The result if the game ended in the position, otherwise `None`.\n    last_move: The move that led to the position, or `None` at the start.\n    movable_pieces: The pieces of the side to move with a legal target, sorted by\n        coordinate. Empty once the game ended.\n    placeable_coords: Where the side to move may place a piece, sorted. Empty once\n        the game ended or without a piece that may be placed.\n    placeable_piece_types: The piece types the side to move may place. Empty once\n        the game ended or without a coordinate to place on.\n    must_pass: Whether the side to move has no legal move and must pass, by playing\n        the move `None`.\n    pending_move: Whether the last move of the game, not of the position, waits for\n        a person to confirm making it on the physical board. No move can be played\n        until it is confirmed or undone."
+      },
+      "GameRecord": {
+        "properties": {
+          "rules": {
+            "$ref": "#/components/schemas/Rules"
+          },
+          "setup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardSetup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "moves": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Move"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Moves"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rules"
+        ],
+        "title": "GameRecord",
+        "description": "A game as its rules, starting position and moves, which is enough to replay it.\n\nAttributes:\n    rules: The rules the game is played with.\n    setup: The starting position from the board editor, or `None` for the initial\n        state.\n    moves: The moves played from the starting position, where `None` is a pass."
+      },
+      "GameResult": {
+        "type": "string",
+        "enum": [
+          "white",
+          "black",
+          "draw"
+        ],
+        "title": "GameResult",
+        "description": "The result of a finished game."
+      },
+      "GameStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "finished",
+          "abandoned"
+        ],
+        "title": "GameStatus",
+        "description": "Whether a game is still being played."
+      },
+      "GameSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GameStatus"
+          },
+          "white": {
+            "$ref": "#/components/schemas/PlayerConfig"
+          },
+          "black": {
+            "$ref": "#/components/schemas/PlayerConfig"
+          },
+          "board_location": {
+            "$ref": "#/components/schemas/BoardLocation"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ply_count": {
+            "type": "integer",
+            "title": "Ply Count"
+          },
+          "current_player": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Current Player"
+          },
+          "current_player_type": {
+            "$ref": "#/components/schemas/PlayerType"
+          },
+          "pending_move": {
+            "type": "boolean",
+            "title": "Pending Move"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status",
+          "white",
+          "black",
+          "board_location",
+          "result",
+          "ply_count",
+          "current_player",
+          "current_player_type",
+          "pending_move",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "GameSummary",
+        "description": "A game in the game list.\n\nAttributes:\n    id: The game ID.\n    name: The display name.\n    status: Whether the game is still being played.\n    white: The white side.\n    black: The black side.\n    board_location: Where the game is played: on the screen or at the table.\n    result: The result, or `None` while there is none.\n    ply_count: The number of moves played.\n    current_player: The side to move after the last move.\n    current_player_type: Whether a person or an agent plays the side to move.\n    pending_move: Whether the last move waits for a person to confirm making it on\n        the physical board.\n    created_at: When the game was created.\n    updated_at: When the game was last changed."
+      },
+      "GameUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "board_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GameUpdate",
+        "description": "The request body that changes a game; fields left out are unchanged.\n\nAttributes:\n    name: The new display name.\n    status: The new status.\n    board_location: The new board location, which must suit the players as when\n        creating the game. Moving a game to the `screen` confirms a pending move."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthCheckResult": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "failed"
+        ]
+      },
+      "HintAgent": {
+        "properties": {
+          "spec": {
+            "$ref": "#/components/schemas/AgentSpec"
+          },
+          "budget_s": {
+            "$ref": "#/components/schemas/AgentBudget",
+            "default": 5.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "title": "HintAgent",
+        "description": "An agent that suggests moves to the person playing a side, on request.\n\nAttributes:\n    spec: The agent. Its params are checked when a game is created, not when a stored\n        game is read.\n    budget_s: The time budget of every hint in seconds."
+      },
+      "HumanPlayer": {
+        "properties": {
+          "hint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HintAgent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlayerName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "type": "string",
+            "const": "human",
+            "title": "Type",
+            "default": "human"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HumanPlayer",
+        "description": "A side played by a person, who enters every move of the side.\n\nAttributes:\n    hint: The agent that suggests moves to the person, or `None` for no hints.\n    name: The name of the person, such as a friend at the table, or `None` for the\n        person using the app.\n    type: Always `human`, which tells the player kinds apart in JSON."
+      },
+      "JsonValue": {},
+      "LivenessReport": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "default": "ok"
+          }
+        },
+        "type": "object",
+        "title": "LivenessReport",
+        "description": "The answer of the liveness probe.\n\nAttributes:\n    status: Always `ok`; any answer at all means the process is serving."
+      },
+      "MovablePiece": {
+        "properties": {
+          "coord": {
+            "$ref": "#/components/schemas/Coordinate"
+          },
+          "piece": {
+            "type": "string",
+            "enum": [
+              "queen",
+              "beetle",
+              "grasshopper",
+              "spider",
+              "ant"
+            ],
+            "title": "Piece"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coord",
+          "piece"
+        ],
+        "title": "MovablePiece",
+        "description": "A piece of the side to move that has at least one legal target.\n\nAttributes:\n    coord: The coordinate of the piece, on top of its stack.\n    piece: The type of the piece."
+      },
+      "Move": {
+        "properties": {
+          "piece": {
+            "type": "string",
+            "enum": [
+              "queen",
+              "beetle",
+              "grasshopper",
+              "spider",
+              "ant"
+            ],
+            "title": "Piece"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coordinate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to": {
+            "$ref": "#/components/schemas/Coordinate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "piece",
+          "from",
+          "to"
+        ],
+        "title": "Move",
+        "description": "A game move that places or moves a piece on the board.\n\nA move with `source_coord` set to `None` represents a placement from the player's\nhand. A move with a `source_coord` represents a movement of an existing piece on the\nboard. The JSON form is `{\"piece\": \"ant\", \"from\": [q, r] | null, \"to\": [q, r]}`, and a\npass (`None` where a move is expected) is `null`.\n\nAttributes:\n    piece_type: The type of piece being placed or moved.\n    source_coord: The axial coordinate `(q, r)` the piece moves from, or `None` if the\n        piece is being placed from the hand.\n    target_coord: The axial coordinate `(q', r')` the piece moves or is placed to."
+      },
+      "MoveConfirm": {
+        "properties": {
+          "expected_ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Ply"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_ply"
+        ],
+        "title": "MoveConfirm",
+        "description": "The request body that confirms a pending agent move was made on the board.\n\nAttributes:\n    expected_ply: The `ply_count` of the game the client saw, so the pending move is\n        its last move. If a move was undone meanwhile, the confirmation is rejected."
+      },
+      "MoveCreate": {
+        "properties": {
+          "move": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Move"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "photo"
+            ],
+            "title": "Source",
+            "default": "manual"
+          },
+          "photo_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Id"
+          },
+          "expected_ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Ply"
+          },
+          "allow_agent_side": {
+            "type": "boolean",
+            "title": "Allow Agent Side",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "move",
+          "expected_ply"
+        ],
+        "title": "MoveCreate",
+        "description": "The request body that plays a move.\n\nAttributes:\n    move: The move, or `None` to pass, which is only legal without another move.\n    source: How the move was entered. Agent moves are committed by the agent.\n    photo_id: The photo the move was read from, required with source `photo` and\n        only allowed with it.\n    expected_ply: The ply the move is played at, which is the `ply_count` of the game\n        the client saw. If another move came first, the move is rejected.\n    allow_agent_side: Whether the move may be entered for a side that an agent plays,\n        for example when the move made at the table differs from the agent's."
+      },
+      "MoveRead": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Move"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/MoveSource"
+          },
+          "photo_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Id"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pending": {
+            "type": "boolean",
+            "title": "Pending"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "move",
+          "source",
+          "photo_id",
+          "decision",
+          "pending",
+          "created_at"
+        ],
+        "title": "MoveRead",
+        "description": "A move of a game.\n\nAttributes:\n    ply: The ply the move was played at.\n    move: The move, or `None` for a pass.\n    source: How the move was entered.\n    photo_id: The photo the move was read from, or `None`.\n    decision: The decision behind an agent move, or `None`.\n    pending: Whether the move is an agent move in a `table` game that waits for a\n        person to confirm making it on the physical board.\n    created_at: When the move was played."
+      },
+      "MoveSource": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "photo",
+          "agent"
+        ],
+        "title": "MoveSource",
+        "description": "How a move was entered."
+      },
+      "Piece": {
+        "properties": {
+          "piece": {
+            "type": "string",
+            "enum": [
+              "queen",
+              "beetle",
+              "grasshopper",
+              "spider",
+              "ant"
+            ],
+            "title": "Piece"
+          },
+          "owner": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Owner"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "piece",
+          "owner"
+        ],
+        "title": "Piece",
+        "description": "A game piece with a type and an owner.\n\nPieces are immutable, so boards can share them and copying a board only needs to copy\nits stacks. The JSON form is `{\"piece\": \"ant\", \"owner\": \"white\"}`.\n\nAttributes:\n    type: The type of the piece.\n    owner: The player that owns the piece."
+      },
+      "PieceCount": {
+        "type": "integer",
+        "minimum": 0.0
+      },
+      "PieceTargets": {
+        "properties": {
+          "coord": {
+            "$ref": "#/components/schemas/Coordinate"
+          },
+          "piece": {
+            "type": "string",
+            "enum": [
+              "queen",
+              "beetle",
+              "grasshopper",
+              "spider",
+              "ant"
+            ],
+            "title": "Piece"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/Coordinate"
+            },
+            "type": "array",
+            "title": "Targets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coord",
+          "piece",
+          "targets"
+        ],
+        "title": "PieceTargets",
+        "description": "The legal targets of a piece of the side to move.\n\nAttributes:\n    coord: The coordinate of the piece, on top of its stack.\n    piece: The type of the piece.\n    targets: The coordinates the piece may move to, sorted."
+      },
+      "PlayerConfig": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/HumanPlayer"
+          },
+          {
+            "$ref": "#/components/schemas/AgentPlayer"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "agent": "#/components/schemas/AgentPlayer",
+            "human": "#/components/schemas/HumanPlayer"
+          }
+        }
+      },
+      "PlayerName": {
+        "type": "string",
+        "maxLength": 40,
+        "minLength": 1
+      },
+      "PlayerType": {
+        "type": "string",
+        "enum": [
+          "human",
+          "agent"
+        ]
+      },
+      "ReadinessReport": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "not ready"
+            ],
+            "title": "Status"
+          },
+          "checks": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HealthCheckResult"
+            },
+            "type": "object",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "ReadinessReport",
+        "description": "The answer of the readiness probe.\n\nAttributes:\n    status: `ready` if every check passed.\n    checks: The result of each check by name: `database` and `storage`."
+      },
+      "Rules": {
+        "properties": {
+          "piece_counts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PieceCount"
+            },
+            "propertyNames": {
+              "enum": [
+                "queen",
+                "beetle",
+                "grasshopper",
+                "spider",
+                "ant"
+              ]
+            },
+            "type": "object",
+            "title": "Piece Counts"
+          },
+          "starting_player": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Starting Player",
+            "default": "white"
+          },
+          "queen_by_turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queen By Turn",
+            "default": 4
+          },
+          "allow_queen_first_turn": {
+            "type": "boolean",
+            "title": "Allow Queen First Turn",
+            "default": true
+          },
+          "move_before_queen": {
+            "type": "boolean",
+            "title": "Move Before Queen",
+            "default": false
+          },
+          "max_turns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Turns"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Rules",
+        "description": "The rules of a Hive game, holding both the configuration and the rule behaviour.\n\n`Rules` is an immutable value: it is hashable, equal for equal fields, and cheap to\npass to worker processes or to store. Every method reads the configuration and a\n`GameState`, and never modifies the state permanently. The JSON form is an object with\nevery field and `piece_counts` keyed by piece type name; missing fields take their\ndefault when reading.\n\nAttributes:\n    piece_counts: The number of copies of each piece type a player receives. Any\n        mapping is accepted and stored as a read-only mapping ordered by piece type.\n    starting_player: The player who takes the first turn.\n    queen_by_turn: The turn number (one-indexed, per player) by which the queen must\n        be placed, or `None` for no deadline.\n    allow_queen_first_turn: Whether the queen may be placed on a player's first turn.\n    move_before_queen: Whether pieces may move before their owner's queen is placed.\n    max_turns: The maximum number of turns per player before the game is a draw, or\n        `None` for no limit."
+      },
+      "SearchInfoValue": {
+        "$ref": "#/components/schemas/JsonValue"
+      },
+      "ThinkCandidateEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "candidate",
+            "title": "Type",
+            "default": "candidate"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Move"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final": {
+            "type": "boolean",
+            "title": "Final"
+          }
+        },
+        "type": "object",
+        "required": [
+          "move",
+          "final"
+        ],
+        "title": "ThinkCandidateEvent",
+        "description": "A legal move the agent proposed as its current answer.\n\nAttributes:\n    type: Always `candidate`, which tells the events apart.\n    move: The proposed move, or `None` to pass.\n    final: Whether the agent is done, which ends its thinking."
+      },
+      "ThinkDecisionEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "decision",
+            "title": "Type",
+            "default": "decision"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionRecord"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GamePosition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision",
+          "position"
+        ],
+        "title": "ThinkDecisionEvent",
+        "description": "The decision of the agent, sent once its turn closed.\n\nAttributes:\n    type: Always `decision`, which tells the events apart.\n    decision: The record of the decision, with the decided move.\n    position: The position after the move if it was committed, otherwise `None`."
+      },
+      "ThinkErrorEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "error",
+            "title": "Type",
+            "default": "error"
+          },
+          "code": {
+            "$ref": "#/components/schemas/ApiErrorCode"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "detail"
+        ],
+        "title": "ThinkErrorEvent",
+        "description": "A failure after the stream started, which ends the stream.\n\nSent after the decision when committing it failed, for example because another move\nwas played meanwhile, or instead of the decision when the worker failed.\n\nAttributes:\n    type: Always `error`, which tells the events apart.\n    code: What went wrong, as in error responses.\n    detail: A human-readable description."
+      },
+      "ThinkEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ThinkInfoEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ThinkCandidateEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ThinkDecisionEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ThinkErrorEvent"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "candidate": "#/components/schemas/ThinkCandidateEvent",
+            "decision": "#/components/schemas/ThinkDecisionEvent",
+            "error": "#/components/schemas/ThinkErrorEvent",
+            "info": "#/components/schemas/ThinkInfoEvent"
+          }
+        }
+      },
+      "ThinkInfoEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "info",
+            "title": "Type",
+            "default": "info"
+          },
+          "info": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SearchInfoValue"
+            },
+            "type": "object",
+            "title": "Info"
+          }
+        },
+        "type": "object",
+        "required": [
+          "info"
+        ],
+        "title": "ThinkInfoEvent",
+        "description": "A progress report of the thinking agent, such as a completed search depth.\n\nAttributes:\n    type: Always `info`, which tells the events apart.\n    info: The progress values, such as `depth`, `nodes`, `score` and `pv`."
+      },
+      "ThinkRequest": {
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "budget_s": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget S"
+          },
+          "commit": {
+            "type": "boolean",
+            "title": "Commit",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ThinkRequest",
+        "description": "The request body that lets an agent think about the latest position of a game.\n\nAttributes:\n    agent: The agent that thinks, or `None` for the agent playing the side to move,\n        or the hint agent of a person playing it.\n    budget_s: The time budget in seconds, or `None` for the budget of the agent or\n        hint agent of the side to move, or 5 s without one. Budgets above the\n        maximum of the service are shortened to it.\n    commit: Whether to play the decided move in the game. Only the agent playing the\n        side to move may commit, so `agent` must be `None` or its spec."
+      },
+      "TurnCloseReason": {
+        "type": "string",
+        "enum": [
+          "final",
+          "deadline",
+          "worker_failed",
+          "no_candidate"
+        ],
+        "title": "TurnCloseReason",
+        "description": "Why a turn closed, which also tells where the applied move came from."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

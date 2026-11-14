@@ -1,0 +1,1013 @@
+{
+  "config": {
+    "participants": [
+      {
+        "kind": "random",
+        "params": {},
+        "label": null
+      },
+      {
+        "kind": "negamax",
+        "params": {
+          "depth": 1
+        },
+        "label": "nm1"
+      }
+    ],
+    "games_per_pair": 2,
+    "budget_s": 1.0,
+    "max_turns": 6,
+    "seed": 46,
+    "jobs": 2,
+    "grace_s": 1.0,
+    "rules": {
+      "piece_counts": {
+        "queen": 1,
+        "beetle": 2,
+        "grasshopper": 3,
+        "spider": 2,
+        "ant": 3
+      },
+      "starting_player": "white",
+      "queen_by_turn": 4,
+      "allow_queen_first_turn": true,
+      "move_before_queen": false,
+      "max_turns": null
+    },
+    "replays": true,
+    "openings": []
+  },
+  "participants": [
+    {
+      "label": "random",
+      "spec": {
+        "kind": "random",
+        "params": {},
+        "label": null
+      },
+      "wins": 0,
+      "draws": 2,
+      "losses": 0,
+      "turn_caps": 2,
+      "elo": 0.0,
+      "decision_stats": {
+        "decisions": 12,
+        "depth_reached": {},
+        "nodes_per_s": null,
+        "close_reasons": {
+          "final": 12,
+          "deadline": 0,
+          "worker_failed": 0,
+          "no_candidate": 0
+        },
+        "elapsed_s": {
+          "count": 12,
+          "mean": 0.0002141081786248833,
+          "p50": 0.0001422450295649469,
+          "p90": 0.0004264949820935726,
+          "max": 0.0006037250277586281
+        },
+        "overrun_s": {
+          "count": 12,
+          "mean": 0.0,
+          "p50": 0.0,
+          "p90": 0.0,
+          "max": 0.0
+        },
+        "overruns": 0,
+        "failures": 0,
+        "worker_restarts": 0,
+        "illegal_submissions": 0,
+        "mean_depth": null,
+        "timeout_rate": 0.0,
+        "overrun_rate": 0.0,
+        "flagged": false
+      },
+      "games": 2,
+      "win_rate": 0.5,
+      "win_rate_interval": [
+        0.09453120573423074,
+        0.9054687942657693
+      ]
+    },
+    {
+      "label": "nm1",
+      "spec": {
+        "kind": "negamax",
+        "params": {
+          "depth": 1
+        },
+        "label": "nm1"
+      },
+      "wins": 0,
+      "draws": 2,
+      "losses": 0,
+      "turn_caps": 2,
+      "elo": 0.0,
+      "decision_stats": {
+        "decisions": 12,
+        "depth_reached": {
+          "1": 12
+        },
+        "nodes_per_s": 2366328.0833333335,
+        "close_reasons": {
+          "final": 12,
+          "deadline": 0,
+          "worker_failed": 0,
+          "no_candidate": 0
+        },
+        "elapsed_s": {
+          "count": 12,
+          "mean": 0.0007868051761761308,
+          "p50": 0.00023116101510822773,
+          "p90": 0.003386472992133349,
+          "max": 0.003576006041839719
+        },
+        "overrun_s": {
+          "count": 12,
+          "mean": 0.0,
+          "p50": 0.0,
+          "p90": 0.0,
+          "max": 0.0
+        },
+        "overruns": 0,
+        "failures": 0,
+        "worker_restarts": 0,
+        "illegal_submissions": 0,
+        "mean_depth": 1.0,
+        "timeout_rate": 0.0,
+        "overrun_rate": 0.0,
+        "flagged": false
+      },
+      "games": 2,
+      "win_rate": 0.5,
+      "win_rate_interval": [
+        0.09453120573423074,
+        0.9054687942657693
+      ]
+    }
+  ],
+  "matches": [
+    {
+      "index": 0,
+      "white": "random",
+      "black": "nm1",
+      "seed": 1516787325825369227,
+      "outcome": "turn_cap",
+      "winner": null,
+      "plies": 12,
+      "duration_s": 0.23698908602818847
+    },
+    {
+      "index": 1,
+      "white": "nm1",
+      "black": "random",
+      "seed": 1492632189379898149,
+      "outcome": "turn_cap",
+      "winner": null,
+      "plies": 12,
+      "duration_s": 0.23687732801772654
+    }
+  ],
+  "replays": [
+    {
+      "rules": {
+        "piece_counts": {
+          "queen": 1,
+          "beetle": 2,
+          "grasshopper": 3,
+          "spider": 2,
+          "ant": 3
+        },
+        "starting_player": "white",
+        "queen_by_turn": 4,
+        "allow_queen_first_turn": true,
+        "move_before_queen": false,
+        "max_turns": null
+      },
+      "white": {
+        "kind": "random",
+        "params": {},
+        "label": null
+      },
+      "black": {
+        "kind": "negamax",
+        "params": {
+          "depth": 1
+        },
+        "label": "nm1"
+      },
+      "seed": 1516787325825369227,
+      "budget_s": 1.0,
+      "opening": [],
+      "decisions": [
+        {
+          "ply": 0,
+          "player": "white",
+          "agent_label": "random",
+          "seed": 5726849235374744029,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0006037250277586281,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              0,
+              0
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 1,
+          "player": "black",
+          "agent_label": "nm1",
+          "seed": 6422394126929552571,
+          "budget_s": 1.0,
+          "elapsed_s": 0.003386472992133349,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -1,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 31,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -1,
+                  0
+                ]
+              }
+            ],
+            "nps": 791361
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 2,
+          "player": "white",
+          "agent_label": "random",
+          "seed": 5726849235374744029,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00028491101693362,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              1,
+              -1
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 3,
+          "player": "black",
+          "agent_label": "nm1",
+          "seed": 6422394126929552571,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0002835980267263949,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "beetle",
+            "from": null,
+            "to": [
+              -2,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 16,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "beetle",
+                "from": null,
+                "to": [
+                  -2,
+                  0
+                ]
+              }
+            ],
+            "nps": 1770499
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 4,
+          "player": "white",
+          "agent_label": "random",
+          "seed": 5726849235374744029,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00018561602337285876,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "spider",
+            "from": null,
+            "to": [
+              2,
+              -1
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 5,
+          "player": "black",
+          "agent_label": "nm1",
+          "seed": 6422394126929552571,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00026100699324160814,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -3,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 21,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -3,
+                  0
+                ]
+              }
+            ],
+            "nps": 3577513
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 6,
+          "player": "white",
+          "agent_label": "random",
+          "seed": 5726849235374744029,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0001422450295649469,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              1,
+              -2
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 7,
+          "player": "black",
+          "agent_label": "nm1",
+          "seed": 6422394126929552571,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00023251405218616128,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              -4,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 8,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  -4,
+                  0
+                ]
+              }
+            ],
+            "nps": 790592
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 8,
+          "player": "white",
+          "agent_label": "random",
+          "seed": 5726849235374744029,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00012325000716373324,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "spider",
+            "from": null,
+            "to": [
+              1,
+              0
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 9,
+          "player": "black",
+          "agent_label": "nm1",
+          "seed": 6422394126929552571,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0002083889557980001,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -3,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 30,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -3,
+                  1
+                ]
+              }
+            ],
+            "nps": 4113534
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 10,
+          "player": "white",
+          "agent_label": "random",
+          "seed": 5726849235374744029,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00011039501987397671,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              3,
+              -2
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 11,
+          "player": "black",
+          "agent_label": "nm1",
+          "seed": 6422394126929552571,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00022779504070058465,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "grasshopper",
+            "from": null,
+            "to": [
+              -4,
+              2
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 35,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "grasshopper",
+                "from": null,
+                "to": [
+                  -4,
+                  2
+                ]
+              }
+            ],
+            "nps": 4209260
+          },
+          "worker_restarted": false,
+          "failure": null
+        }
+      ],
+      "outcome": "turn_cap",
+      "winner": null,
+      "duration_s": 0.23698908602818847
+    },
+    {
+      "rules": {
+        "piece_counts": {
+          "queen": 1,
+          "beetle": 2,
+          "grasshopper": 3,
+          "spider": 2,
+          "ant": 3
+        },
+        "starting_player": "white",
+        "queen_by_turn": 4,
+        "allow_queen_first_turn": true,
+        "move_before_queen": false,
+        "max_turns": null
+      },
+      "white": {
+        "kind": "negamax",
+        "params": {
+          "depth": 1
+        },
+        "label": "nm1"
+      },
+      "black": {
+        "kind": "random",
+        "params": {},
+        "label": null
+      },
+      "seed": 1492632189379898149,
+      "budget_s": 1.0,
+      "opening": [],
+      "decisions": [
+        {
+          "ply": 0,
+          "player": "white",
+          "agent_label": "nm1",
+          "seed": 1922623615856925040,
+          "budget_s": 1.0,
+          "elapsed_s": 0.003576006041839719,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              0,
+              0
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 6,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": null,
+                "to": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "nps": 115347
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 1,
+          "player": "black",
+          "agent_label": "random",
+          "seed": 2674628075556242857,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0004264949820935726,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "spider",
+            "from": null,
+            "to": [
+              -1,
+              0
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 2,
+          "player": "white",
+          "agent_label": "nm1",
+          "seed": 1922623615856925040,
+          "budget_s": 1.0,
+          "elapsed_s": 0.0005125559982843697,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              -1,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 15,
+            "score": -1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": [
+                  0,
+                  0
+                ],
+                "to": [
+                  -1,
+                  1
+                ]
+              }
+            ],
+            "nps": 1667222
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 3,
+          "player": "black",
+          "agent_label": "random",
+          "seed": 2674628075556242857,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00017731997650116682,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "spider",
+            "from": null,
+            "to": [
+              -1,
+              -1
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 4,
+          "player": "white",
+          "agent_label": "nm1",
+          "seed": 1922623615856925040,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00023116101510822773,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": [
+              -1,
+              1
+            ],
+            "to": [
+              -2,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 15,
+            "score": -1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": [
+                  -1,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 2626970
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 5,
+          "player": "black",
+          "agent_label": "random",
+          "seed": 2674628075556242857,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00015788496239110827,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              0,
+              -2
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 6,
+          "player": "white",
+          "agent_label": "nm1",
+          "seed": 1922623615856925040,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00017494597705081105,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": [
+              -2,
+              1
+            ],
+            "to": [
+              -1,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 15,
+            "score": -1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -1,
+                  1
+                ]
+              }
+            ],
+            "nps": 2952756
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 7,
+          "player": "black",
+          "agent_label": "random",
+          "seed": 2674628075556242857,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00012788805179297924,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": null,
+            "to": [
+              1,
+              -2
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 8,
+          "player": "white",
+          "agent_label": "nm1",
+          "seed": 1922623615856925040,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00017766101518645883,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": [
+              -1,
+              1
+            ],
+            "to": [
+              -2,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 15,
+            "score": -0.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": [
+                  -1,
+                  1
+                ],
+                "to": [
+                  -2,
+                  1
+                ]
+              }
+            ],
+            "nps": 2918288
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 9,
+          "player": "black",
+          "agent_label": "random",
+          "seed": 2674628075556242857,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00010625802678987384,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": null,
+            "to": [
+              0,
+              -1
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 10,
+          "player": "white",
+          "agent_label": "nm1",
+          "seed": 1922623615856925040,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00016955600585788488,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 2,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "queen",
+            "from": [
+              -2,
+              1
+            ],
+            "to": [
+              -1,
+              1
+            ]
+          },
+          "last_info": {
+            "depth": 1,
+            "nodes": 15,
+            "score": 1.0,
+            "pv": [
+              {
+                "piece": "queen",
+                "from": [
+                  -2,
+                  1
+                ],
+                "to": [
+                  -1,
+                  1
+                ]
+              }
+            ],
+            "nps": 2862595
+          },
+          "worker_restarted": false,
+          "failure": null
+        },
+        {
+          "ply": 11,
+          "player": "black",
+          "agent_label": "random",
+          "seed": 2674628075556242857,
+          "budget_s": 1.0,
+          "elapsed_s": 0.00012331001926213503,
+          "overrun_s": 0.0,
+          "close_reason": "final",
+          "candidates": 1,
+          "illegal_submissions": 0,
+          "move": {
+            "piece": "ant",
+            "from": [
+              0,
+              -2
+            ],
+            "to": [
+              -2,
+              0
+            ]
+          },
+          "last_info": null,
+          "worker_restarted": false,
+          "failure": null
+        }
+      ],
+      "outcome": "turn_cap",
+      "winner": null,
+      "duration_s": 0.23687732801772654
+    }
+  ],
+  "duration_s": 0.23762331798207015,
+  "version": 2
+}

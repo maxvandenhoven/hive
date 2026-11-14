@@ -1,0 +1,33 @@
+[
+  {
+    "hint": null,
+    "name": null,
+    "type": "human"
+  },
+  {
+    "hint": {
+      "spec": {
+        "kind": "negamax",
+        "params": {
+          "depth": 3
+        },
+        "label": "nm3"
+      },
+      "budget_s": 2.5
+    },
+    "name": "Friend",
+    "type": "human"
+  },
+  {
+    "spec": {
+      "kind": "negamax",
+      "params": {
+        "depth": 2,
+        "mobility": 0.5
+      },
+      "label": null
+    },
+    "budget_s": 5.0,
+    "type": "agent"
+  }
+]
