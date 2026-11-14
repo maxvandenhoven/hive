@@ -94,7 +94,7 @@ See `docs/plans/tooling.md` for the full rules and how each one is enforced.
   math on primitives without an owning type (for example `engine/grid.py`).
 - Use specific, descriptive names, consistent across the package. Prefix types, enums and
   constants with their domain (`MatchOutcome`, `TurnCloseReason`, `AgentRegistration`,
-  `INJECTED_AGENT_PARAMS`) instead of a bare generic word (`Outcome`, `Info`, `Worker`).
+  `SEARCH_WIN_SCORE`) instead of a bare generic word (`Outcome`, `Info`, `Worker`).
   Related types share a pattern, for example the worker messages `ThinkMessage`,
   `SubmissionMessage`, `IdleMessage`.
 - Prefer public over private. Do not prefix functions, methods, attributes or constants

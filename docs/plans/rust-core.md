@@ -191,10 +191,10 @@ measurement (WP 29). Every item must keep perft parity and the differential test
 
 ## Search kernel
 
-Agents stay registered Python classes (D23): the constructor signature is still the params
+Agents stay registered Python classes (D23): their declared params model is the params
 schema, presets still work, and the match runner still calls `think(state, turn)`. A
-search agent builds a Rust `Searcher` from its params once, and `think` hands it the state
-and the turn context.
+search agent builds a Rust `Searcher` from its params (`SearchParams`) once, and `think`
+hands it the state and the turn context.
 
 - **Control.** The search runs in Rust with the GIL released and calls back into Python
   rarely: `turn.submit` for the first legal move and after each completed depth,
