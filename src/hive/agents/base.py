@@ -1,9 +1,10 @@
 import random
 from abc import ABC, abstractmethod
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 from pydantic import JsonValue
 
+from hive.agents.params import AgentParams
 from hive.engine.rules import Rules
 from hive.engine.state import GameState, Move
 
@@ -61,8 +62,8 @@ class TurnContext(Protocol):
         ...
 
 
-class Agent(ABC):
-    """Base class for all agents.
+class Agent[P: AgentParams](ABC):
+    """Base class for all agents, generic over the params model of the kind.
 
     An agent decides moves under a time budget through `think`, which submits candidate
     moves to a `TurnContext` as the search improves. The contract every agent follows:
@@ -77,21 +78,31 @@ class Agent(ABC):
     An agent object lives for a whole match, so it may keep caches across turns. `reset`
     is called between matches when the agent is reused.
 
+    A kind with params declares them as a subclass of `AgentParams`, names it in
+    `Params` and passes it as the type argument, for example
+    `class SearchAgent(Agent[SearchParams])` with `Params = SearchParams`.
+
     Attributes:
         rules: The rules governing the game, used to search the game tree.
         rng: The random number generator seeded at construction, the only source of
             randomness of the agent.
+        params: The validated params of the agent.
     """
 
-    def __init__(self, rules: Rules, *, seed: int) -> None:
+    Params: ClassVar[type[AgentParams]] = AgentParams
+    """The params model of the kind, which validates the params of its specs."""
+
+    def __init__(self, rules: Rules, *, seed: int, params: P) -> None:
         """Initialize the agent.
 
         Args:
             rules: The rules governing the game.
             seed: The seed for the random number generator of the agent.
+            params: The validated params of the agent, an instance of `Params`.
         """
         self.rules = rules
         self.rng = random.Random(seed)
+        self.params = params
 
     @abstractmethod
     def think(self, state: GameState, turn: TurnContext) -> None:

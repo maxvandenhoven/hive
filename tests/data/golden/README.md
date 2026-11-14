@@ -10,6 +10,7 @@ checks that the code reads and writes each file unchanged, or plays the same gam
 | `champion_spec.json` | The agent spec of the generation 5 champion, from `configs/evaluation/champion.json` | `TestChampionSpec` |
 | `players.json` | The `white_player` and `black_player` JSON values as the `game` table stores them: a person, a person with a hint agent, an agent | `test_stored_players_round_trip` |
 | `openapi.json` | The output of `hive openapi`, compared without `info.version` | `test_openapi_output` |
+| `agent_params_schemas.json` | The `params_schema` of every agent kind, the registered ones and the test kinds of `hive.match.testing`, compared as dicts so the order of properties does not matter (recorded on `main` at 96d46f5 for WP 47) | `TestAgentParamsSchemas` |
 | `pinned_match.json` | A match between two depth-limited agents with seed 46: every move, the seat seeds, the last search report of every decision (without `nps`) and the outcome | `TestPinnedMatch` |
 
 A change that alters one of these on purpose regenerates the file in the same pull
@@ -20,6 +21,8 @@ uv run hive gauntlet --agent random --agent "{kind: negamax, label: nm1, params:
   --games-per-pair 2 --budget 1 --max-turns 6 --seed 46 --jobs 2 --replays \
   --out tests/data/golden/gauntlet_report.json
 uv run hive openapi --output tests/data/golden/openapi.json
+uv run python -c "import json, hive.match.testing; from hive.agents.factory import list_agents; print(json.dumps({a.kind: a.params_schema for a in list_agents()}, indent=2, sort_keys=True))" \
+  > tests/data/golden/agent_params_schemas.json
 uv run hive play \
   --white "{kind: negamax, label: champion-d3, params: {depth: 3, queen_safety: 0.75, pinned_material: 0.05, beetle_control: 0.5, alpha_beta: true, tempo: 0.3, mobile_ant: 0.3, mobile_beetle: 0.15, mobile_queen: 0.2, mobile_spider: 0.1, mobile_grasshopper: 0.1, repetition_draws: true}}" \
   --black "{kind: negamax, label: nm2, params: {depth: 2}}" \

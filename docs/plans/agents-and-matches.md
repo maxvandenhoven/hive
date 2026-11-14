@@ -21,10 +21,13 @@ class TurnContext(Protocol):
     def info(self, **fields: SearchInfoValue) -> None: ...
 
 
-class Agent(ABC):
-    def __init__(self, rules: Rules, *, seed: int) -> None:
+class Agent[P: AgentParams](ABC):
+    Params: ClassVar[type[AgentParams]] = AgentParams
+
+    def __init__(self, rules: Rules, *, seed: int, params: P) -> None:
         self.rules = rules
         self.rng = random.Random(seed)
+        self.params = params
 
     @abstractmethod
     def think(self, state: GameState, turn: TurnContext) -> None: ...
@@ -111,39 +114,46 @@ with a different kind of evaluation (for example a neural network) is a new agen
 with its own params, not a new evaluator. Piece values are a module constant; they can
 become params if tuning needs them.
 
-### Factory (WP 07)
+### Factory (WP 07, params models from WP 47)
 
-Agents are made available to configs with a decorator. The parameters of a kind are its
-constructor's keyword-only parameters after `seed`, so the signature is the schema:
+Agents are made available to configs with a decorator. Each kind declares its params as a
+frozen pydantic model, a subclass of `AgentParams` (`src/hive/agents/params.py`) that
+rejects unknown params, and names it in `Params`; the model is the schema:
 
 ```python
+class SearchParams(AgentParams):           # frozen, extra="forbid"
+    depth: int | None = Field(
+        default=None,
+        ge=1,
+        description="The maximum search depth in plies, or `None` to search until "
+        "stopped.",
+    )
+    queen_safety: float = Field(default=1.0, description="...")
+    ...
+
+class SearchAgent(Agent[SearchParams]):
+    Params = SearchParams
+
+    def __init__(self, rules: Rules, *, seed: int, params: SearchParams) -> None: ...
+
 @register_agent("negamax")
 class NegamaxAgent(SearchAgent): ...
-
-class SearchAgent(Agent):
-    def __init__(
-        self,
-        rules: Rules,                                    # injected by the factory
-        *,
-        seed: int,                                       # injected by the factory
-        depth: Annotated[int | None, Field(ge=1)] = None,
-        queen_safety: float = 1.0,
-        ...
-    ) -> None:
-        """...
-
-        Args:
-            depth: The maximum search depth in plies, or `None` to search until stopped.
-            ...
-        """
 ```
 
-- `register_agent` builds a frozen pydantic model from the annotations (constraints go in
-  `Annotated[..., Field(...)]`) and defaults, and takes each field description from the
-  `Args:` section of the constructor docstring. Required params (no default) and nested
-  dataclass params (for example a network shape) work as well. A constructor that does
-  not take `rules` first, or has a positional or unannotated agent param, is rejected
-  when the class is registered.
+- `register_agent` stores the class, and `AgentRegistration.params_model` is its
+  `Params`. Constraints, defaults and descriptions are written in `Field(...)`. Required
+  params (no default) and nested dataclass params (for example a network shape) work as
+  well. A kind without params keeps the empty `AgentParams` (`random`).
+- Every agent is constructed as `agent_class(rules, seed=seed, params=params)` with the
+  validated model; `rules` and `seed` are not params. `SearchAgent` keeps `params` and
+  passes `params.model_dump()` to the Rust `Searcher` as keywords (WP 48 replaces this with
+  one mapping).
+- The served `params_schema` is the JSON schema of the model, titled after the agent
+  class (`NegamaxAgentParams`, `MinimaxAgentParams`), so kinds that share a model keep a
+  title of their own, and without the docstring of the model. Until WP 47 the model was
+  built from the constructor signature (`Annotated` constraints, descriptions parsed from
+  the `Args:` section of the docstring); the schemas served stayed the same, pinned by
+  `tests/data/golden/agent_params_schemas.json`.
 - `hive/agents/__init__.py` imports the built-in agent modules, so their decorators run
   whenever anything from `hive.agents` is imported.
 - Only registered kinds can be built. There are no import paths in specs, so stored specs
@@ -162,7 +172,7 @@ class AgentSpec(JsonCodec):  # to_json() / from_json(data), shape only
     def from_yaml(cls, text: str, *, source: str | None = None) -> AgentSpec: ...
     @classmethod
     def load(cls, path: Path) -> AgentSpec: ...
-    def validate_params(self, *, source: str | None = None) -> BaseModel: ...
+    def validate_params(self, *, source: str | None = None) -> AgentParams: ...
 
 def build_agent(spec: AgentSpec, rules: Rules, *, seed: int) -> Agent: ...
 def list_agents() -> list[AgentRegistration]: ...   # kind, description, params schema
@@ -198,7 +208,7 @@ def list_agents() -> list[AgentRegistration]: ...   # kind, description, params 
 
   YAML syntax errors report the line and column. `build_agent` validates again, so a
   spec constructed in code gets the same errors.
-- `register_agent` stores an `AgentRegistration` (kind, agent class, params model) in
+- `register_agent` stores an `AgentRegistration` (kind, agent class) in
   `AGENT_REGISTRY`. `list_agents()` returns the registrations, whose `description` is the
   summary line of the class docstring and whose `params_schema` is the JSON schema of the
   params, so the API can list agents and render parameter forms.

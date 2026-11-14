@@ -6,16 +6,19 @@ purpose regenerates the file in the same pull request, as `tests/data/golden/REA
 describes, so the diff shows what changed.
 """
 
+import importlib
 import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from sqlalchemy.dialects import postgresql
 from typer.testing import CliRunner
 
 from hive import __version__
+from hive.agents import factory
 from hive.agents.base import SearchInfoValue
-from hive.agents.factory import AgentSpec, build_agent
+from hive.agents.factory import AgentSpec, build_agent, list_agents
 from hive.agents.negamax import NegamaxAgent
 from hive.api.db.models import TypedJsonb
 from hive.api.players import AgentPlayer, HumanPlayer, PlayerConfig
@@ -104,6 +107,37 @@ class TestChampionSpec:
         agent = build_agent(spec=spec, rules=Rules(), seed=0)
 
         assert isinstance(agent, NegamaxAgent)
+
+
+class TestAgentParamsSchemas:
+    def test_registered_kinds(self) -> None:
+        golden = read_golden("agent_params_schemas.json")
+        schemas = {agent.kind: agent.params_schema for agent in list_agents()}
+
+        assert schemas == {kind: golden[kind] for kind in schemas}
+
+    def test_test_kinds(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test the kinds of `hive.match.testing`, registering them in a registry copy."""
+        golden = read_golden("agent_params_schemas.json")
+        monkeypatch.setattr(factory, "AGENT_REGISTRY", dict(factory.AGENT_REGISTRY))
+        testing = importlib.import_module("hive.match.testing")
+        agent_classes = {
+            "test-counting": testing.CountingAgent,
+            "test-crashes": testing.CrashingAgent,
+            "test-illegal": testing.IllegalAgent,
+            "test-lingers": testing.LingeringAgent,
+            "test-never-submits": testing.NeverSubmitsAgent,
+        }
+
+        schemas = {
+            kind: factory.AgentRegistration(
+                kind=kind, agent_class=agent_class
+            ).params_schema
+            for kind, agent_class in agent_classes.items()
+        }
+
+        assert schemas == {kind: golden[kind] for kind in schemas}
+        assert set(golden) == set(schemas) | {agent.kind for agent in list_agents()}
 
 
 def test_stored_players_round_trip() -> None:

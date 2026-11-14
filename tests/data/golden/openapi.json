@@ -1068,7 +1068,7 @@
           "params_schema"
         ],
         "title": "AgentRegistration",
-        "description": "A registered agent kind: the agent class and the model that validates its params.\n\nIts JSON form, which the API lists for the agent picker, has the `kind`, the\n`description` and the `params_schema`; the class and the model are left out.\n\nAttributes:\n    kind: The kind name used in `AgentSpec.kind`.\n    agent_class: The agent class, called with the rules, a keyword `seed` and the\n        validated params as keywords.\n    params_model: The model that validates the params, derived from the signature of\n        the agent constructor."
+        "description": "A registered agent kind: the agent class and the model that validates its params.\n\nIts JSON form, which the API lists for the agent picker, has the `kind`, the\n`description` and the `params_schema`; the class and the model are left out.\n\nAttributes:\n    kind: The kind name used in `AgentSpec.kind`.\n    agent_class: The agent class, called with the rules, a keyword `seed` and the\n        validated params as the keyword `params`."
       },
       "AgentSpec": {
         "properties": {

@@ -2,6 +2,7 @@ import pytest
 
 from hive.agents.base import Agent
 from hive.agents.factory import AgentSpec, build_agent
+from hive.agents.params import AgentParams
 from hive.agents.random import RandomAgent
 from hive.agents.testing import LocalTurnContext
 from hive.engine.rules import Rules
@@ -41,7 +42,7 @@ def test_random_vs_negamax_completes(seed: int) -> None:
 def random_game(seed: int, extra_calls: int) -> list[Move | None]:
     """Play a seeded random game, calling `legal_moves` extra times before every move."""
     rules = Rules(max_turns=MAX_TURNS)
-    agent = RandomAgent(rules=rules, seed=seed)
+    agent = RandomAgent(rules=rules, seed=seed, params=AgentParams())
     state = rules.create_initial_state()
 
     moves: list[Move | None] = []
