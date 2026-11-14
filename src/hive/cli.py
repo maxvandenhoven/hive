@@ -745,13 +745,16 @@ def bench_engine(
             profiler.disable()
             profiler.dump_stats(profile)
 
-    typer.echo(f"{'case':<16} {'nodes':>9} {'median s':>9} {'spread':>7} {'nodes/s':>9}")
+    width = max(len("case"), *(len(result.case.name) for result in report.results))
+    typer.echo(
+        f"{'case':<{width}} {'nodes':>10} {'median s':>9} {'spread':>7} {'nodes/s':>11}"
+    )
 
     for result in report.results:
         typer.echo(
-            f"{result.case.name:<16} {result.case.nodes:>9,} "
+            f"{result.case.name:<{width}} {result.case.nodes:>10,} "
             f"{result.median_seconds:>9.3f} {result.spread:>7.1%} "
-            f"{result.nodes_per_second:>9,.0f}"
+            f"{result.nodes_per_second:>11,.0f}"
         )
 
     typer.echo(

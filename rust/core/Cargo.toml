@@ -1,0 +1,15 @@
+[package]
+name = "hive-core"
+description = "The Hive engine and the search of the agents, without Python."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

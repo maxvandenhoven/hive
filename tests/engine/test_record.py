@@ -40,8 +40,9 @@ def rules_strategy(draw: st.DrawFn) -> Rules:
     other_types = [
         piece_type for piece_type in PieceType if piece_type is not PieceType.QUEEN
     ]
+    # At most 13 pieces per player, within the 14 the board grid of the engine allows.
     piece_counts = {PieceType.QUEEN: 1} | draw(
-        st.dictionaries(st.sampled_from(other_types), st.integers(0, 4))
+        st.dictionaries(st.sampled_from(other_types), st.integers(0, 3))
     )
     queen_by_turn = draw(st.none() | st.integers(1, 10))
     allow_queen_first_turn = draw(st.booleans()) or queen_by_turn == 1

@@ -41,7 +41,7 @@ def count_params() -> list[Any]:
 
 
 def move_key(move: Move | None) -> MoveKey:
-    """Get a hashable key for a move, since `Move` is not hashable."""
+    """Get a key for a move that compares with moves of other engines and references."""
     if move is None:
         return None
 

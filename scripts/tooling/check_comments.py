@@ -6,7 +6,7 @@ checked as a single comment, and an empty `#` line starts a new block. Pragmas s
 `# noqa` and `# type: ignore` are skipped.
 
 Usage: `python scripts/tooling/check_comments.py PATH [PATH ...]`, where each path is a
-Python file or a directory that is searched recursively.
+Python file (or stub) or a directory that is searched recursively.
 """
 
 import io
@@ -15,6 +15,9 @@ import sys
 import tokenize
 from dataclasses import dataclass
 from pathlib import Path
+
+SOURCE_SUFFIXES = frozenset({".py", ".pyi"})
+"""The suffixes of the files checked: Python sources and stubs."""
 
 MIN_WORDS_FOR_PERIOD = 5
 PRAGMA_PATTERN = re.compile(r"^(noqa\b|type:|pragma:|fmt:|ruff:|ty:|isort:)")
@@ -205,8 +208,8 @@ def main(argv: list[str] | None = None) -> int:
     files = sorted(
         file
         for path in paths
-        for file in (path.rglob("*.py") if path.is_dir() else [path])
-        if file.suffix == ".py"
+        for file in (path.rglob("*") if path.is_dir() else [path])
+        if file.suffix in SOURCE_SUFFIXES
     )
     violations = [violation for file in files for violation in check_file(file)]
 

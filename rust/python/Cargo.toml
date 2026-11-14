@@ -1,0 +1,22 @@
+[package]
+name = "hive-python"
+description = "Python bindings of the Hive engine and search, built into `hive._core`."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+# An extension module does not link libpython, so it cannot run tests on its own; the
+# Python tests cover the bindings.
+test = false
+doctest = false
+
+[dependencies]
+hive-core.workspace = true
+pyo3.workspace = true
+
+[lints]
+workspace = true

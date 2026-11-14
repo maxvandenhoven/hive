@@ -20,6 +20,12 @@ jobs:
           version: "0.11.2"
           enable-cache: true
 
+      # `uv sync` builds the Rust extension `hive._core` with the toolchain pinned in
+      # `rust-toolchain.toml`, which the preinstalled rustup fetches on first use.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
       # The `train` extra (torch, Ultralytics) is only used on the workstation.
       - name: Sync dependencies
         run: uv sync --locked --all-groups --all-extras --no-extra train
@@ -70,9 +76,39 @@ jobs:
       - name: Build
         run: npm run build
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
       - name: Check the API client is up to date
         working-directory: .
         run: |
           uv sync --locked --extra api
           make api-client
           git diff --exit-code -- frontend/src/api/schema.ts
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The bindings build against the Python of `.venv` (see `rust/.cargo/config.toml`).
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.2"
+
+      - name: Create the Python environment of the bindings
+        run: uv venv --python 3.13
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Check formatting
+        run: make format-rust && git diff --exit-code
+
+      - name: Lint
+        run: make lint-rust
+
+      - name: Test
+        run: make test-rust

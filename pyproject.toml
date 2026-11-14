@@ -49,10 +49,24 @@ hive = "hive.cli:app"
 # Ultralytics depends on `opencv-python`, which installs the same `cv2` module as the
 # headless build of the `vision` extra; the headless build serves both.
 override-dependencies = ["opencv-python; sys_platform == 'never'"]
+# Rebuild the Rust extension `hive._core` when its sources change (see tooling.md §Rust).
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "rust/**/*.rs" },
+    { file = "rust/**/Cargo.toml" },
+    { file = "rust/Cargo.lock" },
+]
 
 [build-system]
-requires = ["uv_build>=0.11.2,<0.12.0"]
-build-backend = "uv_build"
+requires = ["maturin>=1.16,<2"]
+build-backend = "maturin"
+
+# The package is pure Python apart from `hive._core`, the Rust core of the engine and the
+# search, which maturin builds from `rust/python` with the release profile.
+[tool.maturin]
+manifest-path = "rust/python/Cargo.toml"
+python-source = "src"
+module-name = "hive._core"
 
 [dependency-groups]
 dev = [
@@ -71,7 +85,7 @@ dev = [
 [tool.ruff]
 line-length = 90
 indent-width = 4
-include = ["src/**/*.py", "tests/**/*.py", "scripts/**/*.py", "blender/**/*.py"]
+include = ["src/**/*.py", "src/**/*.pyi", "tests/**/*.py", "scripts/**/*.py", "blender/**/*.py"]
 
 [tool.ruff.format]
 skip-magic-trailing-comma = true
@@ -115,7 +129,7 @@ convention = "google"
 
 [tool.ty.environment]
 python-version = "3.13"
-extra-paths = ["scripts", "scripts/tooling", "blender"]
+extra-paths = ["scripts", "scripts/tooling", "blender", "tests"]
 
 [tool.ty.src]
 include = ["src", "tests", "scripts"]
@@ -129,7 +143,7 @@ unresolved-import = "ignore"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["scripts", "scripts/tooling", "blender"]
+pythonpath = ["scripts", "scripts/tooling", "blender", "tests"]
 addopts = ["--strict-markers"]
 markers = ["slow: long-running tests, excluded from `make test` (run with `make test-slow`)"]
 

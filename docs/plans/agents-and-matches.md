@@ -75,6 +75,14 @@ iterative deepening loop:
 The alpha-beta variants were removed with the old `choose_move` agents. They come back in
 WP 28 on top of this loop.
 
+From WP 45 the search runs in Rust (D31, `rust-core.md` §Search kernel). `SearchAgent`
+builds a Rust `Searcher` from its params, and the loop above is the behaviour the port
+keeps: the same depths, finishing rules, evaluation terms, `info` fields and node counts
+at a fixed depth. The Rust search runs without the GIL and calls `should_stop()` before
+each depth and every `STOP_CHECK_INTERVAL` (now 1024) nodes, a fixed count rather than a
+time, so a seeded agent stays reproducible under a fake clock. The `random` agent stays
+Python: it is no faster in Rust, and its seeded games stay the same.
+
 #### Evaluation weights (no evaluator abstraction)
 
 The old `Evaluator` ABC, with one class per heuristic and a `WeightedCompositeEvaluator`,
@@ -338,7 +346,8 @@ hive gauntlet \
   `shed.gauntlet.derive_seed`), so any match can be reproduced.
 - Fairness: concurrent matches default to and are capped at `cpu_count` (a match has two
   workers, but only the seat to move thinks), and the CLI refuses higher `--jobs` unless
-  `--allow-oversubscribe` is given.
+  `--allow-oversubscribe` is given. From WP 28, an agent with `threads > 1` counts each
+  thread against `cpu_count`.
 - Output: a versioned JSON document with config, per-participant results (wins, draws,
   losses, win rate with confidence interval, Elo estimate), per-participant decision stats
   (depth reached distribution, nodes/s, timeout rate, overrun distribution, failures,

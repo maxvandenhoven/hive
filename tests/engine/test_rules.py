@@ -232,10 +232,10 @@ class TestPlacement:
         assert rules.placeable_coords(state) == []
         assert rules.placement_moves(state) == []
 
-    def test_excludes_empty_hand_types(self, rules: Rules) -> None:
+    def test_excludes_empty_hand_types(self) -> None:
         """Test that piece types no longer in hand cannot be placed."""
+        rules = Rules(piece_counts={**BASE_PIECE_COUNTS, PieceType.SPIDER: 0})
         state = rules.create_initial_state()
-        state.hand[Player.WHITE][PieceType.SPIDER] = 0
 
         assert PieceType.SPIDER not in rules.placeable_piece_types(state)
 

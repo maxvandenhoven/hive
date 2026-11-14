@@ -345,6 +345,37 @@ class PerftBenchCase(EngineBenchCase):
 
 
 @dataclass(frozen=True, slots=True)
+class NativePerftBenchCase(EngineBenchCase):
+    """A benchmark case that runs perft entirely in the Rust core (`Rules.perft`).
+
+    It applies and undoes every leaf like `PerftBenchCase`, but without the Python loop,
+    so it measures the engine itself rather than the engine through the bindings.
+
+    Attributes:
+        depth: The number of plies to walk.
+    """
+
+    depth: int
+
+    @override
+    def run(self, state: GameState, rules: Rules) -> EngineBenchSample:
+        """Run the native perft once and time it.
+
+        Args:
+            state: The state of the position, which is restored afterwards.
+            rules: The rules of the suite.
+
+        Returns:
+            The number of leaf positions and the seconds of the walk.
+        """
+        start = time.perf_counter()
+        nodes = rules.perft(state=state, depth=self.depth)
+        seconds = time.perf_counter() - start
+
+        return EngineBenchSample(nodes=nodes, seconds=seconds)
+
+
+@dataclass(frozen=True, slots=True)
 class SearchBenchCase(EngineBenchCase):
     """A benchmark case that makes one search decision, which adds evaluation to perft.
 
@@ -398,13 +429,38 @@ ENGINE_BENCH_CASES: list[EngineBenchCase] = [
         agent=AgentSpec(kind="negamax", params={"depth": 2, "mobility": 1.0}),
         nodes=946,
     ),
+    NativePerftBenchCase(
+        name="perft-start-6-native", position="start", depth=6, nodes=12_219_480
+    ),
+    NativePerftBenchCase(
+        name="perft-ant-4-native", position="ant_moves", depth=4, nodes=2_729_747
+    ),
+    NativePerftBenchCase(
+        name="perft-long-4-native", position="long_hive", depth=4, nodes=11_797_660
+    ),
+    SearchBenchCase(
+        name="negamax-long-4",
+        position="long_hive",
+        agent=AgentSpec(kind="negamax", params={"depth": 4}),
+        nodes=12_102_433,
+    ),
+    SearchBenchCase(
+        name="mobility-ant-3",
+        position="ant_moves",
+        agent=AgentSpec(kind="negamax", params={"depth": 3, "mobility": 1.0}),
+        nodes=39_464,
+    ),
 ]
-"""The fixed cases of `hive bench engine`, each about one second at the WP 27 baseline.
+"""The fixed cases of `hive bench engine`.
 
-The start position measures placements. `ant_moves` and `long_hive` from the perft suite
-are large hives with many ant, spider and beetle moves, where articulation points and
-slide checks dominate. The search cases add a negamax decision with the default evaluation
-and one with the mobility term, which generates the moves of both players at every leaf.
+The first five were each about one second at the WP 27 baseline. The start position
+measures placements. `ant_moves` and `long_hive` from the perft suite are large hives with
+many ant, spider and beetle moves, where articulation points and slide checks dominate.
+The search cases add a negamax decision with the default evaluation and one with the
+mobility term, which generates the moves of both players at every leaf. Since the Rust
+core (WP 44 and 45), the perft cases measure the engine through the Python bindings and
+the search cases run in Rust. The native perft cases walk deeper entirely in Rust, and the
+deeper search cases take long enough to time the Rust search reliably.
 """
 
 

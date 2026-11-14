@@ -12,7 +12,7 @@ Properties and `typing.overload` stubs are skipped. Whether public functions hav
 docstring at all is checked by ruff's `D1` rules.
 
 Usage: `python scripts/tooling/check_docstrings.py PATH [PATH ...]`, where each path is a
-Python file or a directory that is searched recursively.
+Python file (or stub) or a directory that is searched recursively.
 """
 
 import ast
@@ -22,6 +22,9 @@ import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+SOURCE_SUFFIXES = frozenset({".py", ".pyi"})
+"""The suffixes of the files checked: Python sources and stubs."""
 
 SKIPPED_PARAMETERS = frozenset({"self", "cls"})
 """Parameters that are never documented."""
@@ -301,8 +304,8 @@ def main(argv: list[str] | None = None) -> int:
     files = sorted(
         file
         for path in paths
-        for file in (path.rglob("*.py") if path.is_dir() else [path])
-        if file.suffix == ".py"
+        for file in (path.rglob("*") if path.is_dir() else [path])
+        if file.suffix in SOURCE_SUFFIXES
     )
     violations = [violation for file in files for violation in check_file(file)]
 

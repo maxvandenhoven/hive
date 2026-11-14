@@ -15,7 +15,8 @@ the order in which work happens. Topic files go deeper on each area:
 | [`synthetic-data.md`](synthetic-data.md) | Scene generation, Blender tilesets, rendering, datasets, YOLO training |
 | [`tooling.md`](tooling.md) | Code style, ruff/ty/pytest, Makefile, Claude Code hooks, CI |
 | [`deployment.md`](deployment.md) | Docker image, Kubernetes manifests, Argo CD, Tailscale, homelab prerequisites |
-| [`performance.md`](performance.md) | Engine speed (M6: profiling, autoresearch, Rust) and agent strength (M7: repetition, alpha-beta, tuning) |
+| [`performance.md`](performance.md) | Engine speed (M6: profiling, Rust core, autoresearch) and agent strength (M7: repetition, alpha-beta, tuning), with all measurements |
+| [`rust-core.md`](rust-core.md) | Rust core of the engine and the search: crates, Python API contract, representation, search kernel, correctness gates |
 
 Work is split into **work packages** (WPs), each tracked as a GitHub issue that contains a
 self-contained session prompt. The entry point for a session is: *"Implement issue #N"*.
@@ -101,6 +102,10 @@ Dependency direction inside the package is strictly one way:
 `engine ← agents ← match ← api`, `engine ← vision ← api`, `engine ← data`. The engine
 imports nothing from the rest of the package.
 
+The engine and the search of the agents run in a Rust core, built into the private
+extension module `hive._core` and re-exported by `hive.engine` and `hive.agents` (D30,
+D31, `rust-core.md`). The diagram and the dependency direction stay the same.
+
 ## 4. Decisions
 
 Each decision has a short rationale. Topic files go into detail.
@@ -112,7 +117,7 @@ Each decision has a short rationale. Topic files go into detail.
 | D3 | Behaviour is a method on the type that owns the data it reads. Plain functions only for math on primitives without an owning type (`grid.py`). | One consistent rule. `Rules` is an immutable value, so its methods are as testable as functions. |
 | D4 | Validate at the boundary, trust inside: `GameState` is created only via `Rules.create_initial_state`, `Rules.from_board` (validated) or advanced via `Rules.apply_checked_move` (validated). Search uses unchecked `apply_move` / `undo_move`. | Correctness without paying validation cost in search. Perft and property tests guard the fast path. |
 | D5 | Correctness first: perft parity against published reference counts (stored as cited data in the repo, no dependency on other engines). Speed is a separate later round. | Perft catches rule bugs hand-written tests miss, and doubles as a speed benchmark. |
-| D6 | Engine speed round goes profiling → autoresearch → Rust rewrite, each only if the previous is not enough. | Keep the engine readable until data shows otherwise. |
+| D6 | Engine speed round: profiling and targeted Python speedups first (WP 27), then a Rust core for the engine and the search (D30, D31), then autoresearch on the Rust core (WP 29). | WP 27 made the Python engine 2.5 times faster and left no single hot spot; a Rust spike was 40 to 80 times faster, which tuning Python cannot approach (`rust-core.md`). |
 | D7 | Agents implement `think(state, turn)` and talk through a `TurnContext` with `submit(move, final=...)`, `remaining_seconds()`, `should_stop()` and `info(...)`, adapted from the `shed` project. | Iterative-deepening style anytime decisions; the runner caps turn time in the app and keeps gauntlets fair. |
 | D8 | One persistent worker process per seat per match (per pool slot in the API). Cooperative stop via a shared event. The runner takes the latest legal candidate at the deadline; a worker is only killed if it misses a grace period. | Mirrors UCI chess engines. Models and caches load once; kills are a safety net, not the normal path. |
 | D9 | Same `AgentSpec(kind, params)` + factory drives the API agent picker and the gauntlet CLI. | One way to name and configure agents everywhere. |
@@ -136,6 +141,10 @@ Each decision has a short rationale. Topic files go into detail.
 | D27 | In table games an agent move is stored as pending until a person confirms it on the physical board (Done, or a matching photo from WP 19). | Closing the app must not lose the fact that the physical board is behind; the game list can show "agent's move to make". |
 | D28 | One theme ("Slate & Honey": slate neutrals, one honey accent, no dark mode) with board colour tokens that each have one meaning (movable, target, forbidden, last move, agent suggestion), shared by both renderers, the legend and the help. | Calmer and clearer than the default near-white look; one meaning per colour makes the board explainable. |
 | D29 | The 2.5D board is a React Three Fiber renderer behind the same props as `SvgBoard`: orthographic camera at a fixed isometric tilt, rotation in 60° steps, the same gestures, marks and transition contract, loaded lazily behind a 2D / 2.5D toggle. | Predictable on a phone (taps never become orbits), and the 2D view does not pay for the 3D libraries. |
+| D30 | The engine runs in a Rust core (`rust/`, crate `hive-core`), built by maturin into the private extension `hive._core` with PyO3. Its `GameState`, `Rules` and `Move` are the public classes, re-exported from `hive.engine.state` and `hive.engine.rules` with the same names, signatures, JSON and pickling; enums, `Piece`, codec, records, errors and grid helpers stay Python. | The spike was 40 to 80 times faster entirely in Rust. Python wrapper classes or dataclass moves at the boundary would give up a large part of that, so the Rust classes are the API. One implementation, no Python fallback. |
+| D31 | The search runs in Rust as well: agents stay registered Python classes whose params configure a Rust `Searcher`, and `think(state, turn)` keeps the `TurnContext` protocol (callbacks after each completed depth, stop polled every `STOP_CHECK_INTERVAL` nodes). | A Python search loop costs about 1 µs per node by itself, so Python agents top out near 1M nodes/s whatever the engine. Registration, params, presets and the match runner stay as they are. |
+| D32 | Correctness gates for the Rust core: perft parity at every reference depth, differential tests against the frozen Python engine (`tests/oracle/`), debug invariants, and for the search equal root scores to plain negamax for every change that must not change results; changes that may change results need gauntlet evidence. | Optimise aggressively without trusting hand-written tests alone; the oracle catches what perft counts cannot (move order, messages, validation). |
+| D33 | Rust tooling: pinned stable toolchain, `rustfmt` at 90 characters, `clippy::pedantic` with the documentation lints, `cargo test`. Binding doc comments are Google-style Python docstrings, repeated in a hand-written `_core.pyi` that the Python checkers and `ty` read and a test keeps in sync with the bindings. No nightly-only formatting and no extra tools (`tooling.md` §Rust). | The same quality bar as the Python code with the standard Rust tools, and one source of docs and types for Python callers. |
 
 ## 5. Target repo structure
 
@@ -143,6 +152,7 @@ Each decision has a short rationale. Topic files go into detail.
 hive/
 ├─ pyproject.toml              # single package `hive`, extras: api, vision, train; ruff/ty/pytest config
 ├─ uv.lock                     # committed
+├─ rust-toolchain.toml         # pinned stable Rust toolchain (D33)
 ├─ Makefile                    # all developer commands (see tooling.md)
 ├─ CLAUDE.md                   # agent instructions, points to docs/plans
 ├─ .claude/
@@ -150,7 +160,13 @@ hive/
 │  └─ hooks/                   # hook scripts
 ├─ .github/workflows/          # ci.yaml (checks), release.yaml (image + tag bump)
 ├─ docs/plans/                 # this folder
+├─ rust/                       # Cargo workspace (D30, see rust-core.md)
+│  ├─ Cargo.toml, Cargo.lock   # workspace lints and dependency versions; lockfile committed
+│  ├─ rustfmt.toml
+│  ├─ core/                    # crate `hive-core`: engine/ and agents/ modules, tests/ (perft parity)
+│  └─ python/                  # crate `hive-python`: PyO3 bindings, builds `hive._core`
 ├─ src/hive/
+│  ├─ _core.pyi, py.typed      # the stub of the Rust core, kept in sync by a test; the built `_core*.so` is gitignored
 │  ├─ engine/                  # grid.py, state.py, rules.py, codec.py, record.py, errors.py
 │  ├─ agents/                  # base.py, factory.py, random.py, search.py, minimax.py, negamax.py, testing.py
 │  ├─ match/                   # turn.py, worker.py, runner.py, records.py, gauntlet.py
@@ -161,7 +177,8 @@ hive/
 │  ├─ assets/                  # insect SVG/PNG assets
 │  ├─ bench.py                 # perft and benchmarks
 │  └─ cli.py                   # `hive` entry point (Typer)
-├─ tests/                      # mirrors src/hive/; tests/data/ holds perft references and fixtures
+├─ tests/                      # mirrors src/hive/; tests/data/ holds perft references and fixtures,
+│                              # tests/oracle/ the frozen Python engine for differential tests
 ├─ scripts/
 │  ├─ train/                   # [train] YOLO training and ONNX export
 │  └─ tooling/                 # comment checker used by `make lint`
@@ -191,12 +208,12 @@ a test or a script first).
 | **M3 Classical vision** | Photo capture, grid fitting, move matching, classical reader, camera flow, evaluation harness | Camera button proposes the correct move on real photos; `hive vision eval` reports metrics for the classical reader |
 | **M4 Synthetic data and YOLO** | Scene generation, Blender rendering with tilesets, dataset export, YOLO training, ONNX reader, comparison report | YOLO reader is selectable in the app and compared against the classical reader on the real test set |
 | **M5 Deployment** | Docker image, CI release, Kustomize manifests, Argo CD, Tailscale ingress, migrations, metrics | Merging to `main` deploys to the homelab and the app is reachable at `https://hive.<tailnet>.ts.net` |
-| **M6 Performance** | Engine profiling, targeted speedups, autoresearch harness for engine speed | Measurable perft speedup with parity intact |
-| **M7 Agent strength** | Repetition handling, alpha-beta and transposition table, evaluator tuning, each validated by gauntlets between agents | The strongest agent beats an experienced human player at the app's time budget |
+| **M6 Performance** | Engine profiling and targeted speedups, a Rust core for the engine and the search behind the unchanged Python API, autoresearch harness on the Rust core | Engine and search run in Rust with perft parity, differential tests and node-count parity; the speedups are recorded in `performance.md` |
+| **M7 Agent strength** | Repetition handling, alpha-beta and transposition table, evaluator tuning in the Rust search, each validated by gauntlets between agents | The strongest agent beats an experienced human player at the app's time budget |
 
 M6 depends only on M1 (perft and gauntlet) and can be interleaved with M2–M5 at any time.
-M7 builds on M6: a faster engine searches deeper at the same budget. It does not block
-M2–M5.
+M7 builds on M6: repetition and alpha-beta are written in the Rust search kernel of WP 45,
+and a faster engine searches deeper at the same budget. It does not block M2–M5.
 
 ## 7. Work packages and implementation order
 
@@ -233,9 +250,9 @@ issue should not be started.
 | 25 | Docker image and release workflow | M5 | 12, 13 | #36 |
 | 26 | Kubernetes manifests, Argo CD and Tailscale | M5 | 25 | #37 |
 | 27 | Engine profiling and targeted speedups | M6 | 05 | #38 |
-| 28 | Alpha-beta, transposition table and evaluator tuning | M7 | 09, 27, 30 | #39 |
-| 29 | Autoresearch harness for engine speed | M6 | 27 | #40 |
-| 30 | Repetition draws, repetition-aware search and seeded tie-breaking | M7 | 09, 27 | #55 |
+| 28 | Alpha-beta, transposition table, threads and evaluator tuning in the Rust search | M7 | 09, 30 | #39 |
+| 29 | Autoresearch harness for engine and search speed on the Rust core | M6 | 44 | #40 |
+| 30 | Repetition draws, repetition-aware search and seeded tie-breaking in the Rust core | M7 | 09, 45 | #55 |
 | 31 | Slate and honey theme and board colour tokens | M2 | 15 | #65 |
 | 32 | Board legibility: background grid, clear marks and a legend | M2 | 31 | #66 |
 | 33 | API game setups: board location, hint agents, pending agent moves | M2 | 12 | #67 |
@@ -247,6 +264,10 @@ issue should not be started.
 | 39 | 2.5D isometric board with bakelite tiles | M2 | 35, 37 | #73 |
 | 40 | Animations in the 2.5D board | M2 | 36, 39 | #74 |
 | 41 | Phone and touch audit | M2 | 38, 40 | #75 |
+| 42 | Rust toolchain, workspace and binding skeleton | M6 | 27 | – |
+| 43 | Rust engine core with native perft | M6 | 42 | – |
+| 44 | Rust engine as a drop-in behind the Python API | M6 | 43 | – |
+| 45 | Rust search kernel: port the search agents | M6 | 44 | – |
 
 Dependency graph (arrows mean "unblocks"):
 
@@ -285,7 +306,8 @@ flowchart LR
     WP25 --> WP26
   end
   subgraph M6
-    WP27 --> WP29
+    WP27 --> WP42 --> WP43 --> WP44 --> WP45
+    WP44 --> WP29
   end
   subgraph M7
     WP30 --> WP28
@@ -299,16 +321,18 @@ flowchart LR
   WP04 --> WP21
   WP12 & WP13 --> WP25
   WP05 --> WP27
-  WP09 & WP27 --> WP30
-  WP09 & WP27 --> WP28
+  WP09 & WP45 --> WP30
+  WP09 --> WP28
 ```
 
 Recommended order (a valid topological order following the milestones):
 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 31, 32, 33, 34, 35, 36, 37,
-38, 39, 40, 41, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, then 27, 29, 30, 28. The M2 UI
-round (31–41) follows WP 15; the camera work (16, 19) waits for the scenario-aware game
-page (35), while 17, 18, 20 and M4 can be interleaved. M6 (27, 29) can start any time
-after 05, and M7 (30, 28) after 09 and 27.
+38, 39, 40, 41, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, then 27, 42, 43, 44, 45, 30,
+28, 29. The M2 UI round (31–41) follows WP 15; the camera work (16, 19) waits for the
+scenario-aware game page (35), while 17, 18, 20 and M4 can be interleaved. M6 can start
+any time after 05: the Rust core (42 to 45) follows WP 27 in order, and the autoresearch
+harness (29) can start once the engine runs in Rust (44) but gains most after the search
+does (45). M7 (30, 28) follows WP 45.
 
 ## 8. Session workflow
 
@@ -348,4 +372,3 @@ Not planned in any milestone, but the design keeps these possible:
 - Free-orbit 3D board view beyond the planned fixed-isometric 2.5D renderer.
 - Gauntlets, rendering and training as Kubernetes Jobs.
 - UHP notation import/export and pondering.
-- Rust engine core (see `performance.md`, only if profiling and autoresearch fall short).

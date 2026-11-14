@@ -1,0 +1,6 @@
+# Plain cargo commands build the bindings like maturin does: against the Python of the uv
+# environment, as an extension module that does not link libpython. Run `make sync` (or
+# `uv sync`) first so `.venv` exists.
+[env]
+PYO3_PYTHON = { value = "../.venv/bin/python", relative = true }
+PYO3_BUILD_EXTENSION_MODULE = "1"

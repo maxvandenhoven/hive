@@ -489,176 +489,6 @@ class TestGameStateGetOccupiedCoords:
         assert state.get_occupied_coords() == {(0, 0)}
 
 
-class TestGameStateGetAdjacentPlayers:
-    """Test the `get_adjacent_players` query."""
-
-    def test_no_neighbors(self, default_state: GameState) -> None:
-        """Test that an isolated coordinate has no adjacent players."""
-        state = default_state
-        assert state.get_adjacent_players((0, 0)) == set()
-
-    def test_single_player_neighbor(self, default_state: GameState) -> None:
-        """Test adjacent players with one neighboring piece."""
-        state = default_state
-        state.board[(1, 0)] = [Piece(type=PieceType.ANT, owner=Player.WHITE)]
-        assert state.get_adjacent_players((0, 0)) == {Player.WHITE}
-
-    def test_both_players_adjacent(self, default_state: GameState) -> None:
-        """Test adjacent players with neighbors from both players."""
-        state = default_state
-        state.board[(1, 0)] = [Piece(type=PieceType.ANT, owner=Player.WHITE)]
-        state.board[(-1, 0)] = [Piece(type=PieceType.ANT, owner=Player.BLACK)]
-        assert state.get_adjacent_players((0, 0)) == {Player.WHITE, Player.BLACK}
-
-    def test_uses_top_piece_owner(self, default_state: GameState) -> None:
-        """Test that stacked pieces report the top piece's owner."""
-        state = default_state
-        state.board[(1, 0)] = [
-            Piece(type=PieceType.ANT, owner=Player.WHITE),
-            Piece(type=PieceType.BEETLE, owner=Player.BLACK),
-        ]
-        assert state.get_adjacent_players((0, 0)) == {Player.BLACK}
-
-
-class TestCalculateBoundaryCoords:
-    """Test the `calculate_boundary_coords` internal helper."""
-
-    def test_empty_board(self, default_state: GameState) -> None:
-        """Test that an empty board has no boundary coordinates."""
-        state = default_state
-        assert state.calculate_boundary_coords() == set()
-
-    def test_single_piece(self, default_state: GameState) -> None:
-        """Test that a single piece yields its six neighbors as boundary."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-
-        boundary = state.calculate_boundary_coords()
-        assert boundary == {(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)}
-
-    def test_two_adjacent_pieces(self, default_state: GameState) -> None:
-        """Test boundary for two adjacent pieces shares no occupied coords."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0))
-        )
-
-        boundary = state.calculate_boundary_coords()
-        assert (0, 0) not in boundary
-        assert (1, 0) not in boundary
-        assert len(boundary) == 8
-
-    def test_ring_has_inner_and_outer_boundary(self, ring_6_state: GameState) -> None:
-        """Test that a ring of six pieces has both inner and outer boundary."""
-        state = ring_6_state
-
-        boundary = state.calculate_boundary_coords()
-        assert (0, 0) in boundary
-        assert len(boundary) == 13
-
-    def test_stacked_pieces_same_boundary(self, default_state: GameState) -> None:
-        """Test that a stack produces the same boundary as a single piece."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-        state.apply_placement(
-            Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
-        )
-
-        boundary = state.calculate_boundary_coords()
-        assert boundary == {(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)}
-
-
-class TestPieceLifted:
-    """Test the `piece_lifted` context manager."""
-
-    def test_removes_single_piece_from_board(self, default_state: GameState) -> None:
-        """Test that lifting the only piece removes the coord from the board."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-
-        with state.piece_lifted((0, 0)):
-            assert not state.is_occupied((0, 0))
-
-    def test_restores_single_piece_after_exit(self, default_state: GameState) -> None:
-        """Test that the piece is restored after the context exits."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(0, 0))
-        )
-
-        with state.piece_lifted((0, 0)):
-            pass
-
-        assert state.is_occupied((0, 0))
-        assert state.get_top_piece((0, 0)).type is PieceType.SPIDER
-
-    def test_yields_the_lifted_piece(self, default_state: GameState) -> None:
-        """Test that the context manager yields the correct piece."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.QUEEN, source_coord=None, target_coord=(0, 0))
-        )
-
-        with state.piece_lifted((0, 0)) as piece:
-            assert piece.type is PieceType.QUEEN
-            assert piece.owner is Player.WHITE
-
-    def test_lifts_top_from_stack(self, default_state: GameState) -> None:
-        """Test that only the top piece is lifted from a stack."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-        state.apply_placement(
-            Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
-        )
-
-        with state.piece_lifted((0, 0)) as piece:
-            assert piece.type is PieceType.BEETLE
-            assert state.is_occupied((0, 0))
-            assert state.get_top_piece((0, 0)).type is PieceType.ANT
-
-    def test_restores_stack_after_exit(self, default_state: GameState) -> None:
-        """Test that the stack is fully restored after context exit."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-        state.apply_placement(
-            Move(piece_type=PieceType.BEETLE, source_coord=None, target_coord=(0, 0))
-        )
-
-        with state.piece_lifted((0, 0)):
-            pass
-
-        assert state.get_stack_height((0, 0)) == 2
-        assert state.get_top_piece((0, 0)).type is PieceType.BEETLE
-
-    def test_restores_piece_on_exception(self, default_state: GameState) -> None:
-        """Test that the piece is restored even if the body raises."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-
-        with pytest.raises(RuntimeError):
-            with state.piece_lifted((0, 0)):
-                msg = "boom"
-                raise RuntimeError(msg)
-
-        assert state.is_occupied((0, 0))
-        assert state.get_stack_height((0, 0)) == 1
-
-
 class TestGetArticulationPoints:
     """Test the `get_articulation_points` Tarjan implementation."""
 
@@ -734,12 +564,16 @@ class TestIsConnected:
         assert line_3_state.is_connected()
         assert ring_6_state.is_connected()
 
-    def test_split_board(self, line_3_state: GameState) -> None:
+    def test_split_board(self, default_state: GameState) -> None:
         """Test that a board with two separate groups is not connected."""
-        state = line_3_state
+        state = default_state
 
-        with state.piece_lifted((0, 0)):
-            assert not state.is_connected()
+        for coord in [(-1, 0), (1, 0)]:
+            state.apply_placement(
+                Move(piece_type=PieceType.ANT, source_coord=None, target_coord=coord)
+            )
+
+        assert not state.is_connected()
 
 
 class TestIsConnectedAfterRemoving:
@@ -794,52 +628,6 @@ class TestIsConnectedAfterRemoving:
                 assert not state.is_connected_after_removing(coord)
             else:
                 assert state.is_connected_after_removing(coord)
-
-
-class TestCanSlide:
-    """Test the `can_slide` gate-check for piece movement.
-
-    Coordinate reference for sliding from (0,0) east to (1,0):
-      - Direction: (1, 0)
-      - Anti-clockwise flank: (1, -1) (north-east)
-      - Clockwise flank: (0, 1) (south-east)
-    The slide is blocked only when both flanks are occupied.
-    """
-
-    def test_slide_to_empty_unblocked(self, default_state: GameState) -> None:
-        """Test sliding to an empty target with no flanking pieces."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-        assert state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
-
-    def test_blocked_when_target_occupied(self, default_state: GameState) -> None:
-        """Test that sliding into an occupied target is blocked."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0))
-        )
-        assert not state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
-
-    def test_blocked_when_both_flanks_occupied(self, east_gate_state: GameState) -> None:
-        """Test that two occupied flanks block the slide (gate)."""
-        state = east_gate_state
-        assert not state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
-
-    def test_one_flank_occupied_still_slides(self, default_state: GameState) -> None:
-        """Test that a single occupied flank does not block the slide."""
-        state = default_state
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
-        )
-        state.apply_placement(
-            Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, -1))
-        )
-        assert state.can_slide(source_coord=(0, 0), target_coord=(1, 0))
 
 
 @pytest.mark.parametrize(
