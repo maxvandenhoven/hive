@@ -1,4 +1,7 @@
+/// <reference types="node" />
 import "@testing-library/jest-dom/vitest";
+
+import { File as NodeFile } from "node:buffer";
 
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
@@ -13,6 +16,14 @@ globalThis.ResizeObserver = class {
   unobserve() {}
   disconnect() {}
 };
+// The fetch of Node only sends its own form data and files, which jsdom replaces; its
+// form data class is reached through a response it parses.
+const nodeForm = await new Response(new URLSearchParams()).formData();
+globalThis.FormData = nodeForm.constructor as typeof FormData;
+globalThis.File = NodeFile as unknown as typeof File;
+// jsdom keeps no object URLs, so photo previews get a fixed one.
+URL.createObjectURL = () => "blob:photo";
+URL.revokeObjectURL = () => undefined;
 // jsdom does not lay out SVGs, so the board finds no screen positions.
 SVGSVGElement.prototype.getScreenCTM = () => null;
 // Sonner follows the colour scheme of the system.

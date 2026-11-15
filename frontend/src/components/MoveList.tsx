@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import type { GameDetail, MoveSource } from "@/api/client";
+import { photoImageUrl, type GameDetail, type MoveSource } from "@/api/client";
 import { PieceIcon } from "@/components/board/PieceTile";
 import { Button } from "@/components/ui/button";
 import { describeMove, playerAtPly } from "@/lib/moves";
@@ -21,7 +21,10 @@ interface MoveListProps {
   onShowPly: (ply: number) => void;
 }
 
-/** The moves of a game, oldest first and scrolled to the latest; a move replays it. */
+/**
+ * The moves of a game, oldest first and scrolled to the latest; a move replays it, and
+ * the thumbnail of a move read from a photo opens the photo.
+ */
 export function MoveList({ game, shownPly, onShowPly }: MoveListProps) {
   const listRef = useRef<HTMLOListElement>(null);
   const moveCount = game.moves.length;
@@ -50,7 +53,7 @@ export function MoveList({ game, shownPly, onShowPly }: MoveListProps) {
         const shown = shownPly === move.ply + 1;
 
         return (
-          <li key={move.ply}>
+          <li key={move.ply} className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
@@ -80,6 +83,22 @@ export function MoveList({ game, shownPly, onShowPly }: MoveListProps) {
                 <span className="text-xs text-muted-foreground">{source}</span>
               )}
             </Button>
+            {move.photo_id !== null && (
+              <a
+                href={photoImageUrl(move.photo_id)}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Photo of move ${move.ply + 1}`}
+                className="shrink-0 rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                <img
+                  src={photoImageUrl(move.photo_id)}
+                  alt=""
+                  loading="lazy"
+                  className="size-7 rounded-sm object-cover"
+                />
+              </a>
+            )}
           </li>
         );
       })}

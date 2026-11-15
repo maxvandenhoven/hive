@@ -345,13 +345,22 @@ is the live position, which follows new moves; a replayed ply past the last move
 an undo) shows the live one. Replayed positions are read-only and marked on the board,
 while agent turns carry on in the live game.
 
-**Camera (WP 16, WP 19).** A camera button on human turns opens `CameraCapture`
-(`<input type="file" accept="image/*" capture="environment">` first; a `getUserMedia`
-viewfinder with a framing overlay later). WP 16 uploads and stores the photo. WP 19 shows
-the proposed move for confirmation, or `MatchCandidates` (top candidates plus manual entry)
-when the match is weak. On agent turns, the photo verifies that the expected move was
-made. Camera access needs HTTPS, which the Tailscale ingress provides in production; in
-local dev use `localhost`.
+**Camera (WP 16, WP 19).** In `table` games a **Photo** button (`CameraCapture`, a file
+input with `capture="environment"`) sits in the turn prompt on a person's turn and next to
+**Done** while an agent move is pending. `usePhotoMoves` uploads the photo and
+`PhotoMatchPanel` under the prompt shows what it showed (`lib/photos.ts`): a clear move
+with how sure it is ("Play this move", "Other moves"), the candidates of an unclear photo
+with their probabilities (`MatchCandidates`, pick one), or why it failed, always with
+**Another photo** (read together with the unclear one) and **Enter by hand**; notes say
+when the hive touches the photo edge, earlier photos were combined or the previous photo
+helped. The picked move is drawn as the proposed move. Nothing is played without a tap. A
+photo that matches the pending agent move confirms it like **Done**; one showing another
+move offers "Keep the move made at the table". Moves read from a photo show its thumbnail
+in the move list. The new game flow offers "On this screen" or "At the table" against an
+agent, and for table games "Start from: a photo of a board" (`BoardFromPhoto`), which reads
+the position from one photo (`POST /board-estimates`), shows it with how sure it is and
+why, and asks who moves next. A file input works over plain HTTP on a phone, so the dev
+server can be opened over the LAN (`npm --prefix frontend run dev -- --host`).
 
 ## Help
 

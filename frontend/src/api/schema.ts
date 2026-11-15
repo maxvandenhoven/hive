@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * Read Readiness
-         * @description Report whether the database and the object store are reachable. Responds with 503 and the failing checks if either is not.
+         * @description Report whether the database and the object store are reachable and a configured vision model is loaded. Responds with 503 and the failing checks if not.
          */
         get: operations["read_readiness"];
         put?: never;
@@ -267,9 +267,29 @@ export interface paths {
         put?: never;
         /**
          * Confirm Move
-         * @description Confirm that the pending agent move, the last move of a game at the table, was made on the physical board, so the game can go on.
+         * @description Confirm that the pending agent move, the last move of a game at the table, was made on the physical board, so the game can go on. With `photo_id`, the photo that showed the move is linked to it.
          */
         post: operations["confirm_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Photo
+         * @description Take a photo of the physical board of a game at the table. The photo is stored and, with a board reader, matched against the game: after a person's move it proposes the legal moves it shows, best first, and whether one is clear; while an agent move is pending, it checks that the move was made. Unclear photos of the same position are combined with the next one. Nothing is played: commit a proposed move with `source` `photo` and the `photo_id`, or confirm the pending move with the `photo_id`.
+         */
+        post: operations["add_photo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -290,6 +310,46 @@ export interface paths {
          * @description Let an agent think about the latest position within a time budget, streaming `info` and `candidate` events and ending with the `decision`. Without `agent`, the agent or hint agent of the side to move thinks. With `commit`, the agent playing the side to move plays its decision in the game, pending at the table until it is confirmed. Failures after the stream started end it with an `error` event. Closing the stream stops the agent.
          */
         post: operations["think"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/{photo_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Photo Image
+         * @description Get the stored image of a photo, upright, as a JPEG.
+         */
+        get: operations["read_photo_image"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/board-estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Estimate Board
+         * @description Read a whole position from one photo of a physical board, without the history of a game, to start a game from it with the default rules. Says how sure the reading is: `confident`, `uncertain` (check the tiles before using it) or `failed` (no valid board, for example with stacks). The photo is not stored.
+         */
+        post: operations["estimate_board"];
         delete?: never;
         options?: never;
         head?: never;
@@ -405,7 +465,7 @@ export interface components {
          * @description The machine-readable code of an error response.
          * @enum {string}
          */
-        ApiErrorCode: "game_not_found" | "game_not_active" | "ply_out_of_range" | "ply_conflict" | "move_not_legal" | "agent_turn" | "photo_not_found" | "coordinate_empty" | "piece_not_movable" | "no_move_to_undo" | "agent_required" | "commit_not_allowed" | "pool_busy" | "agent_unavailable" | "move_pending" | "no_pending_move" | "setup_not_supported";
+        ApiErrorCode: "game_not_found" | "game_not_active" | "ply_out_of_range" | "ply_conflict" | "move_not_legal" | "agent_turn" | "photo_not_found" | "coordinate_empty" | "piece_not_movable" | "no_move_to_undo" | "agent_required" | "commit_not_allowed" | "pool_busy" | "agent_unavailable" | "move_pending" | "no_pending_move" | "setup_not_supported" | "not_at_table" | "photo_too_large" | "photo_not_readable" | "vision_unavailable";
         /**
          * BoardCell
          * @description One occupied cell of a board in the JSON form of `GameBoard`.
@@ -419,6 +479,42 @@ export interface components {
             /** Stack */
             stack: components["schemas"]["Piece"][];
         };
+        /**
+         * BoardEstimate
+         * @description A position read from a single photo, with how sure the reading is.
+         *
+         *     Attributes:
+         *         status: Whether the board can be trusted, should be checked, or is not valid.
+         *         tiles: The tiles read on the hive, sorted by coordinate.
+         *         board: The board of the tiles, one piece per hex, centred near `(0, 0)`.
+         *         lowest_probability: How likely the most doubtful reading of a tile is.
+         *         players: The sides that may be to move on the board under the rules; empty if
+         *             the board is not valid.
+         *         ignored: The number of detections that are not part of the hive, such as tiles
+         *             in hand.
+         *         reasons: What makes the estimate uncertain or failed, for the person taking the
+         *             photo.
+         */
+        BoardEstimate: {
+            status: components["schemas"]["BoardEstimateStatus"];
+            /** Tiles */
+            tiles: components["schemas"]["EstimatedTile"][];
+            board: components["schemas"]["GameBoard"];
+            /** Lowest Probability */
+            lowest_probability: number;
+            /** Players */
+            players: ("white" | "black")[];
+            /** Ignored */
+            ignored: number;
+            /** Reasons */
+            reasons: string[];
+        };
+        /**
+         * BoardEstimateStatus
+         * @description How sure a board estimate from one photo is.
+         * @enum {string}
+         */
+        BoardEstimateStatus: "confident" | "uncertain" | "failed";
         /**
          * BoardLocation
          * @description Where a game is played.
@@ -447,6 +543,27 @@ export interface components {
             current_player: "white" | "black";
             /** Current Ply */
             current_ply?: number | null;
+        };
+        /** Body_add_photo */
+        Body_add_photo: {
+            /**
+             * Image
+             * @description The photo, a JPEG or PNG image.
+             */
+            image: string;
+            /**
+             * Expected Ply
+             * @description The `ply_count` of the game the client saw.
+             */
+            expected_ply: number;
+        };
+        /** Body_estimate_board */
+        Body_estimate_board: {
+            /**
+             * Image
+             * @description The photo, a JPEG or PNG image.
+             */
+            image: string;
         };
         Coordinate: [
             number,
@@ -520,6 +637,26 @@ export interface components {
             code: components["schemas"]["ApiErrorCode"];
             /** Detail */
             detail: string;
+        };
+        /**
+         * EstimatedTile
+         * @description A tile of an estimated board.
+         *
+         *     Attributes:
+         *         coord: The hex of the tile, in the coordinates of the estimated board.
+         *         piece: The tile read on the hex.
+         *         probability: How likely the reading is, from the class scores of the reader.
+         *         raised: Whether the face looks higher than the table, so it is on a stack.
+         *         origin: The hex of the tile in the lattice frame of the photo.
+         */
+        EstimatedTile: {
+            coord: components["schemas"]["Coordinate"];
+            piece: components["schemas"]["Piece"];
+            /** Probability */
+            probability: number;
+            /** Raised */
+            raised: boolean;
+            origin: components["schemas"]["Coordinate"];
         };
         GameBoard: components["schemas"]["BoardCell"][];
         /**
@@ -868,16 +1005,41 @@ export interface components {
             to: components["schemas"]["Coordinate"];
         };
         /**
+         * MoveCandidate
+         * @description A possible explanation of the photos.
+         *
+         *     Attributes:
+         *         moves: The moves played since the known position, one or two; `None` is a pass.
+         *         probability: The posterior probability among the candidates.
+         *         log_likelihood: The log-likelihood of the photos, with the prior.
+         *         conflicts: The number of hexes that disagree with the candidate in the photo that
+         *             fits it best.
+         */
+        MoveCandidate: {
+            /** Moves */
+            moves: (components["schemas"]["Move"] | null)[];
+            /** Probability */
+            probability: number;
+            /** Log Likelihood */
+            log_likelihood: number;
+            /** Conflicts */
+            conflicts: number;
+        };
+        /**
          * MoveConfirm
          * @description The request body that confirms a pending agent move was made on the board.
          *
          *     Attributes:
          *         expected_ply: The `ply_count` of the game the client saw, so the pending move is
          *             its last move. If a move was undone meanwhile, the confirmation is rejected.
+         *         photo_id: The photo that shows the move was made, which is linked to the move
+         *             and marked confirmed, or `None` when a person confirms it.
          */
         MoveConfirm: {
             /** Expected Ply */
             expected_ply: number;
+            /** Photo Id */
+            photo_id?: string | null;
         };
         /**
          * MoveCreate
@@ -942,11 +1104,133 @@ export interface components {
             created_at: string;
         };
         /**
+         * MoveResolution
+         * @description The result of resolving photos to a move.
+         *
+         *     Attributes:
+         *         status: Whether a move was found, more photos are needed, or nothing fits.
+         *         candidates: The most likely candidates, best first.
+         *         reason: Why no move was accepted, for the person taking the photos.
+         */
+        MoveResolution: {
+            status: components["schemas"]["ResolutionStatus"];
+            /** Candidates */
+            candidates: components["schemas"]["MoveCandidate"][];
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
          * MoveSource
          * @description How a move was entered.
          * @enum {string}
          */
         MoveSource: "manual" | "photo" | "agent";
+        /**
+         * MoveVerification
+         * @description Whether photos show an expected move, such as an agent move made on the table.
+         *
+         *     Attributes:
+         *         status: `matched` when the photos clearly show the expected move, `mismatched`
+         *             when they clearly show another one, otherwise `unclear`.
+         *         probability: The posterior of the expected move among the candidates, or 0 if
+         *             it is not one of them.
+         *         reason: What the photos show when they do not match, for the person taking
+         *             them.
+         */
+        MoveVerification: {
+            status: components["schemas"]["VerificationStatus"];
+            /** Probability */
+            probability: number;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * PhotoMatch
+         * @description What a photo shows about a game, stored with the photo.
+         *
+         *     Attributes:
+         *         purpose: Whether the photo finds a person's move or checks a pending agent move.
+         *         resolution: The legal moves that explain the photo, best first, and whether one
+         *             of them is clear. For a verification, the moves from the position before the
+         *             pending move.
+         *         verification: Whether the photo shows the pending agent move, for verifications
+         *             only.
+         *         photo_ids: The photos of the same position that were resolved together, oldest
+         *             first and ending with this one. Earlier photos count when they were unclear.
+         *         previous_photo_id: The photo of the position before the move, whose readings of
+         *             the tiles helped to recognise them, or `None` if there is none.
+         *         tile_count: The number of tiles found on the hive.
+         *         edge: Whether the hive touches the edge of the photo, so tiles may be cut off.
+         */
+        PhotoMatch: {
+            purpose: components["schemas"]["PhotoPurpose"];
+            resolution: components["schemas"]["MoveResolution"];
+            verification: components["schemas"]["MoveVerification"] | null;
+            /** Photo Ids */
+            photo_ids: string[];
+            /** Previous Photo Id */
+            previous_photo_id: string | null;
+            /** Tile Count */
+            tile_count: number;
+            /** Edge */
+            edge: boolean;
+        };
+        /**
+         * PhotoPurpose
+         * @description What a photo taken in a game is for.
+         * @enum {string}
+         */
+        PhotoPurpose: "move" | "verification";
+        /**
+         * PhotoRead
+         * @description A photo taken in a game at the table, with what it shows.
+         *
+         *     Attributes:
+         *         id: The photo ID; the image is at `/api/photos/{id}/image`.
+         *         game_id: The ID of the game.
+         *         ply: The ply of the move whose result the photo shows: the next move for a
+         *             photo of a person's move, the pending move for a photo that checks an agent
+         *             move.
+         *         width: The width of the stored image in pixels.
+         *         height: The height of the stored image in pixels.
+         *         reader: The board reader that read the photo, or `None` if the service has no
+         *             reader.
+         *         model_version: The model of the reader, or `None`.
+         *         confirmed: Whether a move was committed from the photo, or the pending move it
+         *             showed confirmed.
+         *         created_at: When the photo was taken.
+         *         match: What the photo shows about the game, or `None` if it was not read.
+         */
+        PhotoRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Game Id
+             * Format: uuid
+             */
+            game_id: string;
+            /** Ply */
+            ply: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Reader */
+            reader: string | null;
+            /** Model Version */
+            model_version: string | null;
+            /** Confirmed */
+            confirmed: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            match: components["schemas"]["PhotoMatch"] | null;
+        };
         /**
          * Piece
          * @description A game piece with a type and an owner.
@@ -1000,7 +1284,8 @@ export interface components {
          *
          *     Attributes:
          *         status: `ready` if every check passed.
-         *         checks: The result of each check by name: `database` and `storage`.
+         *         checks: The result of each check by name: `database` and `storage`, and
+         *             `vision` when a reader model is configured.
          */
         ReadinessReport: {
             /**
@@ -1013,6 +1298,12 @@ export interface components {
                 [key: string]: components["schemas"]["HealthCheckResult"];
             };
         };
+        /**
+         * ResolutionStatus
+         * @description The outcome of a move resolution.
+         * @enum {string}
+         */
+        ResolutionStatus: "resolved" | "ambiguous" | "failed";
         /**
          * Rules
          * @description The rules of a Hive game, holding both the configuration and the rule behaviour.
@@ -1185,6 +1476,12 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * VerificationStatus
+         * @description Whether photos show that an expected move was made.
+         * @enum {string}
+         */
+        VerificationStatus: "matched" | "mismatched" | "unclear";
     };
     responses: never;
     parameters: never;
@@ -1767,13 +2064,75 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The photo is not a photo of the game. Or the request is not valid. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_photo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_photo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoRead"];
+                };
+            };
+            /** @description Game not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The game is played on the screen, so it takes no photos. The game is not at the expected ply. The game is finished or abandoned. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The photo is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The upload is not an image. Or the request is not valid. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1836,6 +2195,97 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_photo_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The JPEG image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
+            /** @description Photo not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estimate_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_estimate_board"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardEstimate"];
+                };
+            };
+            /** @description The photo is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The upload is not an image. Or the request is not valid. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description No board reader is available. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

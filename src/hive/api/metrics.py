@@ -1,4 +1,4 @@
-"""Prometheus metrics of the API service: requests, agent decisions and the worker pool.
+"""Prometheus metrics of the API service: requests, decisions, the worker pool, photos.
 
 Every app has its own `ApiMetrics` with its own registry, so apps in one process (as in
 tests) do not share counts. Request latency is measured by a plain ASGI middleware rather
@@ -32,6 +32,9 @@ REQUEST_BUCKETS_S = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10
 DECISION_BUCKETS_S = (0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0)
 """The histogram buckets of decision times in seconds, spanning the usual budgets."""
 
+PHOTO_BUCKETS_S = (0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
+"""The histogram buckets of photo reading and matching times in seconds."""
+
 OVERRUN_BUCKETS_S = (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0)
 """The histogram buckets of decision overruns in seconds, up to past the grace period."""
 
@@ -52,6 +55,12 @@ class ApiMetrics:
         illegal_submissions: Moves agents submitted that were not legal.
         worker_pool_size: The worker processes in the pool, idle or busy.
         worker_pool_busy: The worker processes lent to a decision.
+        photo_read_seconds: The seconds the board reader took per photo, by reader.
+        photo_match_seconds: The seconds matching a read photo against its game took.
+        photo_match: Photos taken in games by outcome: `resolved`, `ambiguous` or
+            `failed` for a person's move, `matched`, `mismatched` or `unclear` for a
+            pending agent move, `unread` without a reader.
+        board_estimates: Boards read from a single photo, by status.
     """
 
     def __init__(self) -> None:
@@ -102,6 +111,31 @@ class ApiMetrics:
         self.worker_pool_busy = Gauge(
             "hive_worker_pool_busy",
             "Agent worker processes lent to a decision.",
+            registry=self.registry,
+        )
+        self.photo_read_seconds = Histogram(
+            "hive_photo_read_seconds",
+            "Seconds the board reader took to find the tiles in a photo.",
+            labelnames=["reader"],
+            buckets=PHOTO_BUCKETS_S,
+            registry=self.registry,
+        )
+        self.photo_match_seconds = Histogram(
+            "hive_photo_match_seconds",
+            "Seconds matching the tiles of a photo against the game took.",
+            buckets=PHOTO_BUCKETS_S,
+            registry=self.registry,
+        )
+        self.photo_match = Counter(
+            "hive_photo_match",
+            "Photos taken in games by what they showed.",
+            labelnames=["outcome"],
+            registry=self.registry,
+        )
+        self.board_estimates = Counter(
+            "hive_board_estimates",
+            "Boards read from a single photo, by how sure the reading was.",
+            labelnames=["status"],
             registry=self.registry,
         )
 

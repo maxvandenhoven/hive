@@ -12,7 +12,7 @@ stateless per request: load the game's moves from Postgres, replay them with
 | Web framework | FastAPI + uvicorn | Async throughout (see "Code structure"). Pydantic v2 request/response models in `api/schemas.py`; engine, agent and match values (`Rules`, `BoardSetup`, `Move`, `AgentSpec`, `AgentRegistration`, `DecisionRecord`, `GameRecord`) are used as they are (D25), so the OpenAPI schema types them. |
 | Settings | pydantic-settings | `DatabaseSettings` (only the database URL, all migrations need) and `ApiSettings` extending it. Env vars prefixed `HIVE_` or a `.env` file: database URL, S3 endpoint/keys/bucket, model name/version, pool size, budgets. Connection settings have no defaults; `make dev` copies `.env.example` (matching the compose stack) to `.env`. |
 | Database | SQLAlchemy 2.x typed ORM (`Mapped[...]`) with its asyncio extension, psycopg 3, Alembic | No SQLModel. The same `postgresql+psycopg://` URL serves the async app and the synchronous Alembic migrations (`hive db upgrade`, `DatabaseSettings.alembic_config()`). JSONB columns hold typed values through `TypedJsonb`; `GameRow.ply_count` is counted in SQL. Relationships are `lazy="raise"` and loaded with `selectinload`. Migrations in `src/hive/api/db/migrations/`. |
-| Object storage | Garage via `boto3` (S3 API) | A small async `ObjectStore` with what is used (`delete_prefix`, `check`), running boto3 calls in worker threads through one `request` helper; uploads and downloads come with photos (WP 16). Failed deletions raise `ObjectStoreError`. Tests use `moto`'s in-process S3. |
+| Object storage | Garage via `boto3` (S3 API) | A small async `ObjectStore` with what is used (`put`, `get`, `delete_prefix`, `check`), running boto3 calls in worker threads through one `request` helper. Failed deletions raise `ObjectStoreError`. Tests use `moto`'s in-process S3. |
 | Logging | stdlib `logging`, `python-json-logger`, `asgi-correlation-id` | JSON lines with the `X-Request-ID` request ID, including uvicorn's access log (written when the response starts, so without latency; route and latency metrics come from Prometheus in WP 12). No `BaseHTTPMiddleware`, which breaks streaming. No `print` (`T20`). |
 | Metrics | `prometheus-client` | `/metrics` endpoint. |
 | Local dev | `deploy/compose.yaml` with Postgres and single-node Garage | `make dev` starts compose, migrates, and runs `hive serve --reload` (plus `vite` from WP 13). Garage bootstraps itself with `server --single-node --default-bucket` (v2.3+), creating the layout, the `hive` bucket and a fixed dev key, which `.env.example` matches. |
@@ -85,13 +85,15 @@ move
 photo
   id            uuid pk
   game_id       uuid fk → game (on delete cascade)
-  ply           int       -- the ply the photo was taken for
+  ply           int       -- the ply of the move whose result it shows: the next move,
+                          -- or the pending agent move for a verification photo
   object_key    text      -- Garage key: photos/<game_id>/<photo_id>.jpg
   width, height int
-  reader        text null -- classical | yolo
-  model_version text null
-  detections    jsonb null -- raw TileObservations
-  match         jsonb null -- top candidates with scores
+  reader        text null -- yolo
+  model_version text null -- for example hive-yolo-seg/v001 (from model.json)
+  detections    jsonb null -- list[TileObservation]
+  match         jsonb null -- PhotoMatch: purpose, MoveResolution, MoveVerification,
+                          -- combined photo ids, previous photo id, tile count, edge
   confirmed     bool      -- true once the move it proposed was committed
   created_at    timestamptz
 ```
@@ -116,7 +118,7 @@ agent on the `screen` only; the API still accepts `table` for them.
 
 In a `table` game, a committed agent move is stored with `pending = true` (D27): the
 physical board is behind until a person makes the move and confirms it with
-`POST /games/{id}/moves/last/confirm` (or, from WP 19, a matching photo). Only the last
+`POST /games/{id}/moves/last/confirm` (with the `photo_id` of a matching photo, or without one after **Done**). Only the last
 move can be pending. While it is, playing a move or committing a decision is 409
 `move_pending`; undoing it is allowed. Moving a game to the `screen` confirms a pending
 move, and agent moves on the screen are never pending. `GameSummary` (and `GameDetail`)
@@ -145,18 +147,47 @@ the generated frontend client.
 | GET | `/games/{id}/state?ply=N` | 11 | `GamePosition`: board (stacks), hands, side to move, `ply` and `ply_count`, result, last move (the stored move, so a pass is told apart from the start), `movable_pieces` (with at least one target), `placeable_coords`, `placeable_piece_types`, `must_pass` and `pending_move` (whether the game's last move waits for confirmation, at any `ply`). The move lists are empty once the game ended. `ply` (default: latest) enables replay; past the last move is 422 `ply_out_of_range`. |
 | GET | `/games/{id}/targets?q=&r=` | 11 | Legal targets of the top piece at `(q, r)` in the latest position. 404 `coordinate_empty`; 422 `piece_not_movable` with the reason from `Rules.immobility_reason` (other side's piece, queen not placed, one-hive rule, no target, game over). |
 | POST | `/games/{id}/moves` | 11 | Play a move: `{move, source, photo_id?, expected_ply, allow_agent_side}`, returning the new `GamePosition` (201). `source` is `manual` or `photo`; `photo_id` is required with `photo` only, must belong to the game, and is marked `confirmed`. Checks in order: 409 `ply_conflict` on an `expected_ply` mismatch, 409 `game_not_active` for finished or abandoned games, 409 `move_pending` while the last move waits for confirmation, 409 `agent_turn` when an agent plays the side to move (any source) unless `allow_agent_side`, 422 `move_not_legal` with the reason from `Rules.illegal_move_reason`. Sets status `finished` and the result when the game ends. |
-| POST | `/games/{id}/moves/last/confirm` | 33 | Confirm that the pending last move was made on the physical board: `{expected_ply}`, returning the `GamePosition`. 409 `ply_conflict` on a mismatch, 409 `no_pending_move` if the last move is not pending. |
+| POST | `/games/{id}/moves/last/confirm` | 33, 19 | Confirm that the pending last move was made on the physical board: `{expected_ply, photo_id?}`, returning the `GamePosition`. A `photo_id` (a photo of the game, else 422 `photo_not_found`) is linked to the move and marked `confirmed`. 409 `ply_conflict` on a mismatch, 409 `no_pending_move` if the last move is not pending. |
 | DELETE | `/games/{id}/moves/last` | 11 | Undo the last move, returning the new `GamePosition`. Optional `expected_ply` (409 `ply_conflict`); 409 `no_move_to_undo` without moves. Reopens finished games (status `active`, no result); abandoned games stay abandoned. Unconfirms the move's photo. |
 | POST | `/games/{id}/think` | 12 | SSE stream about the latest position. Body: `{agent?: AgentSpec, budget_s?, commit: bool}`; `agent` defaults to the side to move's agent, or the hint agent of a human side (WP 33), and `budget_s` to its budget (5 s without one), clamped to `HIVE_MAX_BUDGET_S`. Streams `info` and `candidate` events, ends with `decision` (with the new `GamePosition` when committed), or `error` after a failed commit (for example `ply_conflict` when a move was played meanwhile) or a failed worker. With `commit=true` (only allowed on an agent side, using that side's spec), the final move is stored with `source=agent` and its `DecisionRecord`, pending in `table` games. Errors before the stream: 404 `game_not_found`, 409 `game_not_active`, 409 `commit_not_allowed`, 409 `move_pending` (commit while a move is pending), 422 `agent_required` (human side without `agent` or hint agent), 503 `pool_busy`, 503 `agent_unavailable`. |
-| POST | `/games/{id}/photos` | 16 | Upload a photo (multipart) for the current ply; stores it. From WP 19 also runs reader + matcher and returns candidates. |
-| GET | `/photos/{id}/image` | 16 | Stream the stored image. |
-| GET | `/healthz`, `/readyz` | 10 | Liveness; readiness checks DB, S3 and (from WP 24) model loaded. |
+| POST | `/games/{id}/photos` | 16, 19 | Multipart `image` and `expected_ply`. Table games only (409 `not_at_table`); 409 `ply_conflict`, 409 `game_not_active` (unless a move is pending), 413 `photo_too_large` (`HIVE_PHOTO_MAX_BYTES`), 422 `photo_not_readable`. Decodes the photo upright (EXIF), scales it to `HIVE_PHOTO_MAX_SIDE`, stores it as JPEG at `photos/<game_id>/<photo_id>.jpg` and, with a reader, matches it (see "Photo flow"). Returns `PhotoRead` (201) with the `match`; never changes the game. |
+| GET | `/photos/{id}/image` | 16 | The stored JPEG, cacheable as immutable; 404 `photo_not_found`. |
+| POST | `/board-estimates` | – | Multipart `image`: reads a whole position from one photo (`hive.vision.estimate.BoardEstimate`: `confident`, `uncertain` or `failed` with reasons, the board and the sides that may move), to start a table game from it as its `setup`. Not stored. 503 `vision_unavailable` without a reader. |
+| GET | `/healthz`, `/readyz` | 10 | Liveness; readiness checks DB, S3 and, when `HIVE_VISION_MODEL` is set, that the model loaded (`vision`). |
 | GET | `/metrics` | 12 | Prometheus metrics. |
 
 Static files: the built frontend (`HIVE_FRONTEND_DIR`, default `frontend/dist` relative to
 the working directory) is mounted at `/` after every route, with an SPA fallback to
 `index.html` for client-side routes (`hive.api.frontend.FrontendFiles`). Unknown paths under
 `/api` stay a JSON 404. Without a build, only the API is served.
+
+## Photo flow (WP 16, WP 19)
+
+`api/vision.py` holds `BoardVision` (the YOLO reader loaded at startup from
+`HIVE_VISION_MODEL`, an ONNX file with `model.json` beside it for the version; one photo at a
+time in a worker thread) and the stored `PhotoMatch`; `api/photos.py` holds `PhotoService`.
+Without a model, or if it fails to load, photos are stored but not read (`match` null),
+and a configured model that failed makes `/readyz` fail. Settings:
+`HIVE_VISION_MODEL`, `HIVE_VISION_SCORE_THRESHOLD` (0.25), `HIVE_PHOTO_MAX_BYTES` (25 MB),
+`HIVE_PHOTO_MAX_SIDE` (2560 px).
+
+For each photo the service resolves the move against the known position
+(`MoveResolver`, `vision.md`) with two kinds of earlier evidence, both refitted from
+stored detections so the API stays stateless:
+
+- Earlier photos: unconfirmed photos of the same ply and purpose taken since the game last
+  changed (`created_at > game.updated_at`) whose resolution was `ambiguous` are resolved
+  together with the new photo. A move, undo or confirmation updates the game, so photos
+  from before it never count.
+- The previous photo: the photo linked to the move before (`move.photo_id`), the one a
+  move was read from or that confirmed an agent move, gives the tile memory.
+
+Without a pending move the photo finds a person's move (`purpose: move`); the client shows
+the candidates and commits one with `source: photo` and the `photo_id`. With a pending
+agent move it checks that move (`purpose: verification`, `MoveResolver.verify`):
+`matched` when the photos clearly show it (the client then confirms with the `photo_id`),
+`mismatched` when they clearly show another move (the client can undo the agent move and
+play the photo's move with `allow_agent_side`), else `unclear`.
 
 ## Agent worker pool (WP 12)
 
@@ -232,7 +263,8 @@ Implementation notes (WP 12):
   `DecisionRecord` fields; one per photo match (reader, latency, top score, margin).
 - Metrics: HTTP request histograms by route and status, the decision metrics listed in
   `agents-and-matches.md`, pool gauges, `hive_photo_read_seconds{reader}`,
-  `hive_photo_match_total{outcome}` (auto, candidates, failed).
+  `hive_photo_match_seconds`, `hive_photo_match_total{outcome}` (resolved, ambiguous, failed,
+  matched, mismatched, unclear, unread) and `hive_board_estimates_total{status}`.
 - A `ServiceMonitor` scrapes `/metrics` in the cluster (WP 26).
 
 Implementation notes (WP 12):
@@ -249,5 +281,6 @@ Implementation notes (WP 12):
   `cancelled` and the whole record under `decision`, plus the request ID. A cancelled
   decision is logged but only its worker restart counts in the metrics, since its time
   and close reason reflect the disconnect.
-- Pool gauges read the pool when scraped (`Gauge.set_function`). The photo metrics come
-  with the photo flow (WP 16, WP 19).
+- Pool gauges read the pool when scraped (`Gauge.set_function`). Each read photo logs one
+  line (`hive.api.photos`) with the purpose, outcome, read and match seconds, tile and
+  photo counts, whether the previous photo was used, the top probability and the margin.

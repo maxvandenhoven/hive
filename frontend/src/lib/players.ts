@@ -20,6 +20,11 @@ export const DEFAULT_AGENT_BUDGET_S = 5;
 
 export type PlayerSide = "white" | "black";
 
+/** The side that is not `side`. */
+export function otherSide(side: PlayerSide): PlayerSide {
+  return side === "white" ? "black" : "white";
+}
+
 export const PLAYER_SIDES: PlayerSide[] = ["white", "black"];
 
 export const SIDE_TITLES: Record<PlayerSide, string> = { white: "White", black: "Black" };

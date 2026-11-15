@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-/** A request the app sent, with its decoded JSON body. */
+/** A request the app sent, with its decoded JSON body or its multipart fields. */
 export interface RecordedRequest {
   method: string;
   path: string;
@@ -25,7 +25,12 @@ export function mockApi(handlers: Record<string, ApiHandler>): RecordedRequest[]
 
   vi.stubGlobal("fetch", async (input: Request, init?: RequestInit) => {
     const url = new URL(input.url);
-    const text = await input.text();
+    const multipart = input.headers
+      .get("Content-Type")
+      ?.startsWith("multipart/form-data");
+    // A multipart body is recorded as its fields, with files by their names.
+    const form = multipart === true ? await input.formData() : null;
+    const text = form === null ? await input.text() : "";
 
     // Like `fetch`, a request aborted before its response fails.
     if (init?.signal?.aborted === true) {
@@ -36,7 +41,17 @@ export function mockApi(handlers: Record<string, ApiHandler>): RecordedRequest[]
       method: input.method,
       path: url.pathname,
       search: url.search,
-      body: text ? (JSON.parse(text) as unknown) : null,
+      body:
+        form !== null
+          ? Object.fromEntries(
+              [...form.entries()].map(([name, value]) => [
+                name,
+                typeof value === "string" ? value : `file:${value.name}`,
+              ]),
+            )
+          : text
+            ? (JSON.parse(text) as unknown)
+            : null,
       signal: init?.signal ?? null,
     };
     requests.push(request);

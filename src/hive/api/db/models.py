@@ -33,11 +33,13 @@ from sqlalchemy.orm import (
 from sqlalchemy.types import TypeDecorator
 
 from hive.api.players import BoardLocation, PlayerConfig, PlayerType
+from hive.api.vision import PhotoMatch
 from hive.engine.codec import json_adapter
 from hive.engine.record import BoardSetup, GameRecord
 from hive.engine.rules import Rules
 from hive.engine.state import GameState, Move, Player
 from hive.match.records import DecisionRecord
+from hive.vision.types import TileObservation
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -180,14 +182,17 @@ class PhotoRow(DatabaseBase):
     Attributes:
         id: The photo ID.
         game_id: The ID of the game.
-        ply: The ply the photo was taken for.
+        ply: The ply of the move whose result the photo shows: the next move for a
+            photo of a person's move, the pending move for a photo that checks an agent
+            move.
         object_key: The key of the image in the object store.
         width: The image width in pixels.
         height: The image height in pixels.
         reader: The board reader that read the photo, or `None` if it was not read.
         model_version: The version of the reader model, or `None` if it has none.
-        detections: The raw tile observations of the reader, or `None`.
-        match: The top move candidates with their scores, or `None`.
+        detections: The tile faces the reader found, or `None` if it was not read.
+        match: What the photo shows about the game: the most likely moves and whether
+            one is clear, or `None` if it was not read.
         confirmed: Whether the move the photo proposed was committed.
         created_at: When the photo was taken.
         game: The game.
@@ -205,8 +210,12 @@ class PhotoRow(DatabaseBase):
     height: Mapped[int]
     reader: Mapped[str | None] = mapped_column(String)
     model_version: Mapped[str | None] = mapped_column(String)
-    detections: Mapped[Any] = mapped_column(JSONB(none_as_null=True), nullable=True)
-    match: Mapped[Any] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    detections: Mapped[list[TileObservation] | None] = mapped_column(
+        TypedJsonb(list[TileObservation] | None, none_as_null=True)
+    )
+    match: Mapped[PhotoMatch | None] = mapped_column(
+        TypedJsonb(PhotoMatch | None, none_as_null=True)
+    )
     confirmed: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now()
@@ -334,6 +343,17 @@ class GameRow(DatabaseBase):
     def photo_prefix(self) -> str:
         """The object key prefix of the photos of the game."""
         return f"photos/{self.id}/"
+
+    def photo_key(self, photo_id: uuid.UUID) -> str:
+        """Get the object key of the image of a photo of the game.
+
+        Args:
+            photo_id: The photo ID.
+
+        Returns:
+            The key, `photos/<game_id>/<photo_id>.jpg`.
+        """
+        return f"{self.photo_prefix}{photo_id}.jpg"
 
     @property
     def current_player(self) -> Player:

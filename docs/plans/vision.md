@@ -301,6 +301,24 @@ Evaluating on rendered games: `hive data sequences`, render, `hive data export`,
 detections next to the tracked board and the decision) and an animated GIF per game
 (Pillow, from the `plotting` extra). See `synthetic-data.md` §Game sequences.
 
+## Board estimates from one photo
+
+`BoardEstimate.from_observed(observed, rules)` (`estimate.py`) reads a whole position
+without history, to start a game from a board on the table: each hive tile gets its most
+likely class that the set still has a piece of (clearest readings first), centred near
+`(0, 0)`. It is `failed` when a face sits clearly above the table (the tiles under a
+stack are hidden), the board is not valid for either side, or there are more tiles than
+the set; `uncertain` when a tile reads below 80%, a beetle's height cannot be told (too
+few tiles or a flat view to know the camera angle), a side has `queen_by_turn` tiles or
+more but no queen (a misread queen), the hive touches the photo edge, or detections next
+to the hive could not be placed; otherwise `confident`.
+
+On the 9 real photos (two arrangements of 10 tiles, `hive-yolo-seg` v001) every photo of
+one arrangement gives the same board up to rotation; 6 are read exactly, and the two
+misread ones (the steep close-up, both queens read as spiders) are `uncertain` with the
+reason. Starting from arrangement B one queen move earlier, two other real photos of B
+resolve that move at 100% and 99.8%.
+
 ## Status and next steps
 
 State after the branch `feature/wp21-24-synthetic-data-yolo` (M3 and M4 started out of
@@ -317,14 +335,13 @@ not yet).
 | 24 | Training and ONNX export, ONNX reader with numpy NMS and masks, first synthetic and real-photo results | `scripts/train/train_yolo.py`, `src/hive/vision/yolo/reader.py`, `hive vision detect` |
 | 17 | Grid fitting, move resolution with several photos, tile memory, two-move recovery, tracker, simulator | `src/hive/vision/{lattice,grid_fit,resolver,tracking,testing}.py` |
 | 20 (part) | Tracking evaluation on rendered games | `src/hive/vision/sequences.py`, `hive vision track` |
+| 16, 19 | Photo upload and storage, reading and matching in the API with earlier unclear photos and the previous photo, agent move verification, single-photo board estimates, camera flow in the app | `src/hive/api/{vision,photos}.py`, `src/hive/vision/estimate.py`, `MoveResolver.verify`, `api-and-data.md` §Photo flow, `frontend.md` §Flows |
 
 ### Still missing
 
-- **WP 16 photo capture and storage**: no upload endpoint, no photo rows, no camera button.
-- **WP 19 camera move flow**: the API does not run the reader, fit or resolver; no
-  `HIVE_READER` or `HIVE_MODEL_VERSION` settings; no proposal, candidate or retake
-  screens; no verification mode for agent moves (checking a photo against the expected
-  move with a diff).
+- **WP 19 remaining**: model download from Garage (`HIVE_MODEL_VERSION`); the model is
+  a local ONNX file (`HIVE_VISION_MODEL`). The classical reader does not exist, so the app
+  uses YOLO. The camera is a file input, not a viewfinder with a framing overlay.
 - **WP 18 classical reader**: not started; there is no baseline to compare YOLO with.
 - **WP 20 evaluation harness**: no `hive vision eval` with tile, board and game metrics on
   labeled real photos, no `sequences.jsonl` export of recorded app games, no
@@ -383,21 +400,14 @@ not yet).
 6. **Classical baseline** (WP 18), if still wanted, to complete the comparison the plan
    asks for.
 
-### Next steps to bring it into the app
+### Next steps in the app
 
-1. **WP 16 photo capture**: upload endpoint with storage in Garage and a `photo` row per
-   ply; camera button in table games.
-2. **Model serving** (WP 24): upload the model to `models/<name>/<version>/`, download and
-   cache it at API startup from `HIVE_MODEL_VERSION`, gate `/readyz` on it; ONNX Runtime
-   only, no torch in the image.
-3. **Resolver in the API** (WP 19): run reader, fit and resolver in a worker thread per
-   photo; keep the previous photo's observed board per game (or recompute it from the
-   stored photo) and the unclear photos of the current ply; store detections and the
-   resolution with the photo.
-4. **UI** (WP 19): proposed move for confirmation (never commit without it), the
-   candidates sheet for ambiguous photos with "take another photo", the reason of a
-   failed photo, manual entry as fallback, and a border warning when the hive is cut off.
-5. **Agent moves at the table**: a verification mode that scores the expected agent move
-   and reports match or mismatch with the differing hexes, as an alternative to **Done**.
-6. **Observability**: metrics for resolution status, photos per move, latency and
-   corrections, so real accuracy can be followed after release.
+Photo capture, the resolver in the API, the camera flow and agent move verification are
+done (see the WP 16, 19 row above). Left:
+
+1. **Model serving**: upload the model to `models/<name>/<version>/` in Garage and
+   download it at startup from `HIVE_MODEL_VERSION` instead of a local file.
+2. **Viewfinder**: a `getUserMedia` camera view with a framing overlay that warns before
+   the photo is taken when the hive is cut off.
+3. **Calibration** on real games recorded in the app (`sequences.jsonl` export, WP 20),
+   using the stored photos, detections and matches.

@@ -51,6 +51,14 @@ class ResolutionStatus(StrEnum):
     FAILED = "failed"
 
 
+class VerificationStatus(StrEnum):
+    """Whether photos show that an expected move was made."""
+
+    MATCHED = "matched"
+    MISMATCHED = "mismatched"
+    UNCLEAR = "unclear"
+
+
 @dataclass(frozen=True, slots=True)
 class ResolverConfig:
     """Settings of the move resolver; likelihoods are natural logarithms.
@@ -129,6 +137,24 @@ class MoveResolution(JsonCodec):
     def best(self) -> MoveCandidate | None:
         """The most likely candidate, if any."""
         return self.candidates[0] if self.candidates else None
+
+
+@dataclass(frozen=True, slots=True)
+class MoveVerification(JsonCodec):
+    """Whether photos show an expected move, such as an agent move made on the table.
+
+    Attributes:
+        status: `matched` when the photos clearly show the expected move, `mismatched`
+            when they clearly show another one, otherwise `unclear`.
+        probability: The posterior of the expected move among the candidates, or 0 if
+            it is not one of them.
+        reason: What the photos show when they do not match, for the person taking
+            them.
+    """
+
+    status: VerificationStatus
+    probability: float
+    reason: str | None = None
 
 
 @dataclass(slots=True)
@@ -306,6 +332,82 @@ class MoveResolver:
             )
 
         return self.decide(state=state, scores=scores)
+
+    def verify(
+        self, state: GameState, expected: Move | None, resolution: MoveResolution
+    ) -> MoveVerification:
+        """Check whether a resolution shows an expected move.
+
+        Moves that give the same board up to rotation and translation are one outcome,
+        so an equivalent placement of the expected move counts as the expected move.
+
+        Args:
+            state: The known position before the move; it is not changed.
+            expected: The move that should have been made, or `None` for a pass.
+            resolution: The resolution of photos taken after it, from `resolve` on the
+                same state.
+
+        Returns:
+            The verification.
+        """
+        expected_key = self.outcome_key(state=state, moves=[expected])
+        probability = next(
+            (
+                candidate.probability
+                for candidate in resolution.candidates
+                if self.outcome_key(state=state, moves=candidate.moves) == expected_key
+            ),
+            0.0,
+        )
+        best = resolution.best
+        wanted = describe_move(expected)
+
+        if resolution.status is ResolutionStatus.RESOLVED and best is not None:
+            if self.outcome_key(state=state, moves=best.moves) == expected_key:
+                return MoveVerification(
+                    status=VerificationStatus.MATCHED, probability=probability
+                )
+
+            shown = " then ".join(describe_move(move) for move in best.moves)
+
+            return MoveVerification(
+                status=VerificationStatus.MISMATCHED,
+                probability=probability,
+                reason=f"The photo shows {shown} instead of {wanted}.",
+            )
+
+        if resolution.status is ResolutionStatus.FAILED:
+            return MoveVerification(
+                status=VerificationStatus.UNCLEAR,
+                probability=probability,
+                reason=resolution.reason,
+            )
+
+        return MoveVerification(
+            status=VerificationStatus.UNCLEAR,
+            probability=probability,
+            reason=(
+                f"The photo does not clearly show {wanted} ({probability:.0%} sure). "
+                "Take another photo with the moved tile in view."
+            ),
+        )
+
+    def outcome_key(self, state: GameState, moves: list[Move | None]) -> object:
+        """Get the board after moves up to rotation and translation.
+
+        Args:
+            state: The known position; it is not changed.
+            moves: The moves, each legal in the position before it.
+
+        Returns:
+            A key that is equal for boards that differ only by a rigid motion.
+        """
+        after = state.copy()
+
+        for move in moves:
+            after.apply_move(move)
+
+        return board_key(after.board)
 
     def decide(self, state: GameState, scores: list[CandidateScore]) -> MoveResolution:
         """Turn candidate scores into a resolution.

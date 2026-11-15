@@ -1,9 +1,11 @@
-"""The FastAPI app factory and the lifespan that opens the database, store and pool."""
+"""The FastAPI app factory and the lifespan that opens the services the app uses."""
 
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from functools import partial
 
+import anyio.to_thread
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 
@@ -14,9 +16,10 @@ from hive.api.frontend import FrontendFiles
 from hive.api.metrics import ApiMetrics, HttpMetricsMiddleware
 from hive.api.observability import REQUEST_ID_HEADER
 from hive.api.pool import AgentPool
-from hive.api.routes import agents, games, health, metrics
+from hive.api.routes import agents, games, health, metrics, photos
 from hive.api.settings import ApiSettings
 from hive.api.storage import ObjectStore
+from hive.api.vision import BoardVision
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +30,13 @@ def create_app(
     database: Database | None = None,
     store: ObjectStore | None = None,
     pool: AgentPool | None = None,
+    vision: BoardVision | None = None,
 ) -> FastAPI:
     """Create the API app.
 
-    The database, object store and worker pool are opened by the lifespan handler, so
-    creating the app connects to nothing and starts no process.
+    The database, object store, worker pool and board reader are opened by the lifespan
+    handler, so creating the app connects to nothing, starts no process and loads no
+    model.
 
     Args:
         settings: The service settings, or `None` to read them from the environment.
@@ -40,6 +45,8 @@ def create_app(
         store: The object store to use instead of the one in the settings, for tests.
         pool: The worker pool to use instead of one sized by the settings, for tests.
             It is not closed on shutdown.
+        vision: The board reader to use instead of the model in the settings, for
+            tests.
 
     Returns:
         The app.
@@ -49,10 +56,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-        """Open the database, object store and worker pool for the lifetime of the app.
+        """Open the database, store, pool and board reader for the lifetime of the app.
 
         Args:
-            app: The app, whose state receives the `database`, `store` and `pool`.
+            app: The app, whose state receives the `database`, `store`, `pool` and
+                `vision`.
 
         Yields:
             Control while the app serves requests; the database is disposed and the
@@ -64,6 +72,13 @@ def create_app(
             capacity=resolved_settings.pool_size, wait_s=resolved_settings.pool_wait_s
         )
         app_metrics.watch_pool(app.state.pool)
+        app.state.vision = vision or await anyio.to_thread.run_sync(
+            partial(
+                BoardVision.load,
+                model_path=resolved_settings.vision_model,
+                score_threshold=resolved_settings.vision_score_threshold,
+            )
+        )
 
         try:
             yield
@@ -90,6 +105,7 @@ def create_app(
     app.include_router(metrics.router)
     app.include_router(agents.router)
     app.include_router(games.router)
+    app.include_router(photos.router)
 
     # The frontend is mounted last, so every route above takes precedence over its files.
     frontend_dir = resolved_settings.frontend_dir

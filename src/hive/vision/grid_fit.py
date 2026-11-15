@@ -415,6 +415,31 @@ class ObservedBoard:
 
         return min(max(0.5 + margin / self.tile_size, 0.0), 1.0)
 
+    def edge_coords(self, margin: float = 0.01) -> list[Coordinate]:
+        """Find the hive tiles that touch the edge of the photo.
+
+        A tile at the edge may be cut off, and the hive may go on outside the frame, so
+        the photo may not show every tile.
+
+        Args:
+            margin: How close to the edge a face counts as touching it, as a share of the
+                longer image side.
+
+        Returns:
+            The hexes of those tiles in the lattice frame of the photo, sorted.
+        """
+        width, height = self.image_size
+        limit = margin * max(width, height)
+        coords = []
+
+        for coord, tile in self.tiles.items():
+            x0, y0, x1, y1 = tile.observation.box
+
+            if min(x0, y0, width - x1, height - y1) <= limit:
+                coords.append(coord)
+
+        return sorted(coords)
+
 
 def face_size(observation: TileObservation) -> float:
     """Get the size of a detected face in pixels.

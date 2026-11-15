@@ -4,12 +4,13 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, File, Form, Query, Response, UploadFile, status
 from fastapi.sse import EventSourceResponse
 
 from hive.api.db.models import GameStatus
 from hive.api.dependencies import (
     GameServiceDependency,
+    PhotoServiceDependency,
     SessionFactoryDependency,
     StoreDependency,
     ThinkingDependency,
@@ -27,7 +28,10 @@ from hive.api.errors import (
     MovePendingError,
     NoMoveToUndoError,
     NoPendingMoveError,
+    NotAtTableError,
     PhotoNotFoundError,
+    PhotoNotReadableError,
+    PhotoTooLargeError,
     PieceNotMovableError,
     PlyConflictError,
     PlyOutOfRangeError,
@@ -46,6 +50,7 @@ from hive.api.schemas import (
     GameUpdate,
     MoveConfirm,
     MoveCreate,
+    PhotoRead,
     PieceTargets,
     ThinkEvent,
 )
@@ -344,8 +349,11 @@ async def undo_move(
 @router.post(
     "/{game_id}/moves/last/confirm",
     description="Confirm that the pending agent move, the last move of a game at the "
-    "table, was made on the physical board, so the game can go on.",
-    responses=error_responses(GameNotFoundError, PlyConflictError, NoPendingMoveError),
+    "table, was made on the physical board, so the game can go on. With `photo_id`, the "
+    "photo that showed the move is linked to it.",
+    responses=error_responses(
+        GameNotFoundError, PlyConflictError, NoPendingMoveError, PhotoNotFoundError
+    ),
 )
 async def confirm_move(
     game_id: uuid.UUID, body: MoveConfirm, games: GameServiceDependency
@@ -354,7 +362,8 @@ async def confirm_move(
 
     Args:
         game_id: The game ID.
-        body: The ply the client expects the game at.
+        body: The ply the client expects the game at, and the photo that showed the
+            move, if any.
         games: The game service.
 
     Returns:
@@ -364,8 +373,61 @@ async def confirm_move(
         GameNotFoundError: If there is no game with the ID.
         PlyConflictError: If the game is not at the expected ply.
         NoPendingMoveError: If the last move is not pending.
+        PhotoNotFoundError: If the photo is not a photo of the game.
     """
     return await games.confirm_move(game_id=game_id, body=body)
+
+
+@router.post(
+    "/{game_id}/photos",
+    status_code=status.HTTP_201_CREATED,
+    description="Take a photo of the physical board of a game at the table. The photo "
+    "is stored and, with a board reader, matched against the game: after a person's "
+    "move it proposes the legal moves it shows, best first, and whether one is clear; "
+    "while an agent move is pending, it checks that the move was made. Unclear photos "
+    "of the same position are combined with the next one. Nothing is played: commit a "
+    "proposed move with `source` `photo` and the `photo_id`, or confirm the pending move "
+    "with the `photo_id`.",
+    responses=error_responses(
+        GameNotFoundError,
+        NotAtTableError,
+        PlyConflictError,
+        GameNotActiveError,
+        PhotoTooLargeError,
+        PhotoNotReadableError,
+    ),
+)
+async def add_photo(
+    game_id: uuid.UUID,
+    photos: PhotoServiceDependency,
+    image: Annotated[UploadFile, File(description="The photo, a JPEG or PNG image.")],
+    expected_ply: Annotated[
+        int, Form(ge=0, description="The `ply_count` of the game the client saw.")
+    ],
+) -> PhotoRead:
+    """Store a photo of a game at the table and match it against the game.
+
+    Args:
+        game_id: The game ID.
+        photos: The photo service.
+        image: The uploaded photo.
+        expected_ply: The `ply_count` of the game the client saw.
+
+    Returns:
+        The stored photo, with what it shows.
+
+    Raises:
+        GameNotFoundError: If there is no game with the ID.
+        NotAtTableError: If the game is played on the screen.
+        PlyConflictError: If the game is not at the expected ply.
+        GameNotActiveError: If the game is over without a pending move to check.
+        PhotoTooLargeError: If the upload is larger than the limit.
+        PhotoNotReadableError: If the upload is not an image.
+    """
+    data = await image.read(photos.settings.photo_max_bytes + 1)
+    photo = await photos.add_photo(game_id=game_id, data=data, expected_ply=expected_ply)
+
+    return PhotoRead.model_validate(photo)
 
 
 @router.post(

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { GamePage, GameSummary } from "@/api/client";
 import { GAMES_PAGE_SIZE, GamesPage } from "@/pages/GamesPage";
 import { mockApi, type RecordedRequest } from "@/test/api";
-import { AGENT_KINDS, AGENT_PRESETS, gameSummary } from "@/test/fixtures";
+import { AGENT_KINDS, AGENT_PRESETS, boardEstimate, gameSummary } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
 
 const GAME = gameSummary();
@@ -34,8 +34,9 @@ const NM2_SPEC = AGENT_PRESETS[0]?.spec;
 const NM3_SPEC = AGENT_PRESETS[1]?.spec;
 
 /** Mock the API of the new game flow; created games echo the request. */
-function mockNewGame(): RecordedRequest[] {
+function mockNewGame(handlers: Parameters<typeof mockApi>[0] = {}): RecordedRequest[] {
   return mockApi({
+    ...handlers,
     "GET /api/games": () => page([]),
     "GET /api/agents": () => ({ body: AGENT_KINDS }),
     "GET /api/agents/presets": () => ({ body: AGENT_PRESETS }),
@@ -330,6 +331,89 @@ describe("GamesPage", () => {
         board_location: "table",
       });
     });
+  });
+
+  it("plays against an agent at the table", async () => {
+    const requests = mockNewGame();
+    const user = userEvent.setup();
+    renderPage(<GamesPage />);
+
+    const dialog = await openNewGame(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: /Play against an agent/ }),
+    );
+    await user.click(within(dialog).getByRole("radio", { name: /At the table/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Start game" }));
+
+    await waitFor(() => {
+      expect(postedGame(requests)).toEqual(
+        expect.objectContaining({ board_location: "table" }),
+      );
+    });
+  });
+
+  it("starts a game at the table from a photo of a board", async () => {
+    const estimate = boardEstimate({ players: ["black"] });
+    const requests = mockNewGame({
+      "POST /api/board-estimates": () => ({ body: estimate }),
+    });
+    const user = userEvent.setup();
+    renderPage(<GamesPage />);
+
+    const dialog = within(await openNewGame(user));
+    await user.click(dialog.getByRole("button", { name: /Play a friend with hints/ }));
+    await user.click(dialog.getByRole("radio", { name: "A photo of a board" }));
+
+    expect(dialog.getByRole("button", { name: "Start game" })).toBeDisabled();
+
+    await user.upload(
+      dialog.getByLabelText("Take a photo of the board"),
+      new File(["jpeg"], "board.jpg", { type: "image/jpeg" }),
+    );
+
+    expect(await dialog.findByText("Read the board from the photo")).toBeInTheDocument();
+    expect(dialog.getByText(/2 tiles, the least clear 95% sure/)).toBeInTheDocument();
+    expect(dialog.getByRole("radio", { name: "Black to move" })).toBeChecked();
+    expect(
+      dialog.queryByRole("radio", { name: "White to move" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(dialog.getByRole("button", { name: "Start game" }));
+
+    await waitFor(() => {
+      expect(postedGame(requests)).toEqual(
+        expect.objectContaining({
+          board_location: "table",
+          setup: { board: estimate.board, current_player: "black" },
+        }),
+      );
+    });
+  });
+
+  it("says why a photo gives no board to start from", async () => {
+    mockNewGame({
+      "POST /api/board-estimates": () => ({
+        body: boardEstimate({
+          status: "failed",
+          players: [],
+          reasons: ["The white beetle at (1, 0) looks like it is on a stack."],
+        }),
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage(<GamesPage />);
+
+    const dialog = within(await openNewGame(user));
+    await user.click(dialog.getByRole("button", { name: /Play a friend with hints/ }));
+    await user.click(dialog.getByRole("radio", { name: "A photo of a board" }));
+    await user.upload(
+      dialog.getByLabelText("Take a photo of the board"),
+      new File(["jpeg"], "board.jpg", { type: "image/jpeg" }),
+    );
+
+    expect(await dialog.findByText(/looks like it is on a stack/)).toBeInTheDocument();
+    expect(dialog.getByText("Could not read a board to start from")).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: "Start game" })).toBeDisabled();
   });
 
   it("watches two agents, one of them set up in advanced", async () => {

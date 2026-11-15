@@ -450,7 +450,8 @@ class GameService:
 
         Args:
             game_id: The game ID.
-            body: The ply the client expects the game at.
+            body: The ply the client expects the game at, and the photo that showed the
+                move, if any.
 
         Returns:
             The latest position, without a pending move.
@@ -459,6 +460,7 @@ class GameService:
             GameNotFoundError: If there is no game with the ID.
             PlyConflictError: If the game is not at the expected ply.
             NoPendingMoveError: If the last move is not pending.
+            PhotoNotFoundError: If the photo is not a photo of the game.
         """
         game = await self.get_game(game_id, lock=True)
 
@@ -469,6 +471,16 @@ class GameService:
 
         if not game.moves or not game.moves[-1].pending:
             raise NoPendingMoveError(game_id)
+
+        # The photo that showed the move becomes the reference for the next photo.
+        if body.photo_id is not None:
+            photo = await self.session.get(PhotoRow, body.photo_id)
+
+            if photo is None or photo.game_id != game.id:
+                raise PhotoNotFoundError(body.photo_id)
+
+            photo.confirmed = True
+            game.moves[-1].photo_id = photo.id
 
         game.moves[-1].pending = False
         game.updated_at = utc_now()

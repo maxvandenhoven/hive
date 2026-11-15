@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { Move } from "@/api/client";
+import type { BoardView } from "@/components/board/types";
 import {
+  boardAfterMove,
   boardBeforeMove,
   describeMove,
   describeMoveOnBoard,
@@ -179,5 +181,38 @@ describe("describeMoveOnBoard", () => {
     expect(boardBeforeMove(after, { piece: "ant", from: null, to: [1, 1] })).toHaveLength(
       3,
     );
+  });
+});
+
+describe("boardAfterMove", () => {
+  const board: BoardView = [
+    { coord: [0, 0], pieces: [{ piece: "queen", owner: "white" }] },
+    { coord: [1, 0], pieces: [{ piece: "beetle", owner: "black" }] },
+  ];
+
+  it("places a piece of the side to move", () => {
+    expect(
+      boardAfterMove(board, { piece: "ant", from: null, to: [-1, 0] }, "white"),
+    ).toEqual([...board, { coord: [-1, 0], pieces: [{ piece: "ant", owner: "white" }] }]);
+  });
+
+  it("moves the top piece onto its target, and back again", () => {
+    const climb: Move = { piece: "beetle", from: [1, 0], to: [0, 0] };
+    const after = boardAfterMove(board, climb, "black");
+
+    expect(after).toEqual([
+      {
+        coord: [0, 0],
+        pieces: [
+          { piece: "beetle", owner: "black" },
+          { piece: "queen", owner: "white" },
+        ],
+      },
+    ]);
+    expect(boardBeforeMove(after, climb)).toEqual([board[0], board[1]]);
+  });
+
+  it("leaves the board for a pass", () => {
+    expect(boardAfterMove(board, null, "white")).toBe(board);
   });
 });
