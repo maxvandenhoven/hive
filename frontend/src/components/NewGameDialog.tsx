@@ -3,8 +3,10 @@ import { useId, useState, type ReactNode, type SubmitEvent } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import type { BoardEstimate } from "@/api/client";
 import { useAgentKinds, useAgentPresets, useCreateGame } from "@/api/queries";
 import { AgentChoiceField } from "@/components/AgentChoiceField";
+import { BoardFromPhoto } from "@/components/BoardFromPhoto";
 import { ChoiceCards } from "@/components/ChoiceCards";
 import { GAME_SCENARIO_ICONS } from "@/components/scenarioIcons";
 import { Button } from "@/components/ui/button";
@@ -40,7 +42,13 @@ import {
   type NewGameChoices,
   type WatchGameChoices,
 } from "@/lib/newGame";
-import { GAME_SCENARIO_INFO, GAME_SCENARIOS, type GameScenario } from "@/lib/players";
+import { photoSetup } from "@/lib/photos";
+import {
+  GAME_SCENARIO_INFO,
+  GAME_SCENARIOS,
+  type GameScenario,
+  type PlayerSide,
+} from "@/lib/players";
 
 interface ScenarioCardsProps {
   value: GameScenario | null;
@@ -108,6 +116,26 @@ function AgentGameSetup({
         ]}
         onChange={(colour) => {
           onChange({ ...value, colour });
+        }}
+      />
+      <ChoiceCards
+        legend="Board"
+        layout="row"
+        value={value.location}
+        options={[
+          {
+            value: "screen",
+            title: "On this screen",
+            description: "Tap the moves; the agent moves at once.",
+          },
+          {
+            value: "table",
+            title: "At the table",
+            description: "Play on a physical board and enter moves with photos.",
+          },
+        ]}
+        onChange={(location) => {
+          onChange({ ...value, location });
         }}
       />
       <AgentChoiceField
@@ -231,6 +259,9 @@ function WatchGameSetup({
 
 type NewGameStep = "scenario" | "setup";
 
+/** Where a game at the table starts: the empty board, or a board read from a photo. */
+type StartingPosition = "start" | "photo";
+
 interface NewGameFlowProps {
   agents: NewGameAgents;
   initialChoices: NewGameChoices;
@@ -255,19 +286,27 @@ export function NewGameFlow({
   const [step, setStep] = useState<NewGameStep>(remembered ? "setup" : "scenario");
   const [choices, setChoices] = useState(initialChoices);
   const [name, setName] = useState("");
+  const [start, setStart] = useState<StartingPosition>("start");
+  const [estimate, setEstimate] = useState<BoardEstimate | null>(null);
+  const [nextPlayer, setNextPlayer] = useState<PlayerSide>("white");
   const createGame = useCreateGame();
   const info = GAME_SCENARIO_INFO[choices.scenario];
   const placeholder = defaultGameName(choices, agents);
+  const atTable =
+    choices.scenario === "hints" ||
+    (choices.scenario === "agent" && choices.agentGame.location === "table");
+  const fromPhoto = atTable && start === "photo";
+  const setup = fromPhoto ? photoSetup(estimate, nextPlayer) : null;
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const request = buildNewGameRequest({ choices, agents, name, random: Math.random });
 
-    if (request === null) {
+    if (request === null || (fromPhoto && setup === null)) {
       return;
     }
 
-    createGame.mutate(request, {
+    createGame.mutate(setup === null ? request : { ...request, setup }, {
       onSuccess: (game) => {
         writeNewGameChoices(choices);
         toast.success(`Created ${game.name}.`);
@@ -276,11 +315,11 @@ export function NewGameFlow({
     });
   };
 
-  let setup: ReactNode;
+  let scenarioSetup: ReactNode;
 
   switch (choices.scenario) {
     case "agent":
-      setup = (
+      scenarioSetup = (
         <AgentGameSetup
           value={choices.agentGame}
           agents={agents}
@@ -291,7 +330,7 @@ export function NewGameFlow({
       );
       break;
     case "hints":
-      setup = (
+      scenarioSetup = (
         <HintsGameSetup
           value={choices.hintsGame}
           agents={agents}
@@ -302,7 +341,7 @@ export function NewGameFlow({
       );
       break;
     case "watch":
-      setup = (
+      scenarioSetup = (
         <WatchGameSetup
           value={choices.watchGame}
           agents={agents}
@@ -355,7 +394,29 @@ export function NewGameFlow({
       </DialogHeader>
       <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
-          {setup}
+          {scenarioSetup}
+          {atTable && (
+            <>
+              <ChoiceCards
+                legend="Start from"
+                layout="row"
+                value={start}
+                options={[
+                  { value: "start", title: "An empty board" },
+                  { value: "photo", title: "A photo of a board" },
+                ]}
+                onChange={setStart}
+              />
+              {start === "photo" && (
+                <BoardFromPhoto
+                  estimate={estimate}
+                  nextPlayer={nextPlayer}
+                  onEstimate={setEstimate}
+                  onNextPlayer={setNextPlayer}
+                />
+              )}
+            </>
+          )}
           <Field>
             <FieldLabel htmlFor={nameId}>Name (optional)</FieldLabel>
             <Input
@@ -373,7 +434,11 @@ export function NewGameFlow({
           <Button
             type="submit"
             className="w-full sm:w-auto"
-            disabled={placeholder === null || createGame.isPending}
+            disabled={
+              placeholder === null ||
+              createGame.isPending ||
+              (fromPhoto && setup === null)
+            }
           >
             Start game
           </Button>

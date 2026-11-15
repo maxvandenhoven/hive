@@ -9,6 +9,7 @@ import type {
   AgentPlayer,
   AgentPreset,
   AgentRegistration,
+  BoardLocation,
   GameCreate,
   HumanPlayer,
   PlayerConfig,
@@ -49,6 +50,11 @@ export interface AgentGameChoices {
   opponent: AgentChoice;
   hints: boolean;
   hint: AgentChoice;
+  /**
+   * Where the game is played: on this `screen`, or at the `table` on a physical board,
+   * where the person makes the agent's moves and photos can enter moves.
+   */
+  location: BoardLocation;
 }
 
 /** A game against a friend at the table, where only the person using the app gets hints. */
@@ -113,6 +119,7 @@ export function defaultNewGameChoices(agents: NewGameAgents): NewGameChoices | n
       opponent: strongest,
       hints: false,
       hint: strongest,
+      location: "screen",
     },
     hintsGame: { colour: "white", opponentName: "", hint: strongest },
     watchGame: { white: strongest, black: weakest },
@@ -222,7 +229,7 @@ export function buildNewGameRequest({
         side === "white"
           ? { white: person, black: opponent }
           : { white: opponent, black: person };
-      location = "screen";
+      location = choices.agentGame.location;
       defaultName = `You vs ${agentName(opponent.spec)}`;
       break;
     }
@@ -360,6 +367,11 @@ export function readNewGameChoices(
       hints:
         typeof agentGame.hints === "boolean" ? agentGame.hints : defaults.agentGame.hints,
       hint: readAgentChoice(agentGame.hint, defaults.agentGame.hint, agents),
+      location: readOption<BoardLocation>(
+        agentGame.location,
+        ["screen", "table"],
+        defaults.agentGame.location,
+      ),
     },
     hintsGame: {
       colour: readOption<ColourChoice>(

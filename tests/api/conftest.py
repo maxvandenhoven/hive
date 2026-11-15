@@ -20,6 +20,7 @@ from hive.api.dependencies import get_session_factory
 from hive.api.pool import AgentPool
 from hive.api.settings import ApiSettings, DatabaseSettings
 from hive.api.storage import S3_CLIENT_CONFIG, ObjectStore
+from hive.api.vision import BoardVision
 
 POSTGRES_IMAGE = "postgres:17-alpine"
 
@@ -148,6 +149,12 @@ async def pool() -> AsyncGenerator[AgentPool]:
     await pool.close()
 
 
+@pytest.fixture(scope="function")
+def vision() -> BoardVision:
+    """Build an app vision without a reader; photo tests override it with a fake one."""
+    return BoardVision(reader=None)
+
+
 @asynccontextmanager
 async def serve(app: FastAPI) -> AsyncGenerator[httpx2.AsyncClient]:
     """Run the lifespan of an app and yield a client that calls it in-process."""
@@ -167,12 +174,15 @@ def app(
     connection: AsyncConnection,
     store: ObjectStore,
     pool: AgentPool,
+    vision: BoardVision,
 ) -> FastAPI:
-    """Build an app on the test database and the test pool.
+    """Build an app on the test database, the test pool and the test vision.
 
     Every session a request opens is joined to the transaction of the test.
     """
-    app = create_app(settings=settings, database=database, store=store, pool=pool)
+    app = create_app(
+        settings=settings, database=database, store=store, pool=pool, vision=vision
+    )
 
     async def get_test_session_factory() -> Callable[[], AsyncSession]:
         """Open the sessions of a request in the transaction of the test."""

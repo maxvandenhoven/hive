@@ -9,7 +9,9 @@ export type AgentPreset = Schemas["AgentPreset"];
 export type AgentRegistration = Schemas["AgentRegistration"];
 export type AgentSpec = Schemas["AgentSpec"];
 export type BoardCell = Schemas["BoardCell"];
+export type BoardEstimate = Schemas["BoardEstimate"];
 export type BoardLocation = Schemas["BoardLocation"];
+export type BoardSetup = Schemas["BoardSetup"];
 export type DecisionRecord = Schemas["DecisionRecord"];
 export type Coordinate = Schemas["Coordinate"];
 export type GameCreate = Schemas["GameCreate"];
@@ -23,7 +25,10 @@ export type GameUpdate = Schemas["GameUpdate"];
 export type HintAgent = Schemas["HintAgent"];
 export type HumanPlayer = Schemas["HumanPlayer"];
 export type MovablePiece = Schemas["MovablePiece"];
+export type PhotoMatch = Schemas["PhotoMatch"];
+export type PhotoRead = Schemas["PhotoRead"];
 export type Move = Schemas["Move"];
+export type MoveCandidate = Schemas["MoveCandidate"];
 export type MoveCreate = Schemas["MoveCreate"];
 export type MoveRead = Schemas["MoveRead"];
 export type MoveSource = Schemas["MoveSource"];
@@ -69,6 +74,11 @@ function describeErrorBody(status: number, body: unknown): string {
   }
 
   return `The request failed with status ${status}.`;
+}
+
+/** The URL of the stored image of a photo, which browsers may cache. */
+export function photoImageUrl(photoId: string): string {
+  return `/api/photos/${photoId}/image`;
 }
 
 /** The typed client of the API, on the origin that serves the app. */

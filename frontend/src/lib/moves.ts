@@ -109,6 +109,42 @@ export function boardBeforeMove(board: BoardView, move: Move | null): BoardView 
 }
 
 /**
+ * The board after a move, from the board before it: the moved piece goes on top of its
+ * target. A placement puts a piece of `side`, the side to move, on the board.
+ */
+export function boardAfterMove(
+  board: BoardView,
+  move: Move | null,
+  side: PlayerSide,
+): BoardView {
+  if (move === null) {
+    return board;
+  }
+
+  const from = move.from;
+  let piece: Piece = { piece: move.piece, owner: side };
+  let after = board;
+
+  if (from !== null) {
+    const source = board.find((stack) => sameHex(stack.coord, from));
+    piece = source?.pieces[0] ?? piece;
+    after = board
+      .map((stack) =>
+        stack === source ? { ...stack, pieces: stack.pieces.slice(1) } : stack,
+      )
+      .filter((stack) => stack.pieces.length > 0);
+  }
+
+  const target = after.find((stack) => sameHex(stack.coord, move.to));
+
+  return target === undefined
+    ? [...after, { coord: move.to, pieces: [piece] }]
+    : after.map((stack) =>
+        stack === target ? { ...stack, pieces: [piece, ...stack.pieces] } : stack,
+      );
+}
+
+/**
  * Describe a move by the pieces it touches rather than by coordinates, so it can be made
  * on a physical board from any side: `place ant next to the white queen`, `ant moves
  * next to the white queen and the black beetle`, `beetle climbs onto the black queen`,

@@ -4,12 +4,15 @@ import { useCallback } from "react";
 import {
   api,
   unwrap,
+  type BoardEstimate,
   type Coordinate,
   type GameCreate,
   type GameDetail,
   type GamePosition,
   type GameUpdate,
+  type Move,
   type MoveCreate,
+  type PhotoRead,
   type PieceTargets,
 } from "@/api/client";
 
@@ -221,6 +224,13 @@ export function usePlayMove(gameId: string) {
   });
 }
 
+interface ConfirmRequest {
+  /** The ply the game must be at, which is the `ply_count` of the position shown. */
+  expectedPly: number;
+  /** The photo that showed the move was made, or `null` when a person confirms it. */
+  photoId?: string | null;
+}
+
 /**
  * Confirm that the pending agent move, the last move at `expectedPly`, was made on the
  * physical board, returning the new position.
@@ -230,15 +240,143 @@ export function useConfirmMove(gameId: string) {
   const refreshGame = useRefreshGame(gameId);
 
   return useMutation({
-    mutationFn: async (expectedPly: number) =>
+    mutationFn: async ({ expectedPly, photoId = null }: ConfirmRequest) =>
       unwrap(
         await api.POST("/api/games/{game_id}/moves/last/confirm", {
           params: { path: { game_id: gameId } },
-          body: { expected_ply: expectedPly },
+          body:
+            photoId === null
+              ? { expected_ply: expectedPly }
+              : { expected_ply: expectedPly, photo_id: photoId },
         }),
       ) as GamePosition,
     onSuccess: storeLatestPosition,
     onError: refreshGame,
+  });
+}
+
+/** A form with an image file and any other fields, sent as a multipart body. */
+function photoForm(image: Blob, fields: Record<string, string> = {}): FormData {
+  const form = new FormData();
+  form.append("image", image, image instanceof File ? image.name : "photo.jpg");
+
+  for (const [name, value] of Object.entries(fields)) {
+    form.append(name, value);
+  }
+
+  return form;
+}
+
+interface PhotoUpload {
+  image: Blob;
+  /** The ply the game must be at, which is the `ply_count` of the position shown. */
+  expectedPly: number;
+}
+
+/**
+ * Take a photo of the physical board of a game at the table: the API stores it and
+ * says what it shows, without changing the game.
+ */
+export function useAddPhoto(gameId: string) {
+  const refreshGame = useRefreshGame(gameId);
+
+  return useMutation({
+    mutationFn: async ({ image, expectedPly }: PhotoUpload) => {
+      const form = photoForm(image, { expected_ply: String(expectedPly) });
+
+      return unwrap(
+        await api.POST("/api/games/{game_id}/photos", {
+          params: { path: { game_id: gameId } },
+          // The form takes the place of the typed body; the browser sets its boundary.
+          body: { image: "", expected_ply: expectedPly },
+          bodySerializer: () => form,
+        }),
+      ) as PhotoRead;
+    },
+    onError: refreshGame,
+  });
+}
+
+interface PhotoMovesRequest {
+  /** The moves the photo shows, played one after another. */
+  moves: (Move | null)[];
+  /** The ply the game must be at, which is the `ply_count` of the position shown. */
+  expectedPly: number;
+  photoId: string;
+  /**
+   * Whether the photo shows another move than the pending agent move, which is undone
+   * first, so the moves made at the table take its place.
+   */
+  replacePending?: boolean;
+}
+
+/**
+ * Play the moves a photo showed, with the photo linked to them, returning the position
+ * after the last one. A second move (a photo that was skipped) may be for either side.
+ */
+export function usePlayPhotoMoves(gameId: string) {
+  const storeLatestPosition = useStoreLatestPosition(gameId);
+  const refreshGame = useRefreshGame(gameId);
+
+  return useMutation({
+    mutationFn: async ({
+      moves,
+      expectedPly,
+      photoId,
+      replacePending = false,
+    }: PhotoMovesRequest) => {
+      let ply = expectedPly;
+      let position: GamePosition | null = null;
+
+      if (replacePending) {
+        unwrap(
+          await api.DELETE("/api/games/{game_id}/moves/last", {
+            params: { path: { game_id: gameId }, query: { expected_ply: ply } },
+          }),
+        );
+        ply -= 1;
+      }
+
+      for (const [index, move] of moves.entries()) {
+        position = unwrap(
+          await api.POST("/api/games/{game_id}/moves", {
+            params: { path: { game_id: gameId } },
+            body: {
+              move,
+              source: "photo",
+              photo_id: photoId,
+              expected_ply: ply + index,
+              allow_agent_side: replacePending || index > 0,
+            },
+          }),
+        ) as GamePosition;
+      }
+
+      if (position === null) {
+        throw new Error("The photo shows no move.");
+      }
+
+      return position;
+    },
+    onSuccess: storeLatestPosition,
+    onError: refreshGame,
+  });
+}
+
+/** Read a whole board from one photo, to start a game from it; nothing is stored. */
+export function useEstimateBoard() {
+  return useMutation({
+    mutationFn: async (image: Blob) => {
+      const form = photoForm(image);
+
+      return unwrap(
+        await api.POST("/api/board-estimates", {
+          // The form takes the place of the typed body; the browser sets its boundary.
+          body: { image: "" },
+          bodySerializer: () => form,
+        }),
+      ) as BoardEstimate;
+    },
   });
 }
 

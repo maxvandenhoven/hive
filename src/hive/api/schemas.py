@@ -16,6 +16,7 @@ from hive.agents.factory import AgentSpec
 from hive.api.db.models import GameResult, GameRow, GameStatus, MoveSource
 from hive.api.errors import ApiErrorCode
 from hive.api.players import AgentPlayer, BoardLocation, PlayerConfig, PlayerType
+from hive.api.vision import PhotoMatch
 from hive.engine.errors import InvalidBoardError
 from hive.engine.grid import Coordinate
 from hive.engine.record import BoardSetup
@@ -184,11 +185,48 @@ class MoveConfirm(BaseModel):
     Attributes:
         expected_ply: The `ply_count` of the game the client saw, so the pending move is
             its last move. If a move was undone meanwhile, the confirmation is rejected.
+        photo_id: The photo that shows the move was made, which is linked to the move
+            and marked confirmed, or `None` when a person confirms it.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     expected_ply: int = Field(ge=0)
+    photo_id: uuid.UUID | None = None
+
+
+class PhotoRead(BaseModel):
+    """A photo taken in a game at the table, with what it shows.
+
+    Attributes:
+        id: The photo ID; the image is at `/api/photos/{id}/image`.
+        game_id: The ID of the game.
+        ply: The ply of the move whose result the photo shows: the next move for a
+            photo of a person's move, the pending move for a photo that checks an agent
+            move.
+        width: The width of the stored image in pixels.
+        height: The height of the stored image in pixels.
+        reader: The board reader that read the photo, or `None` if the service has no
+            reader.
+        model_version: The model of the reader, or `None`.
+        confirmed: Whether a move was committed from the photo, or the pending move it
+            showed confirmed.
+        created_at: When the photo was taken.
+        match: What the photo shows about the game, or `None` if it was not read.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    game_id: uuid.UUID
+    ply: int
+    width: int
+    height: int
+    reader: str | None
+    model_version: str | None
+    confirmed: bool
+    created_at: datetime
+    match: PhotoMatch | None
 
 
 class MovablePiece(BaseModel):
@@ -484,7 +522,8 @@ class ReadinessReport(BaseModel):
 
     Attributes:
         status: `ready` if every check passed.
-        checks: The result of each check by name: `database` and `storage`.
+        checks: The result of each check by name: `database` and `storage`, and
+            `vision` when a reader model is configured.
     """
 
     status: Literal["ready", "not ready"]

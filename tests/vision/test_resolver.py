@@ -8,8 +8,10 @@ from hive.engine.state import GameState, Move, PieceType
 from hive.vision.classes import TileClass
 from hive.vision.grid_fit import ObservedBoard
 from hive.vision.resolver import (
+    MoveResolution,
     MoveResolver,
     ResolutionStatus,
+    VerificationStatus,
     board_key,
     changed_hexes,
     describe_move,
@@ -109,6 +111,69 @@ def test_symmetric_second_placement_is_one_outcome() -> None:
     assert resolution.status is ResolutionStatus.RESOLVED
     assert resolution.best is not None
     assert board_key(after(state, *resolution.best.moves).board) == board_key(truth.board)
+
+
+class TestVerify:
+    def test_an_equivalent_placement_matches(self) -> None:
+        rules = Rules()
+        state = after(
+            rules.create_initial_state(),
+            Move(piece_type=PieceType.SPIDER, source_coord=None, target_coord=(0, 0)),
+        )
+        expected = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(1, 0))
+        # The ant was placed on another side of the spider, which is the same board.
+        truth = after(
+            state, Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 1))
+        )
+        resolver = MoveResolver(rules)
+        resolution = resolver.resolve(
+            state=state, photos=[photo(truth, random.Random(2))]
+        )
+        verification = resolver.verify(
+            state=state, expected=expected, resolution=resolution
+        )
+
+        assert verification.status is VerificationStatus.MATCHED
+        assert verification.probability > 0.95
+        assert verification.reason is None
+
+    def test_another_move_is_a_mismatch(self) -> None:
+        rules = Rules()
+        rng = random.Random(5)
+        state = play(rules=rules, rng=rng, plies=6)
+        moves = rules.legal_moves(state)
+        truth = after(state, moves[0])
+        expected = next(
+            move
+            for move in moves
+            if board_key(after(state, move).board) != board_key(truth.board)
+        )
+        resolver = MoveResolver(rules)
+        resolution = resolver.resolve(state=state, photos=[photo(truth, rng)])
+        verification = resolver.verify(
+            state=state, expected=expected, resolution=resolution
+        )
+
+        assert resolution.status is ResolutionStatus.RESOLVED
+        assert verification.status is VerificationStatus.MISMATCHED
+        assert verification.reason is not None
+        assert describe_move(expected) in verification.reason
+
+    @pytest.mark.parametrize(
+        "status", [ResolutionStatus.AMBIGUOUS, ResolutionStatus.FAILED]
+    )
+    def test_an_unclear_photo_is_unclear(self, status: ResolutionStatus) -> None:
+        rules = Rules()
+        state = rules.create_initial_state()
+        expected = Move(piece_type=PieceType.ANT, source_coord=None, target_coord=(0, 0))
+        resolution = MoveResolution(status=status, candidates=[], reason="Unclear.")
+        verification = MoveResolver(rules).verify(
+            state=state, expected=expected, resolution=resolution
+        )
+
+        assert verification.status is VerificationStatus.UNCLEAR
+        assert verification.probability == 0.0
+        assert verification.reason is not None
 
 
 def test_unclear_new_tile_asks_for_another_photo() -> None:

@@ -14,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hive.api.db.session import Database
 from hive.api.games import GameService
 from hive.api.metrics import ApiMetrics
+from hive.api.photos import PhotoService
 from hive.api.pool import AgentPool
 from hive.api.schemas import ThinkRequest
 from hive.api.settings import ApiSettings
 from hive.api.storage import ObjectStore
 from hive.api.thinking import AgentThinking, ThinkingPlan
+from hive.api.vision import BoardVision
 
 
 async def get_database(request: Request) -> Database:
@@ -67,6 +69,18 @@ async def get_pool(request: Request) -> AgentPool:
         The pool the lifespan handler created.
     """
     return request.app.state.pool
+
+
+async def get_vision(request: Request) -> BoardVision:
+    """Get the board reader of the app.
+
+    Args:
+        request: The request being handled.
+
+    Returns:
+        The board reader the lifespan handler loaded.
+    """
+    return request.app.state.vision
 
 
 async def get_metrics(request: Request) -> ApiMetrics:
@@ -132,6 +146,9 @@ type MetricsDependency = Annotated[ApiMetrics, Depends(get_metrics)]
 type StoreDependency = Annotated[ObjectStore, Depends(get_store)]
 """The object store of the app, as a route handler parameter."""
 
+type VisionDependency = Annotated[BoardVision, Depends(get_vision)]
+"""The board reader of the app, as a route handler parameter."""
+
 type SessionDependency = Annotated[AsyncSession, Depends(get_session, scope="function")]
 """A database session, as a route handler parameter.
 
@@ -156,6 +173,34 @@ async def get_game_service(
 
 type GameServiceDependency = Annotated[GameService, Depends(get_game_service)]
 """The game service, as a route handler parameter."""
+
+
+async def get_photo_service(
+    session: SessionDependency,
+    store: StoreDependency,
+    vision: VisionDependency,
+    settings: SettingsDependency,
+    metrics: MetricsDependency,
+) -> PhotoService:
+    """Create the photo service of a route handler.
+
+    Args:
+        session: The database session of the handler.
+        store: The object store of the app.
+        vision: The board reader of the app.
+        settings: The settings of the app, with the upload limits.
+        metrics: The metrics of the app.
+
+    Returns:
+        The service.
+    """
+    return PhotoService(
+        session=session, store=store, vision=vision, settings=settings, metrics=metrics
+    )
+
+
+type PhotoServiceDependency = Annotated[PhotoService, Depends(get_photo_service)]
+"""The photo service, as a route handler parameter."""
 
 
 async def start_thinking(

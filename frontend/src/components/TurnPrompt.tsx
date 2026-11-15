@@ -7,6 +7,8 @@ import {
   Undo2Icon,
 } from "lucide-react";
 
+import type { ReactNode } from "react";
+
 import type { GamePosition } from "@/api/client";
 import type { BoardView } from "@/components/board/types";
 import { HintButton, HintStatus } from "@/components/HintButton";
@@ -28,6 +30,11 @@ interface TurnPromptProps {
   hint: Hint;
   /** Whether a move, undo or confirmation is being sent. */
   busy: boolean;
+  /**
+   * The camera button in a game at the table, for a person's move or the pending agent
+   * move, or `null`.
+   */
+  camera?: ReactNode;
   onPass: () => void;
   onUndo: () => void;
   /** Return from a replayed position to the live one. */
@@ -37,8 +44,8 @@ interface TurnPromptProps {
 /**
  * The strip above the board that says what to do now in one sentence, with only the
  * actions that fit: **Done** for an agent move to make on the table, **Hint** and
- * **Pass** on a person's turn, the match controls when watching, **Undo** and **New
- * game** once the game is over.
+ * **Pass** on a person's turn, **Photo** for either at the table, the match controls
+ * when watching, **Undo** and **New game** once the game is over.
  */
 export function TurnPrompt({
   prompt,
@@ -47,6 +54,7 @@ export function TurnPrompt({
   turns,
   hint,
   busy,
+  camera = null,
   onPass,
   onUndo,
   onLive,
@@ -85,6 +93,7 @@ export function TurnPrompt({
               Done
             </Button>
           )}
+          {(kind === "pending" || kind === "turn") && camera}
           {kind === "turn" && position.must_pass && (
             <Button disabled={busy} onClick={onPass}>
               <SkipForwardIcon />

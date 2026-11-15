@@ -258,11 +258,14 @@ export function useAgentTurns({ game, position, idle }: AgentTurnsOptions): Agen
     },
     done: () => {
       if (position.pending_move) {
-        confirmMove.mutate(ply, {
-          onError: (error) => {
-            toast.error(error.message);
+        confirmMove.mutate(
+          { expectedPly: ply },
+          {
+            onError: (error) => {
+              toast.error(error.message);
+            },
           },
-        });
+        );
       }
     },
     retry: () => {

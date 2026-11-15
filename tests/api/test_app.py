@@ -10,9 +10,11 @@ def test_operation_ids_are_handler_names(settings: ApiSettings) -> None:
     ]
 
     assert sorted(operation_ids) == [
+        "add_photo",
         "confirm_move",
         "create_game",
         "delete_game",
+        "estimate_board",
         "export_game",
         "list_agent_kinds",
         "list_agent_presets",
@@ -22,6 +24,7 @@ def test_operation_ids_are_handler_names(settings: ApiSettings) -> None:
         "read_game_state",
         "read_liveness",
         "read_metrics",
+        "read_photo_image",
         "read_piece_targets",
         "read_readiness",
         "think",

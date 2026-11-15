@@ -62,6 +62,13 @@ class ApiSettings(DatabaseSettings):
         frontend_dir: The built frontend, served at `/` with a fallback to `index.html`
             for client-side routes. Relative paths start at the working directory. If it
             is `None` or does not exist, only the API is served.
+        vision_model: The ONNX model of the YOLO board reader, with its `model.json`
+            beside it for the name and version. Relative paths start at the working
+            directory. If it is `None`, photos are stored but not read.
+        vision_score_threshold: The lowest class score that counts as a detected tile.
+        photo_max_bytes: The largest photo upload in bytes.
+        photo_max_side: The longest side in pixels a photo is stored and read at;
+            larger photos are scaled down.
     """
 
     s3_endpoint_url: str
@@ -74,3 +81,7 @@ class ApiSettings(DatabaseSettings):
     pool_wait_s: float = Field(default=10.0, ge=0.0)
     max_budget_s: float = Field(default=30.0, gt=0.0)
     frontend_dir: Path | None = Path("frontend/dist")
+    vision_model: Path | None = None
+    vision_score_threshold: float = Field(default=0.25, gt=0.0, lt=1.0)
+    photo_max_bytes: int = Field(default=25_000_000, gt=0)
+    photo_max_side: int = Field(default=2560, ge=640)

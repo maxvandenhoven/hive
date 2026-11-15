@@ -1,10 +1,14 @@
 import type {
   AgentPreset,
   AgentRegistration,
+  BoardEstimate,
   GameDetail,
   GamePosition,
   GameSummary,
+  Move,
   MoveRead,
+  PhotoMatch,
+  PhotoRead,
   Rules,
 } from "@/api/client";
 
@@ -153,6 +157,78 @@ export function gamePosition(overrides: Partial<GamePosition> = {}): GamePositio
     placeable_piece_types: ["beetle", "grasshopper", "spider", "ant"],
     must_pass: false,
     pending_move: false,
+    ...overrides,
+  };
+}
+
+/** A candidate move of a photo with its probability. */
+export function photoCandidate(moves: (Move | null)[], probability: number) {
+  return { moves, probability, log_likelihood: Math.log(probability), conflicts: 0 };
+}
+
+/** What a photo of a person's move showed: one clear move unless overridden. */
+export function photoMatch(overrides: Partial<PhotoMatch> = {}): PhotoMatch {
+  return {
+    purpose: "move",
+    resolution: {
+      status: "resolved",
+      candidates: [photoCandidate([{ piece: "ant", from: null, to: [-1, 0] }], 0.98)],
+      reason: null,
+    },
+    verification: null,
+    photo_ids: ["0c4a3b5e-0000-4000-8000-0000000000f1"],
+    previous_photo_id: null,
+    tile_count: 3,
+    edge: false,
+    ...overrides,
+  };
+}
+
+/** A read photo of the game of `gameDetail()` for ply 2. */
+export function photoRead(overrides: Partial<PhotoRead> = {}): PhotoRead {
+  return {
+    id: "0c4a3b5e-0000-4000-8000-0000000000f1",
+    game_id: "0c4a3b5e-0000-4000-8000-000000000001",
+    ply: 2,
+    width: 1024,
+    height: 768,
+    reader: "yolo",
+    model_version: "hive-yolo-seg/v001",
+    confirmed: false,
+    created_at: "2026-10-26T20:03:00Z",
+    match: photoMatch(),
+    ...overrides,
+  };
+}
+
+/** A board read from one photo: both queens, clearly. */
+export function boardEstimate(overrides: Partial<BoardEstimate> = {}): BoardEstimate {
+  return {
+    status: "confident",
+    tiles: [
+      {
+        coord: [0, 0],
+        piece: { piece: "queen", owner: "white" },
+        probability: 0.97,
+        raised: false,
+        origin: [2, 1],
+      },
+      {
+        coord: [1, 0],
+        piece: { piece: "queen", owner: "black" },
+        probability: 0.95,
+        raised: false,
+        origin: [3, 1],
+      },
+    ],
+    board: [
+      { coord: [0, 0], stack: [{ piece: "queen", owner: "white" }] },
+      { coord: [1, 0], stack: [{ piece: "queen", owner: "black" }] },
+    ],
+    lowest_probability: 0.95,
+    players: ["white", "black"],
+    ignored: 0,
+    reasons: [],
     ...overrides,
   };
 }

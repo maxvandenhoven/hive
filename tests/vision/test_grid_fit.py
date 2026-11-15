@@ -186,3 +186,29 @@ def test_visibility_drops_outside_the_frame() -> None:
 def test_fit_needs_detections() -> None:
     with pytest.raises(BoardFitError, match="No tiles"):
         ObservedBoard.fit(observations=[], image_size=IMAGE_SIZE)
+
+
+@pytest.mark.parametrize(("target", "edge"), [((0.0, 0.0), False), ((4.0, 0.0), True)])
+def test_edge_coords_find_tiles_at_the_edge(
+    target: tuple[float, float], edge: bool
+) -> None:
+    board = {
+        (q, 0): [Piece(type=PieceType.ANT, owner=Player.WHITE)] for q in range(-1, 3)
+    }
+    camera = SimulatedCamera(
+        tilt_deg=30,
+        azimuth_deg=40,
+        roll_deg=2,
+        distance=6,
+        focal=900,
+        image_size=IMAGE_SIZE,
+        target=target,
+    )
+    observations = simulate_observations(
+        board=board, camera=camera, detector=SimulatedDetector(), rng=random.Random(0)
+    )
+    observed = ObservedBoard.fit(observations=observations, image_size=IMAGE_SIZE)
+    coords = observed.edge_coords()
+
+    assert bool(coords) is edge
+    assert set(coords) <= set(observed.tiles)

@@ -1,7 +1,8 @@
 """Object storage for photos, datasets and models in an S3 bucket.
 
 boto3 blocks, so every request runs in a worker thread and never stalls the event loop.
-Only what the app uses is wrapped; uploads and downloads arrive with photos (WP 16).
+Only what the app uses is wrapped: storing and loading photos, deleting a game's photos
+and the readiness check.
 """
 
 from functools import partial
@@ -81,6 +82,32 @@ class ObjectStore:
         return await anyio.to_thread.run_sync(
             partial(method, Bucket=self.bucket, **params)
         )
+
+    async def put(self, key: str, data: bytes, content_type: str) -> None:
+        """Store an object, replacing any object with the same key.
+
+        Args:
+            key: The object key, for example `photos/<game_id>/<photo_id>.jpg`.
+            data: The content.
+            content_type: The media type the object is served with.
+        """
+        await self.request("put_object", Key=key, Body=data, ContentType=content_type)
+
+    async def get(self, key: str) -> bytes:
+        """Load the content of an object.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The content.
+
+        Raises:
+            botocore.exceptions.ClientError: If there is no object with the key.
+        """
+        response = await self.request("get_object", Key=key)
+
+        return await anyio.to_thread.run_sync(response["Body"].read)
 
     async def delete_prefix(self, prefix: str) -> int:
         """Delete every object whose key starts with a prefix.

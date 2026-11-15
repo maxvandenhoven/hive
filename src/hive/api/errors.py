@@ -39,6 +39,10 @@ class ApiErrorCode(StrEnum):
     MOVE_PENDING = "move_pending"
     NO_PENDING_MOVE = "no_pending_move"
     SETUP_NOT_SUPPORTED = "setup_not_supported"
+    NOT_AT_TABLE = "not_at_table"
+    PHOTO_TOO_LARGE = "photo_too_large"
+    PHOTO_NOT_READABLE = "photo_not_readable"
+    VISION_UNAVAILABLE = "vision_unavailable"
 
 
 class ErrorResponse(BaseModel):
@@ -223,6 +227,78 @@ class PhotoNotFoundError(ApiError):
         """
         super().__init__(f"Photo `{photo_id}` is not a photo of the game.")
         self.photo_id = photo_id
+
+
+class PhotoMissingError(ApiError):
+    """There is no photo with the ID.
+
+    Attributes:
+        photo_id: The photo ID that was not found.
+    """
+
+    status_code = status.HTTP_404_NOT_FOUND
+    code = ApiErrorCode.PHOTO_NOT_FOUND
+    description = "Photo not found."
+
+    def __init__(self, photo_id: uuid.UUID) -> None:
+        """Create the error.
+
+        Args:
+            photo_id: The photo ID that was not found.
+        """
+        super().__init__(f"Photo `{photo_id}` not found.")
+        self.photo_id = photo_id
+
+
+class NotAtTableError(ApiError):
+    """Photos are only taken of games played on a physical board."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = ApiErrorCode.NOT_AT_TABLE
+    description = "The game is played on the screen, so it takes no photos."
+
+    def __init__(self, game_id: uuid.UUID) -> None:
+        """Create the error.
+
+        Args:
+            game_id: The game ID.
+        """
+        super().__init__(
+            f"Game `{game_id}` is played on the screen; photos are only taken of games "
+            "at the table."
+        )
+
+
+class PhotoTooLargeError(ApiError):
+    """The uploaded photo is larger than the service accepts."""
+
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+    code = ApiErrorCode.PHOTO_TOO_LARGE
+    description = "The photo is too large."
+
+    def __init__(self, max_bytes: int) -> None:
+        """Create the error.
+
+        Args:
+            max_bytes: The largest upload in bytes.
+        """
+        super().__init__(f"The photo is larger than {max_bytes / 1e6:.0f} MB.")
+
+
+class PhotoNotReadableError(ApiError):
+    """The uploaded file is not an image that can be decoded."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = ApiErrorCode.PHOTO_NOT_READABLE
+    description = "The upload is not an image."
+
+
+class VisionUnavailableError(ApiError):
+    """The service has no board reader, so it cannot read photos."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = ApiErrorCode.VISION_UNAVAILABLE
+    description = "No board reader is available."
 
 
 class CoordinateEmptyError(ApiError):

@@ -16,12 +16,15 @@ import { useBoardInteraction } from "@/components/board/useBoardInteraction";
 import { GameHeader } from "@/components/GameHeader";
 import { HandTray } from "@/components/HandTray";
 import { HintButton } from "@/components/HintButton";
+import { CameraCapture } from "@/components/CameraCapture";
 import { MoveList } from "@/components/MoveList";
+import { PhotoMatchPanel } from "@/components/PhotoMatchPanel";
 import { ReplayControls } from "@/components/ReplayControls";
 import { ThinkingPanel } from "@/components/ThinkingPanel";
 import { TurnPrompt } from "@/components/TurnPrompt";
 import { useAgentTurns, type AgentTurns } from "@/components/useAgentTurns";
 import { useHint, type Hint } from "@/components/useHint";
+import { usePhotoMoves, type PhotoMoves } from "@/components/usePhotoMoves";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,16 +56,21 @@ function undoPlies(game: GameDetail, turns: AgentTurns, plyCount: number): numbe
 }
 
 /**
- * The move to point out on the board: the agent's best move while it thinks, the
- * pending move to make on the table, or a hint that was asked for.
+ * The move to point out on the board: the agent's best move while it thinks, the move a
+ * photo shows, the pending move to make on the table, or a hint that was asked for.
  */
 function proposedMove(
   turns: AgentTurns,
   hint: Hint,
+  photos: PhotoMoves,
   position: GamePosition,
 ): Move | null | undefined {
   if (turns.state.type === "thinking") {
     return turns.state.candidate;
+  }
+
+  if (photos.proposedMove !== null) {
+    return photos.proposedMove;
   }
 
   if (turns.awaitingDone) {
@@ -88,7 +96,6 @@ function GameScreen({ game, position }: GameScreenProps) {
   const writing = playMove.isPending || undoMove.isPending;
   const turns = useAgentTurns({ game, position, idle: !writing });
   const hint = useHint({ game, position });
-  const busy = writing || turns.confirming;
   const [replayPly, setReplayPly] = useState<number | null>(null);
   // A replay past the last move, for example after an undo, shows the latest position.
   const shownPly =
@@ -99,6 +106,12 @@ function GameScreen({ game, position }: GameScreenProps) {
   const sideToMove = position.current_player;
   const active = game.status === "active" && position.result === null;
   const humanTurn = active && game[sideToMove].type === "human" && !turns.awaitingDone;
+  const photos = usePhotoMoves({
+    game,
+    position,
+    enabled: live && game.status === "active" && (humanTurn || turns.awaitingDone),
+  });
+  const busy = writing || turns.confirming || photos.busy;
   const canPlay = humanTurn && !busy && live;
 
   const play = (move: Move | null) => {
@@ -121,13 +134,23 @@ function GameScreen({ game, position }: GameScreenProps) {
   const board = useMemo(() => toBoardView(shown.board), [shown.board]);
   const liveBoard = useMemo(() => toBoardView(position.board), [position.board]);
   const lastMove = useMemo(() => toMoveView(shown.last_move?.move), [shown.last_move]);
-  const proposedFull = live ? proposedMove(turns, hint, position) : null;
+  const proposedFull = live ? proposedMove(turns, hint, photos, position) : null;
   const proposed = toMoveView(proposedFull);
   // A pending move is already in the game, so its piece is no longer in hand.
   const suggestedPiece =
     proposedFull != null && proposedFull.from === null && !turns.awaitingDone
       ? proposedFull.piece
       : null;
+  const camera = photos.available ? (
+    <CameraCapture
+      label="Photo"
+      variant={turns.awaitingDone ? "outline" : "default"}
+      size={turns.awaitingDone ? "lg" : "default"}
+      disabled={busy}
+      busy={photos.state.type === "reading"}
+      onCapture={photos.take}
+    />
+  ) : null;
   const prompt = describeTurnPrompt({
     game,
     position,
@@ -192,12 +215,14 @@ function GameScreen({ game, position }: GameScreenProps) {
           turns={turns}
           hint={hint}
           busy={busy}
+          camera={camera}
           onPass={pass}
           onUndo={undo}
           onLive={() => {
             setReplayPly(null);
           }}
         />
+        <PhotoMatchPanel photos={photos} />
         {renderTray(away)}
         <Card className="relative aspect-square max-h-[65dvh] w-full bg-board-surface py-0 lg:aspect-auto lg:h-[max(24rem,calc(100dvh-19rem))] lg:max-h-none">
           <Board

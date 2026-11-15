@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Response, status
 
-from hive.api.dependencies import DatabaseDependency, StoreDependency
+from hive.api.dependencies import DatabaseDependency, StoreDependency, VisionDependency
 from hive.api.schemas import HealthCheckResult, LivenessReport, ReadinessReport
 
 logger = logging.getLogger(__name__)
@@ -24,8 +24,8 @@ async def read_liveness() -> LivenessReport:
 
 @router.get(
     "/readyz",
-    description="Report whether the database and the object store are reachable. "
-    "Responds with 503 and the failing checks if either is not.",
+    description="Report whether the database and the object store are reachable and a "
+    "configured vision model is loaded. Responds with 503 and the failing checks if not.",
     responses={
         status.HTTP_503_SERVICE_UNAVAILABLE: {
             "model": ReadinessReport,
@@ -34,13 +34,17 @@ async def read_liveness() -> LivenessReport:
     },
 )
 async def read_readiness(
-    database: DatabaseDependency, store: StoreDependency, response: Response
+    database: DatabaseDependency,
+    store: StoreDependency,
+    vision: VisionDependency,
+    response: Response,
 ) -> ReadinessReport:
-    """Report whether the database and the object store are reachable.
+    """Report whether the database and store are reachable and the vision model loaded.
 
     Args:
         database: The database of the app.
         store: The object store of the app.
+        vision: The board reader of the app, checked only if a model is configured.
         response: The response, whose status code is set to 503 if a check failed.
 
     Returns:
@@ -57,6 +61,9 @@ async def read_readiness(
             results[name] = "failed"
         else:
             results[name] = "ok"
+
+    if vision.configured:
+        results["vision"] = "ok" if vision.reader is not None else "failed"
 
     report = ReadinessReport.from_checks(results)
 
